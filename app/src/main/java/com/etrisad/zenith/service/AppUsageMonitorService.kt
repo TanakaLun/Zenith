@@ -482,11 +482,11 @@ class AppUsageMonitorService : Service() {
                                 remaining > 3600000 -> 5000L
                                 remaining > 600000 -> 3000L
                                 remaining > 60000 -> 1500L
-                                else -> 800L
+                                else -> 600L
                             }
                         }
                     }
-                    else -> 1500L
+                    else -> 1200L
                 }
                 delay(delayTime)
             }
