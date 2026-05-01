@@ -63,6 +63,7 @@ class AppUsageMonitorService : Service() {
     
     private var isBedtimeActive = false
     private var isWindDownActive = false
+    private var isBedtimeBlockingActive = false
     private var lastDndFilter: Int? = null
     private var cachedBedtimeStartMinutes = -1
     private var cachedBedtimeEndMinutes = -1
@@ -71,6 +72,8 @@ class AppUsageMonitorService : Service() {
     private var lastCheckedDayTimestamp = 0L
     private var isScreenOn = true
     private var isPowerSaveMode = false
+
+    private val notificationManager by lazy { getSystemService(NotificationManager::class.java) }
 
     private var lastHUDUpdateTime = 0L
     private val HUD_UPDATE_INTERVAL = 1000L
@@ -287,8 +290,7 @@ class AppUsageMonitorService : Service() {
                 if (currentTime - lastCheckedDayTimestamp > 60000) {
                     currentPreferences?.let { updateBedtimeStatus(it) }
 
-                    reusableCalendar.timeInMillis = currentTime
-                    val currentDay = reusableCalendar.get(java.util.Calendar.DAY_OF_YEAR)
+                    val currentDay = java.util.Calendar.getInstance().apply { timeInMillis = currentTime }.get(Calendar.DAY_OF_YEAR)
                     if (lastCheckedDay != -1 && currentDay != lastCheckedDay) {
                         updateStreaks()
                         shieldRepository.resetAllRemainingTimes()
@@ -332,24 +334,6 @@ class AppUsageMonitorService : Service() {
                         launcherPackages = launchers.map { it.activityInfo.packageName }.toSet()
                         lastLauncherRefreshTime = currentTime
                     } catch (_: Exception) {}
-                }
-
-                if (currentTime - lastCheckedDayTimestamp > 60000) {
-                    reusableCalendar.timeInMillis = currentTime
-                    val currentDay = reusableCalendar.get(java.util.Calendar.DAY_OF_YEAR)
-                    if (lastCheckedDay != -1 && currentDay != lastCheckedDay) {
-                        updateStreaks()
-                        shieldRepository.resetAllRemainingTimes()
-                        notifiedGoals.clear()
-                        dailyUsageCache.clear()
-                        usageStatsCache = null
-                        lastUsageCacheTime = 0L
-                        lastUsageFetchTime = 0L
-                        cachedTotalUsage = 0L
-                        currentShieldCache = null
-                    }
-                    lastCheckedDay = currentDay
-                    lastCheckedDayTimestamp = currentTime
                 }
 
                 if (currentApp != null && currentApp != packageName) {
@@ -478,7 +462,8 @@ class AppUsageMonitorService : Service() {
                 }
 
                 val delayTime = when {
-                    isPowerSaveMode -> 2000L
+                    isPowerSaveMode -> 2500L
+                    InterceptOverlayManager.isShowing -> 3500L
                     currentShieldCache != null -> {
                         val shield = currentShieldCache!!
                         val limitMillis = shield.timeLimitMinutes * 60 * 1000L
@@ -487,19 +472,19 @@ class AppUsageMonitorService : Service() {
                         if (shield.type == FocusType.GOAL) {
                             when {
                                 remaining < 60000 -> 600L
-                                remaining < 300000 -> 1000L
-                                else -> 1500L
+                                remaining < 300000 -> 1200L
+                                else -> 1800L
                             }
                         } else {
                             when {
                                 remaining > 3600000 -> 5000L
                                 remaining > 600000 -> 3000L
                                 remaining > 60000 -> 1500L
-                                else -> 600L
+                                else -> 800L
                             }
                         }
                     }
-                    else -> 1200L
+                    else -> 1500L
                 }
                 delay(delayTime)
             }
@@ -971,23 +956,21 @@ class AppUsageMonitorService : Service() {
             if (isBedtimeActive || isWindDownActive) {
                 isBedtimeActive = false
                 isWindDownActive = false
+                isBedtimeBlockingActive = false
                 updateDndAndWindDown(false, false)
             }
             return
         }
 
-        val currentDay: Int
-        val currentMinutes: Int
-        synchronized(reusableCalendar) {
-            reusableCalendar.timeInMillis = System.currentTimeMillis()
-            currentDay = reusableCalendar.get(Calendar.DAY_OF_WEEK)
-            currentMinutes = reusableCalendar.get(Calendar.HOUR_OF_DAY) * 60 + reusableCalendar.get(Calendar.MINUTE)
-        }
+        val calendar = java.util.Calendar.getInstance()
+        val currentDay = calendar.get(Calendar.DAY_OF_WEEK)
+        val currentMinutes = calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE)
         
         if (currentDay !in prefs.bedtimeDays) {
             if (isBedtimeActive || isWindDownActive) {
                 isBedtimeActive = false
                 isWindDownActive = false
+                isBedtimeBlockingActive = false
                 updateDndAndWindDown(false, false)
             }
             return
@@ -1021,6 +1004,7 @@ class AppUsageMonitorService : Service() {
         if (active != isBedtimeActive || windDownActive != isWindDownActive) {
             isBedtimeActive = active
             isWindDownActive = windDownActive
+            isBedtimeBlockingActive = active || (windDownActive && prefs.bedtimeWindDownEnabled)
 
             updateDndAndWindDown(
                 active && prefs.bedtimeDndEnabled,
@@ -1030,21 +1014,16 @@ class AppUsageMonitorService : Service() {
     }
 
     private fun updateDndAndWindDown(dnd: Boolean, windDown: Boolean) {
-        val nm = getSystemService(NotificationManager::class.java)
-        if (nm.isNotificationPolicyAccessGranted) {
+        if (notificationManager.isNotificationPolicyAccessGranted) {
             try {
                 val targetFilter = if (dnd) NotificationManager.INTERRUPTION_FILTER_PRIORITY else NotificationManager.INTERRUPTION_FILTER_ALL
                 if (lastDndFilter != targetFilter) {
-                    nm.setInterruptionFilter(targetFilter)
+                    notificationManager.setInterruptionFilter(targetFilter)
                     lastDndFilter = targetFilter
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
-        }
-
-        if (windDown) {
-            // Future implementation for Wind Down specific effects (e.g. grayscale)
         }
     }
 
@@ -1166,10 +1145,7 @@ class AppUsageMonitorService : Service() {
     private fun shouldBypassBlocking(packageName: String): Boolean {
         if (packageName == this.packageName) return true
 
-        val prefs = currentPreferences
-        val isBedtimeOrWindDown = isBedtimeActive || (isWindDownActive && prefs?.bedtimeWindDownEnabled == true)
-        
-        if (isBedtimeOrWindDown) {
+        if (isBedtimeBlockingActive) {
             if (packageName in bedtimeWhitelistedPackages) return true
         } else {
             if (packageName in whitelistedPackages) return true
