@@ -171,7 +171,7 @@ fun InterceptOverlayContent(
     val autoKickProgress = remember { Animatable(0f) }
     var isEmergencyHolding by remember { mutableStateOf(false) }
 
-    LaunchedEffect(isBlocked, isEmergencyHolding) {
+    LaunchedEffect(isBlocked, isDelaying, isEmergencyHolding, isEmergencyUnlocked) {
         if (isBlocked) {
             if (!isEmergencyHolding) {
                 val remainingProgress = 1f - autoKickProgress.value
@@ -189,6 +189,18 @@ fun InterceptOverlayContent(
                 }
             } else {
                 autoKickProgress.stop()
+            }
+        } else if (!isDelaying && (shield?.type == FocusType.SHIELD || shield == null)) {
+            autoKickProgress.snapTo(0f)
+            delay(10000)
+            autoKickProgress.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = 5000, easing = LinearEasing)
+            )
+            if (autoKickProgress.value >= 1f) {
+                showContent = false
+                delay(400)
+                onCloseApp()
             }
         } else {
             autoKickProgress.snapTo(0f)
@@ -1051,7 +1063,7 @@ fun ShieldLandscapeContent(
                 Spacer(modifier = Modifier.weight(1f))
                 DelayInProgressSection(randomMessage, delayProgressAnimatable, delayDurationSeconds)
                 Spacer(modifier = Modifier.weight(1f))
-                CloseAppTextButton(onCloseApp, 0f)
+                CloseAppTextButton(onCloseApp, autoKickProgress)
             }
         } else {
             Column(
@@ -1068,7 +1080,7 @@ fun ShieldLandscapeContent(
                 Spacer(modifier = Modifier.height(12.dp))
                 DurationButtonsGrid(if (isEmergencyUnlocked) null else remainingMinutes, onAllowUse)
                 Spacer(modifier = Modifier.weight(1f))
-                CloseAppTextButton(onCloseApp, 0f)
+                CloseAppTextButton(onCloseApp, autoKickProgress)
             }
         }
     }
@@ -1340,6 +1352,9 @@ fun ScheduleOverlayContent(
 ) {
     var showContent by remember { mutableStateOf(false) }
     var isEmergencyUnlocked by remember { mutableStateOf(false) }
+    val autoKickProgress = remember { Animatable(0f) }
+    var isEmergencyHolding by remember { mutableStateOf(false) }
+
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
@@ -1360,6 +1375,40 @@ fun ScheduleOverlayContent(
 
     LaunchedEffect(Unit) {
         showContent = true
+    }
+
+    LaunchedEffect(isEmergencyUnlocked, isEmergencyHolding) {
+        if (!isEmergencyUnlocked) {
+            if (!isEmergencyHolding) {
+                val remainingProgress = 1f - autoKickProgress.value
+                val remainingTime = (remainingProgress * 5000).toInt()
+                if (remainingTime > 0) {
+                    autoKickProgress.animateTo(
+                        targetValue = 1f,
+                        animationSpec = tween(durationMillis = remainingTime, easing = LinearEasing)
+                    )
+                }
+                if (autoKickProgress.value >= 1f) {
+                    showContent = false
+                    delay(400)
+                    onCloseApp()
+                }
+            } else {
+                autoKickProgress.stop()
+            }
+        } else {
+            autoKickProgress.snapTo(0f)
+            delay(10000)
+            autoKickProgress.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = 5000, easing = LinearEasing)
+            )
+            if (autoKickProgress.value >= 1f) {
+                showContent = false
+                delay(400)
+                onCloseApp()
+            }
+        }
     }
 
     val progress by produceState(initialValue = 0f) {
@@ -1446,6 +1495,8 @@ fun ScheduleOverlayContent(
                         progress = progress,
                         totalGlobalUsageToday = totalGlobalUsageToday,
                         isEmergencyUnlocked = isEmergencyUnlocked,
+                        autoKickProgress = autoKickProgress.value,
+                        onEmergencyHoldingChange = { isEmergencyHolding = it },
                         onEmergencyClick = { isEmergencyUnlocked = true },
                         onAllowUse = { minutes ->
                             scope.launch {
@@ -1470,6 +1521,8 @@ fun ScheduleOverlayContent(
                         progress = progress,
                         totalGlobalUsageToday = totalGlobalUsageToday,
                         isEmergencyUnlocked = isEmergencyUnlocked,
+                        autoKickProgress = autoKickProgress.value,
+                        onEmergencyHoldingChange = { isEmergencyHolding = it },
                         onEmergencyClick = { isEmergencyUnlocked = true },
                         onAllowUse = { minutes ->
                             scope.launch {
@@ -1501,6 +1554,8 @@ fun PortraitScheduleLayout(
     progress: Float,
     totalGlobalUsageToday: Long,
     isEmergencyUnlocked: Boolean,
+    autoKickProgress: Float = 0f,
+    onEmergencyHoldingChange: (Boolean) -> Unit = {},
     onEmergencyClick: () -> Unit,
     onAllowUse: (Int) -> Unit,
     onCloseApp: () -> Unit
@@ -1625,7 +1680,7 @@ fun PortraitScheduleLayout(
 
             if (!isEmergencyUnlocked) {
                 if (schedule.emergencyUseCount > 0) {
-                    EmergencyButton(onEmergencyUse = onEmergencyClick)
+                    EmergencyButton(onEmergencyUse = onEmergencyClick, onHoldingChange = onEmergencyHoldingChange)
                     Spacer(modifier = Modifier.height(20.dp))
                 }
             } else {
@@ -1644,7 +1699,7 @@ fun PortraitScheduleLayout(
                 }
             }
 
-            CloseAppTextButton(onCloseApp)
+            CloseAppTextButton(onCloseApp, autoKickProgress)
         }
     }
 }
@@ -1658,6 +1713,8 @@ fun LandscapeScheduleLayout(
     progress: Float,
     totalGlobalUsageToday: Long,
     isEmergencyUnlocked: Boolean,
+    autoKickProgress: Float = 0f,
+    onEmergencyHoldingChange: (Boolean) -> Unit = {},
     onEmergencyClick: () -> Unit,
     onAllowUse: (Int) -> Unit,
     onCloseApp: () -> Unit
@@ -1800,7 +1857,7 @@ fun LandscapeScheduleLayout(
                     )
                     if (schedule.emergencyUseCount > 0) {
                         Spacer(modifier = Modifier.height(16.dp))
-                        EmergencyButton(onEmergencyUse = onEmergencyClick)
+                        EmergencyButton(onEmergencyUse = onEmergencyClick, onHoldingChange = onEmergencyHoldingChange)
                     }
                 } else {
                     Text(
@@ -1814,7 +1871,7 @@ fun LandscapeScheduleLayout(
                 }
                 Spacer(modifier = Modifier.weight(1f))
 
-                CloseAppTextButton(onCloseApp)
+                CloseAppTextButton(onCloseApp, autoKickProgress)
             }
         }
     }
