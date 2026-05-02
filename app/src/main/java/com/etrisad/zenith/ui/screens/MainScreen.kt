@@ -81,6 +81,7 @@ fun MainScreen(
     val preferences by userPreferencesRepository.userPreferencesFlow.collectAsState(
         initial = UserPreferences()
     )
+    val homeUiState by homeViewModel.uiState.collectAsState()
 
     val useNavigationRail = windowSizeClass.widthSizeClass != WindowWidthSizeClass.Compact
 
@@ -299,6 +300,8 @@ fun MainScreen(
             if (showUserSheet) {
                 UserBottomSheet(
                     userName = preferences.userName,
+                    currentStreak = homeUiState.globalCurrentStreak,
+                    bestStreak = homeUiState.globalBestStreak,
                     repository = userPreferencesRepository,
                     onDismissRequest = { showUserSheet = false }
                 )

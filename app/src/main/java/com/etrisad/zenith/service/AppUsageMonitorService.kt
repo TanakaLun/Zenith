@@ -794,7 +794,9 @@ class AppUsageMonitorService : Service() {
 
     private suspend fun updateStreaks() {
         val shields = shieldRepository.allShields.first()
-        if (shields.isEmpty()) return
+        val prefs = preferencesRepository.userPreferencesFlow.first()
+        
+        if (shields.isEmpty() && prefs.screenTimeTargetMinutes <= 0) return
 
         val currentTime = System.currentTimeMillis()
         val (startTime, endTime, todayYear, todayDayOfYear) = synchronized(reusableCalendar) {
@@ -819,6 +821,33 @@ class AppUsageMonitorService : Service() {
         }
 
         val usageMap = usageStatsManager.queryAndAggregateUsageStats(startTime, endTime)
+        
+        // Global Streak Update
+        val isGlobalAlreadyUpdated = synchronized(reusableCalendar) {
+            reusableCalendar.timeInMillis = prefs.globalLastStreakUpdateTimestamp
+            reusableCalendar.get(Calendar.YEAR).toLong() == todayYear &&
+                    reusableCalendar.get(Calendar.DAY_OF_YEAR).toLong() == todayDayOfYear
+        }
+
+        if (!isGlobalAlreadyUpdated && prefs.screenTimeTargetMinutes > 0) {
+            var totalUsageYesterday = 0L
+            val excludePackages = launcherPackages + packageName
+            
+            usageMap.forEach { (pkg, stat) ->
+                if (pkg !in excludePackages) {
+                    totalUsageYesterday += stat.totalTimeVisible.coerceAtLeast(stat.totalTimeInForeground)
+                }
+            }
+
+            val targetMillis = prefs.screenTimeTargetMinutes * 60 * 1000L
+            if (totalUsageYesterday <= targetMillis) {
+                val newStreak = prefs.globalCurrentStreak + 1
+                val newBest = maxOf(prefs.globalBestStreak, newStreak)
+                preferencesRepository.updateGlobalStreak(newStreak, newBest, currentTime)
+            } else {
+                preferencesRepository.updateGlobalStreak(0, prefs.globalBestStreak, currentTime)
+            }
+        }
 
         shields.forEach { shield ->
             val isAlreadyUpdatedToday = synchronized(reusableCalendar) {

@@ -233,6 +233,7 @@ fun SettingsScreen(
 
     if (showRestoreConfirmSheet && restoreMetadata != null && pendingRestoreUri != null) {
         RestoreConfirmationBottomSheet(
+            preferences = preferences,
             metadata = restoreMetadata!!,
             onDismiss = {
                 showRestoreConfirmSheet = false
@@ -670,6 +671,7 @@ fun SettingsScreenContent(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RestoreConfirmationBottomSheet(
+    preferences: UserPreferences,
     metadata: BackupUtils.BackupMetadata,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
@@ -723,7 +725,9 @@ fun RestoreConfirmationBottomSheet(
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                    containerColor = if (preferences.expressiveColors)
+                        MaterialTheme.colorScheme.surfaceContainer
+                    else MaterialTheme.colorScheme.surfaceContainerHigh
                 ),
                 shape = RoundedCornerShape(20.dp)
             ) {

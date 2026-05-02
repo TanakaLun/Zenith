@@ -55,7 +55,9 @@ data class HomeUiState(
     val activeShields: List<ShieldEntity> = emptyList(),
     val activeGoals: List<ShieldEntity> = emptyList(),
     val shieldSortType: ShieldSortType = ShieldSortType.ALPHABETICAL,
-    val goalSortType: ShieldSortType = ShieldSortType.ALPHABETICAL
+    val goalSortType: ShieldSortType = ShieldSortType.ALPHABETICAL,
+    val globalCurrentStreak: Int = 0,
+    val globalBestStreak: Int = 0
 )
 
 class HomeViewModel(
@@ -77,6 +79,8 @@ class HomeViewModel(
     private var globalHistory: List<DailyUsageEntity> = emptyList()
     private var globalFallbackMap: Map<String, Long> = emptyMap()
     private var detailFallbackMap: Map<String, Long> = emptyMap()
+    private var currentTargetMinutes: Int = 0
+    private var prefGlobalBestStreak: Int = 0
 
     init {
         viewModelScope.launch {
@@ -100,9 +104,17 @@ class HomeViewModel(
         }
 
         viewModelScope.launch {
-            shieldRepository.getLastNDaysGlobalUsage(21).collect { history ->
+            shieldRepository.getLastNDaysGlobalUsage(60).collect { history ->
                 globalHistory = history
                 updateGlobalFallback()
+                refreshUsageStats()
+            }
+        }
+
+        viewModelScope.launch {
+            userPreferencesRepository.userPreferencesFlow.collect { prefs ->
+                currentTargetMinutes = prefs.screenTimeTargetMinutes
+                prefGlobalBestStreak = prefs.globalBestStreak
                 refreshUsageStats()
             }
         }
@@ -133,7 +145,7 @@ class HomeViewModel(
             ?.activityInfo?.packageName
         val excludePackages = setOfNotNull(context.packageName, launcherPackage)
 
-        val fallbackStart = getMidnight(20)
+        val fallbackStart = getMidnight(30)
         val now = System.currentTimeMillis()
         
         val stats = usm.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, fallbackStart, now)
@@ -156,7 +168,7 @@ class HomeViewModel(
 
     private fun updatePackageFallback(packageName: String) {
         val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-        val fallbackStart = getMidnight(20)
+        val fallbackStart = getMidnight(30)
         val now = System.currentTimeMillis()
         
         val stats = usm.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, fallbackStart, now)
@@ -251,6 +263,52 @@ class HomeViewModel(
             shield.copy(remainingTimeMillis = (limitMillis - usage).coerceAtLeast(0L))
         }
 
+        val targetMillis = currentTargetMinutes * 60 * 1000L
+        var liveStreak = 0
+        var bestStreakFromHistory = 0
+
+        if (targetMillis > 0) {
+            // Calculate current live streak including today
+            if (totalToday <= targetMillis) {
+                liveStreak = 1
+                val cal = Calendar.getInstance()
+                for (i in 1..60) {
+                    cal.time = Date()
+                    cal.add(Calendar.DAY_OF_YEAR, -i)
+                    val dStr = dateFormat.format(cal.time)
+                    
+                    // Try to get from database first, then fallback to usage stats query
+                    val usage = globalHistory.find { it.date == dStr }?.usageTimeMillis ?: globalFallbackMap[dStr]
+                    
+                    if (usage != null && usage <= targetMillis) {
+                        liveStreak++
+                    } else if (usage != null) {
+                        // User failed target on this day
+                        break
+                    } else {
+                        // No data for this day, assume streak ended or data missing
+                        break
+                    }
+                }
+            }
+
+            // Calculate best streak from available history window
+            var currentTempStreak = 0
+            for (i in 60 downTo 0) {
+                val dStart = getMidnight(i)
+                val dStr = dateFormat.format(Date(dStart))
+                val usage = if (i == 0) totalToday else (globalHistory.find { it.date == dStr }?.usageTimeMillis ?: globalFallbackMap[dStr])
+                
+                if (usage != null && usage <= targetMillis) {
+                    currentTempStreak++
+                } else {
+                    bestStreakFromHistory = maxOf(bestStreakFromHistory, currentTempStreak)
+                    currentTempStreak = 0
+                }
+            }
+            bestStreakFromHistory = maxOf(bestStreakFromHistory, currentTempStreak)
+        }
+
         _uiState.update { it.copy(
             totalScreenTime      = totalToday,
             yesterdayScreenTime  = totalYesterday,
@@ -259,7 +317,9 @@ class HomeViewModel(
             topApps              = topApps,
             allAppsUsage         = allAppsUsage,
             activeShields = sortShields(liveShields.filter { it.type == com.etrisad.zenith.data.local.entity.FocusType.SHIELD }, it.shieldSortType),
-            activeGoals   = sortShields(liveShields.filter { it.type == com.etrisad.zenith.data.local.entity.FocusType.GOAL }, it.goalSortType)
+            activeGoals   = sortShields(liveShields.filter { it.type == com.etrisad.zenith.data.local.entity.FocusType.GOAL }, it.goalSortType),
+            globalCurrentStreak = liveStreak,
+            globalBestStreak = maxOf(prefGlobalBestStreak, bestStreakFromHistory)
         ) }
 
         viewModelScope.launch {

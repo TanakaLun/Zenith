@@ -41,6 +41,9 @@ class UserPreferencesRepository(private val context: Context) {
         val WHITELISTED_PACKAGES = stringPreferencesKey("whitelisted_packages")
         val LAST_RESET_DATE = stringPreferencesKey("last_reset_date")
         val LAST_STREAK_CHECK_DATE = stringPreferencesKey("last_streak_check_date")
+        val GLOBAL_CURRENT_STREAK = intPreferencesKey("global_current_streak")
+        val GLOBAL_BEST_STREAK = intPreferencesKey("global_best_streak")
+        val GLOBAL_LAST_STREAK_UPDATE_TIMESTAMP = longPreferencesKey("global_last_streak_update_timestamp")
         val AUTO_BACKUP_ENABLED = booleanPreferencesKey("auto_backup_enabled")
         val BACKUP_DIRECTORY_URI = stringPreferencesKey("backup_directory_uri")
         val BACKUP_INTERVAL_HOURS = intPreferencesKey("backup_interval_hours")
@@ -89,6 +92,9 @@ class UserPreferencesRepository(private val context: Context) {
             val whitelistedPackages = preferences[PreferencesKeys.WHITELISTED_PACKAGES]?.split(",")?.filter { it.isNotEmpty() }?.toSet() ?: emptySet()
             val lastResetDate = preferences[PreferencesKeys.LAST_RESET_DATE] ?: ""
             val lastStreakCheckDate = preferences[PreferencesKeys.LAST_STREAK_CHECK_DATE] ?: ""
+            val globalCurrentStreak = preferences[PreferencesKeys.GLOBAL_CURRENT_STREAK] ?: 0
+            val globalBestStreak = preferences[PreferencesKeys.GLOBAL_BEST_STREAK] ?: 0
+            val globalLastStreakUpdateTimestamp = preferences[PreferencesKeys.GLOBAL_LAST_STREAK_UPDATE_TIMESTAMP] ?: 0L
             val autoBackupEnabled = preferences[PreferencesKeys.AUTO_BACKUP_ENABLED] ?: false
             val backupDirectoryUri = preferences[PreferencesKeys.BACKUP_DIRECTORY_URI] ?: ""
             val backupIntervalHours = preferences[PreferencesKeys.BACKUP_INTERVAL_HOURS] ?: 3
@@ -123,6 +129,9 @@ class UserPreferencesRepository(private val context: Context) {
                 whitelistedPackages = whitelistedPackages,
                 lastResetDate = lastResetDate,
                 lastStreakCheckDate = lastStreakCheckDate,
+                globalCurrentStreak = globalCurrentStreak,
+                globalBestStreak = globalBestStreak,
+                globalLastStreakUpdateTimestamp = globalLastStreakUpdateTimestamp,
                 autoBackupEnabled = autoBackupEnabled,
                 backupDirectoryUri = backupDirectoryUri,
                 backupIntervalHours = backupIntervalHours,
@@ -225,6 +234,14 @@ class UserPreferencesRepository(private val context: Context) {
     suspend fun setLastStreakCheckDate(date: String) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.LAST_STREAK_CHECK_DATE] = date
+        }
+    }
+
+    suspend fun updateGlobalStreak(current: Int, best: Int, timestamp: Long) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.GLOBAL_CURRENT_STREAK] = current
+            preferences[PreferencesKeys.GLOBAL_BEST_STREAK] = best
+            preferences[PreferencesKeys.GLOBAL_LAST_STREAK_UPDATE_TIMESTAMP] = timestamp
         }
     }
 
@@ -340,6 +357,9 @@ data class UserPreferences(
     val whitelistedPackages: Set<String> = emptySet(),
     val lastResetDate: String = "",
     val lastStreakCheckDate: String = "",
+    val globalCurrentStreak: Int = 0,
+    val globalBestStreak: Int = 0,
+    val globalLastStreakUpdateTimestamp: Long = 0L,
     val autoBackupEnabled: Boolean = false,
     val backupDirectoryUri: String = "",
     val backupIntervalHours: Int = 3,
