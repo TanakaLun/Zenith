@@ -63,11 +63,10 @@ fun AppDetailScreen(
         viewModel.loadAppDetail(packageName)
     }
 
-    DisposableEffect(packageName) {
-        onDispose {
-            viewModel.clearAppDetail(packageName)
-        }
-    }
+    // DisposableEffect dihapus karena clearAppDetail(packageName) di ViewModel 
+    // sekarang tidak lagi mengosongkan UI secara paksa, dan pembersihan state 
+    // sudah ditangani oleh loadAppDetail saat berpindah package.
+
 
     val shield = uiState.shieldEntity
     val isFocusActive = shield != null

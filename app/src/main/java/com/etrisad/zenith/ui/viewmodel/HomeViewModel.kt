@@ -437,9 +437,11 @@ class HomeViewModel(
     }
 
     private fun refreshCurrentAppDetailUsage() {
-        val uiState = _appDetailUiState.value
-        val packageName = uiState.packageName
-        if (packageName.isEmpty()) return
+        val currentState = _appDetailUiState.value
+        val packageName = currentState.packageName
+        
+        // Jangan update jika packageName kosong atau data dasar (appName) belum dimuat
+        if (packageName.isEmpty() || currentState.appName == packageName) return
 
         viewModelScope.launch {
             val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
@@ -448,7 +450,7 @@ class HomeViewModel(
             val currentTodayUsage = usm.queryAndAggregateUsageStats(todayStart, currentNow)
                 .getUsageTime(packageName)
 
-            val yesterdayUsage = uiState.yesterdayUsage
+            val yesterdayUsage = currentState.yesterdayUsage
             val percentageChange = when {
                 yesterdayUsage > 0 -> ((currentTodayUsage - yesterdayUsage).toFloat() / yesterdayUsage) * 100
                 currentTodayUsage > 0 -> 100f
@@ -463,9 +465,9 @@ class HomeViewModel(
     }
 
     fun clearAppDetail(packageName: String) {
+        // Hanya hentikan job, jangan reset state ke kosong agar tidak menyebabkan data hilang tiba-tiba di UI
         if (_appDetailUiState.value.packageName == packageName) {
             appDetailJob?.cancel()
-            _appDetailUiState.value = AppDetailUiState()
         }
     }
 
