@@ -222,6 +222,11 @@ fun SettingsScreen(
             coroutineScope.launch {
                 preferencesRepository.setTotalUsagePillEnabled(enabled)
             }
+        },
+        onEarlyKickEnabledChange = { enabled ->
+            coroutineScope.launch {
+                preferencesRepository.setEarlyKickEnabled(enabled)
+            }
         }
     )
 
@@ -272,7 +277,8 @@ fun SettingsScreenContent(
     onSetBackupInterval: (Int) -> Unit,
     onFloatingTabBarEnabledChange: (Boolean) -> Unit,
     onExpressiveColorsChange: (Boolean) -> Unit,
-    onTotalUsagePillEnabledChange: (Boolean) -> Unit
+    onTotalUsagePillEnabledChange: (Boolean) -> Unit,
+    onEarlyKickEnabledChange: (Boolean) -> Unit
 ) {
     var showTargetSheet by remember { mutableStateOf(false) }
     var showEmergencyRechargeSheet by remember { mutableStateOf(false) }
@@ -399,6 +405,20 @@ fun SettingsScreenContent(
                     icon = Icons.Outlined.Timer,
                     shape = if (preferences.sessionUsageOverlayEnabled)
                         RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
+                    else RoundedCornerShape(8.dp)
+                )
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(4.dp))
+                SettingsToggle(
+                    title = "Early Kick",
+                    description = "Optionally eject from apps 2 minutes before your time limit expires",
+                    checked = preferences.earlyKickEnabled,
+                    onCheckedChange = onEarlyKickEnabledChange,
+                    icon = Icons.Outlined.ExitToApp,
+                    shape = if (preferences.sessionUsageOverlayEnabled)
+                        RoundedCornerShape(8.dp)
                     else RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
                 )
             }

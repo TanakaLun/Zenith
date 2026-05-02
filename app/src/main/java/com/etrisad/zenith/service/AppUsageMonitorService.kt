@@ -14,6 +14,7 @@ import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
 import android.os.IBinder
 import android.util.Log
+import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import com.etrisad.zenith.data.local.entity.FocusType
 import com.etrisad.zenith.data.local.entity.ScheduleMode
@@ -41,6 +42,7 @@ class AppUsageMonitorService : Service() {
     private lateinit var preferencesRepository: UserPreferencesRepository
     private lateinit var overlayManager: InterceptOverlayManager
     private lateinit var sessionUsageOverlayManager: SessionUsageOverlayManager
+    private val earlyKickManager = EarlyKickManager()
     private val usageStatsManager by lazy { getSystemService(USAGE_STATS_SERVICE) as UsageStatsManager }
     private val powerManager by lazy { getSystemService(POWER_SERVICE) as android.os.PowerManager }
     private val reusableEvent = UsageEvents.Event()
@@ -298,6 +300,7 @@ class AppUsageMonitorService : Service() {
                             updateStreaks()
                             shieldRepository.resetAllRemainingTimes()
                             notifiedGoals.clear()
+                            earlyKickManager.reset()
                             dailyUsageCache.clear()
                             usageStatsCache = null
                             lastUsageCacheTime = 0L
@@ -372,6 +375,22 @@ class AppUsageMonitorService : Service() {
 
                         val allowedUntil = allowedApps[currentApp] ?: 0L
                         updateUsageTime(currentApp)
+
+                        val shield = currentShieldCache
+                        if (shield != null && shield.type != FocusType.GOAL && !isPaused(shield)) {
+                            val limitMillis = shield.timeLimitMinutes * 60 * 1000L
+                            val actualRemaining = (limitMillis - cachedTotalUsage).coerceAtLeast(0L)
+                            val prefs = currentPreferences
+                            if (earlyKickManager.shouldKick(currentApp, actualRemaining, prefs?.earlyKickEnabled ?: false)) {
+                                serviceScope.launch(Dispatchers.Main) {
+                                    Toast.makeText(this@AppUsageMonitorService, "Early Kick: 2 minutes remaining", Toast.LENGTH_LONG).show()
+                                }
+                                goToHomeScreen()
+                                lastForegroundApp = currentApp
+                                delay(1500)
+                                continue
+                            }
+                        }
 
                         val shieldForPauseCheck = currentShieldCache
                         val isAppPaused = shieldForPauseCheck != null && isPaused(shieldForPauseCheck)
