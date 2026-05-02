@@ -403,16 +403,22 @@ fun SettingsScreenContent(
                 )
             }
 
-            if (preferences.sessionUsageOverlayEnabled) {
-                item {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    HUDAppearanceSettings(
-                        size = preferences.sessionUsageOverlaySize,
-                        opacity = preferences.sessionUsageOverlayOpacity,
-                        onSizeChange = onSessionUsageOverlaySizeChange,
-                        onOpacityChange = onSessionUsageOverlayOpacityChange,
-                        shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
-                    )
+            item {
+                AnimatedVisibility(
+                    visible = preferences.sessionUsageOverlayEnabled,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
+                    Column {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        HUDAppearanceSettings(
+                            size = preferences.sessionUsageOverlaySize,
+                            opacity = preferences.sessionUsageOverlayOpacity,
+                            onSizeChange = onSessionUsageOverlaySizeChange,
+                            onOpacityChange = onSessionUsageOverlayOpacityChange,
+                            shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
+                        )
+                    }
                 }
             }
 
@@ -434,15 +440,22 @@ fun SettingsScreenContent(
                 )
             }
 
-            if (preferences.autoBackupEnabled) {
-                item {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    AutoBackupSettings(
-                        directoryUri = preferences.backupDirectoryUri,
-                        intervalHours = preferences.backupIntervalHours,
-                        onPickDirectory = onPickBackupDirectory,
-                        onSetInterval = onSetBackupInterval
-                    )
+            item {
+                AnimatedVisibility(
+                    visible = preferences.autoBackupEnabled,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
+                    Column {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        AutoBackupSettings(
+                            directoryUri = preferences.backupDirectoryUri,
+                            intervalHours = preferences.backupIntervalHours,
+                            onPickDirectory = onPickBackupDirectory,
+                            onSetInterval = onSetBackupInterval,
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                    }
                 }
             }
 
@@ -1403,11 +1416,12 @@ fun AutoBackupSettings(
     directoryUri: String,
     intervalHours: Int,
     onPickDirectory: () -> Unit,
-    onSetInterval: (Int) -> Unit
+    onSetInterval: (Int) -> Unit,
+    shape: Shape = RoundedCornerShape(8.dp)
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp),
+        shape = shape,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow
         )
