@@ -957,8 +957,12 @@ fun TopAppsSection(
                                 )
                             )
                         }
-                        Spacer(modifier = Modifier.height(2.dp))
+                        if (index < topApps.size - 1) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                        }
                     }
+
+                    Spacer(modifier = Modifier.height(4.dp))
 
                     val seeFullListShape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
                     Card(
@@ -1112,7 +1116,7 @@ fun LazyListScope.shieldList(
         Column(modifier = Modifier.animateItem()) {
             ShieldItem(shield = shield, shape = shape, formatDuration = formatDuration, onAppClick = onAppClick)
             if (index < shields.size - 1) {
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(4.dp))
             }
         }
     }

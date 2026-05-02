@@ -157,7 +157,7 @@ fun AppDetailScreen(
                     Box(modifier = Modifier.fillMaxWidth().height(250.dp))
                 }
                 if (isFocusActive) {
-                    Spacer(modifier = Modifier.height(2.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                 } else {
                     Spacer(modifier = Modifier.height(4.dp))
                 }
@@ -198,7 +198,7 @@ fun AppDetailScreen(
                                 }
                             }
                             
-                            Spacer(modifier = Modifier.height(2.dp))
+                            Spacer(modifier = Modifier.height(4.dp))
 
                             DeleteShieldCard(
                                 onDelete = {

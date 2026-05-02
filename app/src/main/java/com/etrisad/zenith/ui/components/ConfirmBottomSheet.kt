@@ -432,7 +432,7 @@ fun PhaseFourSelection(onConfirm: (Int?) -> Unit) {
                 }
             }
             if (index < options.size - 1) {
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(4.dp))
             }
         }
     }

@@ -326,7 +326,7 @@ fun FocusScreenContent(
                         )
                     }
                     if (index < uiState.activeGoals.size - 1) {
-                        Spacer(modifier = Modifier.height(2.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
                     }
                 }
             }
@@ -387,7 +387,7 @@ fun FocusScreenContent(
                         )
                     }
                     if (index < uiState.activeShields.size - 1) {
-                        Spacer(modifier = Modifier.height(2.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
                     }
                 }
             }
@@ -449,7 +449,7 @@ fun FocusScreenContent(
                         )
                     }
                     if (index < uiState.activeSchedules.size - 1) {
-                        Spacer(modifier = Modifier.height(2.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
                     }
                 }
             }
@@ -1619,7 +1619,7 @@ fun AppPickerBottomSheet(
                                         isTopApp = true
                                     )
                                     if (index < uiState.topApps.size - 1) {
-                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Spacer(modifier = Modifier.height(4.dp))
                                     }
                                 }
                             }
@@ -1676,7 +1676,7 @@ fun AppPickerBottomSheet(
                                         isTopApp = false
                                     )
                                     if (index < uiState.installedApps.size - 1) {
-                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Spacer(modifier = Modifier.height(4.dp))
                                     }
                                 }
                             }
@@ -2016,7 +2016,7 @@ fun FocusSettingsBottomSheet(
                         )
                     )
 
-                    Spacer(modifier = Modifier.height(2.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
                     SettingsToggle(
                         title = "Strict Mode",
@@ -2027,7 +2027,7 @@ fun FocusSettingsBottomSheet(
                         shape = RoundedCornerShape(2.dp)
                     )
 
-                    Spacer(modifier = Modifier.height(2.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
                     SettingsToggle(
                         title = "Auto Quit",
@@ -2038,7 +2038,7 @@ fun FocusSettingsBottomSheet(
                         shape = RoundedCornerShape(2.dp)
                     )
 
-                    Spacer(modifier = Modifier.height(2.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
                     SettingsToggle(
                         title = "Delay App",

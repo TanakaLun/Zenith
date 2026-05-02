@@ -398,20 +398,20 @@ fun SettingsScreenContent(
                     onCheckedChange = onSessionUsageOverlayEnabledChange,
                     icon = Icons.Outlined.Timer,
                     shape = if (preferences.sessionUsageOverlayEnabled)
-                        RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 4.dp, bottomEnd = 4.dp)
+                        RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
                     else RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
                 )
             }
 
             if (preferences.sessionUsageOverlayEnabled) {
                 item {
-                    Spacer(modifier = Modifier.height(2.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     HUDAppearanceSettings(
                         size = preferences.sessionUsageOverlaySize,
                         opacity = preferences.sessionUsageOverlayOpacity,
                         onSizeChange = onSessionUsageOverlaySizeChange,
                         onOpacityChange = onSessionUsageOverlayOpacityChange,
-                        shape = RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
+                        shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
                     )
                 }
             }
@@ -430,7 +430,7 @@ fun SettingsScreenContent(
                     icon = Icons.Outlined.AutoMode,
                     shape = if (preferences.autoBackupEnabled)
                         RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
-                    else RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
+                    else RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
                 )
             }
 
@@ -447,13 +447,13 @@ fun SettingsScreenContent(
             }
 
             item {
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(4.dp))
                 SettingsActionItem(
                     title = "Manual Backup",
                     summary = "Save your settings and schedules to a file now",
                     onClick = onBackup,
                     icon = Icons.Outlined.Backup,
-                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
+                    shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
                 )
             }
 
