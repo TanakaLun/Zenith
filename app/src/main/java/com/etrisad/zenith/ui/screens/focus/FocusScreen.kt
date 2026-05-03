@@ -286,7 +286,7 @@ fun FocusScreenContent(
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(28.dp),
+                    shape = RoundedCornerShape(24.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                     )
@@ -299,13 +299,11 @@ fun FocusScreenContent(
                 items = uiState.activeGoals,
                 key = { _, shield -> shield.packageName }
             ) { index, shield ->
-                val shape = remember(index, uiState.activeGoals.size) {
-                    when {
-                        uiState.activeGoals.size == 1 -> RoundedCornerShape(28.dp)
-                        index == 0 -> RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp, bottomStart = 12.dp, bottomEnd = 12.dp)
-                        index == uiState.activeGoals.size - 1 -> RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp, bottomStart = 28.dp, bottomEnd = 28.dp)
-                        else -> RoundedCornerShape(12.dp)
-                    }
+                val shape = when {
+                    uiState.activeGoals.size == 1 -> RoundedCornerShape(24.dp)
+                    index == 0 -> RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
+                    index == uiState.activeGoals.size - 1 -> RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
+                    else -> RoundedCornerShape(8.dp)
                 }
 
                 Column(
@@ -349,7 +347,7 @@ fun FocusScreenContent(
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(28.dp),
+                    shape = RoundedCornerShape(24.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                     )
@@ -362,13 +360,11 @@ fun FocusScreenContent(
                 items = uiState.activeShields,
                 key = { _, shield -> shield.packageName }
             ) { index, shield ->
-                val shape = remember(index, uiState.activeShields.size) {
-                    when {
-                        uiState.activeShields.size == 1 -> RoundedCornerShape(28.dp)
-                        index == 0 -> RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp, bottomStart = 12.dp, bottomEnd = 12.dp)
-                        index == uiState.activeShields.size - 1 -> RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp, bottomStart = 28.dp, bottomEnd = 28.dp)
-                        else -> RoundedCornerShape(12.dp)
-                    }
+                val shape = when {
+                    uiState.activeShields.size == 1 -> RoundedCornerShape(24.dp)
+                    index == 0 -> RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
+                    index == uiState.activeShields.size - 1 -> RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
+                    else -> RoundedCornerShape(8.dp)
                 }
 
                 Column(
@@ -413,7 +409,7 @@ fun FocusScreenContent(
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(28.dp),
+                    shape = RoundedCornerShape(24.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                     )
@@ -426,13 +422,11 @@ fun FocusScreenContent(
                 items = uiState.activeSchedules,
                 key = { _, schedule -> schedule.id }
             ) { index, schedule ->
-                val shape = remember(index, uiState.activeSchedules.size) {
-                    when {
-                        uiState.activeSchedules.size == 1 -> RoundedCornerShape(28.dp)
-                        index == 0 -> RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp, bottomStart = 12.dp, bottomEnd = 12.dp)
-                        index == uiState.activeSchedules.size - 1 -> RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp, bottomStart = 28.dp, bottomEnd = 28.dp)
-                        else -> RoundedCornerShape(12.dp)
-                    }
+                val shape = when {
+                    uiState.activeSchedules.size == 1 -> RoundedCornerShape(24.dp)
+                    index == 0 -> RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
+                    index == uiState.activeSchedules.size - 1 -> RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
+                    else -> RoundedCornerShape(8.dp)
                 }
 
                 Column(
@@ -468,7 +462,7 @@ fun FocusScreenContent(
 fun SwipeableItemContainer(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
-    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(28.dp),
+    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(24.dp),
     content: @Composable () -> Unit
 ) {
     val dismissState = rememberSwipeToDismissBoxState(
@@ -494,7 +488,7 @@ fun SwipeableItemContainer(
         enableDismissFromEndToStart = true,
         backgroundContent = {
             val direction = dismissState.dismissDirection
-            
+
             val color by animateColorAsState(
                 when (direction) {
                     SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.errorContainer
@@ -502,19 +496,19 @@ fun SwipeableItemContainer(
                     else -> Color.Transparent
                 }, label = "SwipeBackground"
             )
-            
+
             val alignment = when (direction) {
                 SwipeToDismissBoxValue.StartToEnd -> Alignment.CenterStart
                 SwipeToDismissBoxValue.EndToStart -> Alignment.CenterEnd
                 else -> Alignment.Center
             }
-            
+
             val icon = when (direction) {
                 SwipeToDismissBoxValue.StartToEnd -> Icons.Outlined.Delete
                 SwipeToDismissBoxValue.EndToStart -> Icons.Outlined.Edit
                 else -> null
             }
-            
+
             val tint = when (direction) {
                 SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.error
                 SwipeToDismissBoxValue.EndToStart -> MaterialTheme.colorScheme.primary
@@ -1220,13 +1214,11 @@ fun MultiAppPickerBottomSheet(
                             label = "containerColor"
                         )
 
-                        val shape = remember(index, allApps.size) {
-                            when {
-                                allApps.size == 1 -> RoundedCornerShape(28.dp)
-                                index == 0 -> RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp, bottomStart = 12.dp, bottomEnd = 12.dp)
-                                index == allApps.size - 1 -> RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp, bottomStart = 28.dp, bottomEnd = 28.dp)
-                                else -> RoundedCornerShape(12.dp)
-                            }
+                        val shape = when {
+                            allApps.size == 1 -> RoundedCornerShape(24.dp)
+                            index == 0 -> RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
+                            index == allApps.size - 1 -> RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
+                            else -> RoundedCornerShape(8.dp)
                         }
 
                         Box(
@@ -1650,13 +1642,11 @@ fun AppPickerBottomSheet(
                                 items = uiState.topApps,
                                 key = { _, app -> "top_${app.packageName}" }
                             ) { index, app ->
-                                val shape = remember(index, uiState.topApps.size) {
-                                    when {
-                                        uiState.topApps.size == 1 -> RoundedCornerShape(28.dp)
-                                        index == 0 -> RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp, bottomStart = 12.dp, bottomEnd = 12.dp)
-                                        index == uiState.topApps.size - 1 -> RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp, bottomStart = 28.dp, bottomEnd = 28.dp)
-                                        else -> RoundedCornerShape(12.dp)
-                                    }
+                                val shape = when {
+                                    uiState.topApps.size == 1 -> RoundedCornerShape(24.dp)
+                                    index == 0 -> RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
+                                    index == uiState.topApps.size - 1 -> RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
+                                    else -> RoundedCornerShape(8.dp)
                                 }
                                 Column(modifier = Modifier.animateItem()) {
                                     AppPickerItem(
@@ -1687,7 +1677,7 @@ fun AppPickerBottomSheet(
                             item {
                                 Card(
                                     modifier = Modifier.fillMaxWidth().animateItem(),
-                                    shape = RoundedCornerShape(28.dp),
+                                    shape = RoundedCornerShape(24.dp),
                                     colors = CardDefaults.cardColors(
                                         containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                                     )
@@ -1709,13 +1699,11 @@ fun AppPickerBottomSheet(
                                 items = uiState.installedApps,
                                 key = { _, app -> "all_${app.packageName}" }
                             ) { index, app ->
-                                val shape = remember(index, uiState.installedApps.size) {
-                                    when {
-                                        uiState.installedApps.size == 1 -> RoundedCornerShape(28.dp)
-                                        index == 0 -> RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp, bottomStart = 12.dp, bottomEnd = 12.dp)
-                                        index == uiState.installedApps.size - 1 -> RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp, bottomStart = 28.dp, bottomEnd = 28.dp)
-                                        else -> RoundedCornerShape(12.dp)
-                                    }
+                                val shape = when {
+                                    uiState.installedApps.size == 1 -> RoundedCornerShape(24.dp)
+                                    index == 0 -> RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
+                                    index == uiState.installedApps.size - 1 -> RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
+                                    else -> RoundedCornerShape(8.dp)
                                 }
                                 Column(modifier = Modifier.animateItem()) {
                                     AppPickerItem(
@@ -2147,7 +2135,7 @@ fun FocusSettingsBottomSheet(
                         checked = remindersEnabled,
                         onCheckedChange = { remindersEnabled = it },
                         icon = Icons.Outlined.NotificationsActive,
-                        shape = RoundedCornerShape(28.dp)
+                        shape = RoundedCornerShape(24.dp)
                     )
                 }
 
@@ -2340,7 +2328,7 @@ fun SettingsToggle(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
-    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(28.dp)
+    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(24.dp)
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -2371,9 +2359,9 @@ fun SettingsToggle(
                     modifier = Modifier.size(20.dp)
                 )
             }
-            
+
             Spacer(modifier = Modifier.width(16.dp))
-            
+
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
@@ -2387,11 +2375,11 @@ fun SettingsToggle(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            
+
             Spacer(modifier = Modifier.width(8.dp))
 
             Switch(
-                checked = checked, 
+                checked = checked,
                 onCheckedChange = onCheckedChange,
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = MaterialTheme.colorScheme.onPrimary,

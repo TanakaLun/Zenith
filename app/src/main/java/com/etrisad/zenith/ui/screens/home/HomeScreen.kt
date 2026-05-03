@@ -1172,7 +1172,7 @@ fun ShieldItem(
 
     val nowMillis by produceState(initialValue = System.currentTimeMillis()) {
         while (true) {
-            delay(1000)
+            delay(60000)
             value = System.currentTimeMillis()
         }
     }
