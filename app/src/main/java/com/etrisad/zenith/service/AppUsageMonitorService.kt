@@ -130,6 +130,7 @@ class AppUsageMonitorService : Service() {
         sessionUsageOverlayManager = SessionUsageOverlayManager(this)
 
         serviceScope.launch {
+            allShieldsCache = shieldRepository.allShields.first()
             shieldRepository.allShields.collect { shields ->
                 allShieldsCache = shields
                 lastForegroundApp?.let { currentPkg ->
@@ -335,20 +336,28 @@ class AppUsageMonitorService : Service() {
                         overlayManager.checkAndHide(currentApp)
                     }
 
-                    if (launcherPackages.isEmpty() || currentTime - lastLauncherRefreshTime > 60000) {
+                    if (launcherPackages.isEmpty() || currentTime - lastLauncherRefreshTime > 300000) {
                         try {
                             val homeIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
-                            val launchers = packageManager.queryIntentActivities(homeIntent, android.content.pm.PackageManager.MATCH_ALL)
-                            launcherPackages = launchers.map { it.activityInfo.packageName }.toSet()
-                            lastLauncherRefreshTime = currentTime
+                            val launchers = packageManager.queryIntentActivities(homeIntent, PackageManager.MATCH_DEFAULT_ONLY)
+                            if (launchers.isNotEmpty()) {
+                                launcherPackages = launchers.map { it.activityInfo.packageName }.toSet()
+                                lastLauncherRefreshTime = currentTime
+                            }
                         } catch (_: Exception) {}
                     }
 
                     if (currentApp != null && currentApp != packageName) {
                         sessionUsageOverlayManager.updateForegroundApp(currentApp)
                         
+                        var shield = currentShieldCache ?: allShieldsCache.find { it.packageName == currentApp }
+                        if (shield == null && allShieldsCache.isEmpty()) {
+                            allShieldsCache = shieldRepository.allShields.first()
+                            shield = allShieldsCache.find { it.packageName == currentApp }
+                        }
+
                         if (currentApp != lastForegroundApp || currentShieldCache == null) {
-                            currentShieldCache = allShieldsCache.find { it.packageName == currentApp }
+                            currentShieldCache = shield
                             if (currentApp != lastForegroundApp) {
                                 lastUsageFetchTime = 0L 
                                 lastHUDUpdateTime = 0L
@@ -356,7 +365,6 @@ class AppUsageMonitorService : Service() {
                                 
                                 val systemUsage = getTotalUsageToday(currentApp)
                                 val startOfDay = getStartOfDay()
-                                val shield = currentShieldCache
                                 val dbUsage = if (shield != null && shield.lastUsedTimestamp >= startOfDay) {
                                     val limitMillis = (shield.timeLimitMinutes * 60 * 1000L)
                                     (limitMillis - shield.remainingTimeMillis).coerceAtLeast(0L)
@@ -376,7 +384,6 @@ class AppUsageMonitorService : Service() {
                         val allowedUntil = allowedApps[currentApp] ?: 0L
                         updateUsageTime(currentApp)
 
-                        val shield = currentShieldCache
                         if (shield != null && shield.type != FocusType.GOAL && !isPaused(shield)) {
                             val limitMillis = shield.timeLimitMinutes * 60 * 1000L
                             val actualRemaining = (limitMillis - cachedTotalUsage).coerceAtLeast(0L)
@@ -397,14 +404,13 @@ class AppUsageMonitorService : Service() {
                             }
                         }
 
-                        val shieldForPauseCheck = currentShieldCache
+                        val shieldForPauseCheck = shield
                         val isAppPaused = shieldForPauseCheck != null && isPaused(shieldForPauseCheck)
 
                         if (!isAppPaused && allowedUntil > currentTime) {
                             val prefs = currentPreferences ?: continue
                             if (prefs.sessionUsageOverlayEnabled) {
                                 val remainingMinutes = ((allowedUntil - currentTime) / 60000L).toInt().coerceAtLeast(1)
-                                val shield = currentShieldCache
                                 val isGoal = shield?.type == FocusType.GOAL
 
                                 val limitMillis = (shield?.timeLimitMinutes ?: 0) * 60 * 1000L
@@ -432,7 +438,7 @@ class AppUsageMonitorService : Service() {
                                                         if (updated.isAutoQuitEnabled) {
                                                             goToHomeScreen()
                                                         } else {
-                                                            checkIfAppIsShielded(currentApp)
+                                                            checkIfAppIsShielded(currentApp, updated)
                                                         }
                                                     } else {
                                                         checkIfAppIsShielded(currentApp)
@@ -456,7 +462,6 @@ class AppUsageMonitorService : Service() {
                                 continue
                             }
 
-                            val shield = currentShieldCache
                             if (shield != null) {
                                 if (shield.isAutoQuitEnabled && allowedUntil > 0) {
                                     goToHomeScreen()
@@ -468,9 +473,11 @@ class AppUsageMonitorService : Service() {
                                         currentShieldCache = currentShieldCache?.copy(lastDelayStartTimestamp = 0L)
                                     }
                                 } else {
-                                    checkIfAppIsShielded(currentApp)
+                                    checkIfAppIsShielded(currentApp, shield)
                                     if (allowedUntil > 0) allowedApps[currentApp] = 0L
                                 }
+                            } else {
+                                checkSchedules(currentApp)
                             }
                         }
                     } else if (currentApp == null || currentApp == packageName || launcherPackages.contains(currentApp)) {
@@ -658,11 +665,11 @@ class AppUsageMonitorService : Service() {
         manager.notify(999, notification)
     }
 
-    private suspend fun checkIfAppIsShielded(targetPackageName: String) {
+    private suspend fun checkIfAppIsShielded(targetPackageName: String, forceShield: ShieldEntity? = null) {
         val currentForeground = getForegroundApp()
         if (targetPackageName != currentForeground) return
 
-        val shield = currentShieldCache ?: allShieldsCache.find { it.packageName == targetPackageName }
+        val shield = forceShield ?: allShieldsCache.find { it.packageName == targetPackageName }
         val prefs = currentPreferences ?: return
         if (shield != null && !InterceptOverlayManager.isShowing) {
             val totalUsageToday = getTotalUsageToday(targetPackageName)
@@ -793,8 +800,10 @@ class AppUsageMonitorService : Service() {
             preferencesRepository.setLastStreakCheckDate(todayStr)
         }
         
-        reusableCalendar.timeInMillis = System.currentTimeMillis()
-        lastCheckedDay = reusableCalendar.get(java.util.Calendar.DAY_OF_YEAR)
+        synchronized(reusableCalendar) {
+            reusableCalendar.timeInMillis = System.currentTimeMillis()
+            lastCheckedDay = reusableCalendar.get(java.util.Calendar.DAY_OF_YEAR)
+        }
     }
 
     private suspend fun updateStreaks() {
@@ -983,17 +992,19 @@ class AppUsageMonitorService : Service() {
 
     private fun getStartOfDay(): Long {
         val currentTime = System.currentTimeMillis()
-        reusableCalendar.timeInMillis = currentTime
-        val today = reusableCalendar.get(java.util.Calendar.DAY_OF_YEAR)
-        if (today != lastStartOfDayDate) {
-            reusableCalendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
-            reusableCalendar.set(java.util.Calendar.MINUTE, 0)
-            reusableCalendar.set(java.util.Calendar.SECOND, 0)
-            reusableCalendar.set(java.util.Calendar.MILLISECOND, 0)
-            cachedStartOfDay = reusableCalendar.timeInMillis
-            lastStartOfDayDate = today
+        synchronized(reusableCalendar) {
+            reusableCalendar.timeInMillis = currentTime
+            val today = reusableCalendar.get(java.util.Calendar.DAY_OF_YEAR)
+            if (today != lastStartOfDayDate) {
+                reusableCalendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                reusableCalendar.set(java.util.Calendar.MINUTE, 0)
+                reusableCalendar.set(java.util.Calendar.SECOND, 0)
+                reusableCalendar.set(java.util.Calendar.MILLISECOND, 0)
+                cachedStartOfDay = reusableCalendar.timeInMillis
+                lastStartOfDayDate = today
+            }
+            return cachedStartOfDay
         }
-        return cachedStartOfDay
     }
 
     private fun goToHomeScreen() {
@@ -1105,9 +1116,11 @@ class AppUsageMonitorService : Service() {
         }
 
         val now = System.currentTimeMillis()
-        reusableCalendar.timeInMillis = now
-        val currentTotalMinutes = reusableCalendar.get(java.util.Calendar.HOUR_OF_DAY) * 60 + 
-                                 reusableCalendar.get(java.util.Calendar.MINUTE)
+        val currentTotalMinutes = synchronized(reusableCalendar) {
+            reusableCalendar.timeInMillis = now
+            reusableCalendar.get(java.util.Calendar.HOUR_OF_DAY) * 60 + 
+                                     reusableCalendar.get(java.util.Calendar.MINUTE)
+        }
         
         for (ps in parsedSchedulesCache) {
             val isInInterval = if (ps.startMinutes <= ps.endMinutes) {
@@ -1296,7 +1309,7 @@ class AppUsageMonitorService : Service() {
 
         if (lastPackage == null) {
             try {
-                val stats = usageStatsManager.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, time - 15000, time)
+                val stats = usageStatsManager.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, time - 60000, time)
                 lastPackage = stats?.maxByOrNull { it.lastTimeUsed }?.packageName
             } catch (_: Exception) {}
         }
