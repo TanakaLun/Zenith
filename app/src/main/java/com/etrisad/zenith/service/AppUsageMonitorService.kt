@@ -134,7 +134,6 @@ class AppUsageMonitorService : Service() {
         }
 
         serviceScope.launch {
-            allShieldsCache = shieldRepository.allShields.first()
             shieldRepository.allShields.collect { shields ->
                 allShieldsCache = shields
                 lastForegroundApp?.let { currentPkg ->
@@ -192,6 +191,7 @@ class AppUsageMonitorService : Service() {
         isPowerSaveMode = powerManager.isPowerSaveMode
 
         serviceScope.launch {
+            allShieldsCache = shieldRepository.allShields.first()
             currentPreferences = preferencesRepository.userPreferencesFlow.first()
             startMonitoring()
         }
@@ -322,18 +322,6 @@ class AppUsageMonitorService : Service() {
                         continue
                     }
 
-                    val isAccessibilityActive = try {
-                        ZenithAccessibilityService.isServiceRunning
-                    } catch (_: Exception) { false }
-
-                    if (isAccessibilityActive) {
-                        currentShieldCache = null
-                        usageStatsCache = null
-                        lastUsageFetchTime = 0L
-                        delay(3000)
-                        continue
-                    }
-
                     val currentApp = getForegroundApp()
 
                     if (currentApp != null) {
@@ -381,7 +369,7 @@ class AppUsageMonitorService : Service() {
 
                         if (shouldBypassBlocking(currentApp)) {
                             lastForegroundApp = currentApp
-                            delay(if (isPowerSaveMode) 2000L else 1200L)
+                            delay(if (isPowerSaveMode) 1500L else 1000L)
                             continue
                         }
 
@@ -403,7 +391,7 @@ class AppUsageMonitorService : Service() {
                                 }
                                 goToHomeScreen()
                                 lastForegroundApp = currentApp
-                                delay(1500)
+                                delay(1200)
                                 continue
                             }
                         }
@@ -462,7 +450,7 @@ class AppUsageMonitorService : Service() {
                         if (!isAppPaused && currentTime > allowedUntil && !InterceptOverlayManager.isShowing) {
                             if (checkSchedules(currentApp)) {
                                 lastForegroundApp = currentApp
-                                delay(1000)
+                                delay(800)
                                 continue
                             }
 
@@ -495,8 +483,8 @@ class AppUsageMonitorService : Service() {
                 }
 
                 val delayTime = when {
-                    isPowerSaveMode -> 2500L
-                    InterceptOverlayManager.isShowing -> 3000L
+                    isPowerSaveMode -> 2000L
+                    InterceptOverlayManager.isShowing -> 2500L
                     currentShieldCache != null -> {
                         val shield = currentShieldCache!!
                         val limitMillis = shield.timeLimitMinutes * 60 * 1000L
@@ -504,20 +492,20 @@ class AppUsageMonitorService : Service() {
 
                         if (shield.type == FocusType.GOAL) {
                             when {
-                                remaining < 60000 -> 600L
-                                remaining < 300000 -> 1200L
-                                else -> 1800L
+                                remaining < 60000 -> 500L
+                                remaining < 300000 -> 1000L
+                                else -> 1500L
                             }
                         } else {
                             when {
-                                remaining > 3600000 -> 5000L
-                                remaining > 600000 -> 3000L
-                                remaining > 60000 -> 1500L
-                                else -> 600L
+                                remaining > 3600000 -> 4000L
+                                remaining > 600000 -> 2500L
+                                remaining > 60000 -> 1200L
+                                else -> 500L
                             }
                         }
                     }
-                    else -> 1200L
+                    else -> 1000L
                 }
                 delay(delayTime)
             }
@@ -670,9 +658,6 @@ class AppUsageMonitorService : Service() {
     }
 
     private suspend fun checkIfAppIsShielded(targetPackageName: String, forceShield: ShieldEntity? = null) {
-        val currentForeground = getForegroundApp()
-        if (targetPackageName != currentForeground) return
-
         val shield = forceShield ?: allShieldsCache.find { it.packageName == targetPackageName }
         val prefs = currentPreferences ?: return
         if (shield != null && !InterceptOverlayManager.isShowing) {
@@ -1300,20 +1285,22 @@ class AppUsageMonitorService : Service() {
         val time = System.currentTimeMillis()
         val usageEvents = try {
             usageStatsManager.queryEvents(time - 10000, time)
-        } catch (_: Exception) { null } ?: return lastForegroundApp
+        } catch (_: Exception) { null }
         
         var lastPackage: String? = null
-        while (usageEvents.hasNextEvent()) {
-            usageEvents.getNextEvent(reusableEvent)
-            if (reusableEvent.eventType == UsageEvents.Event.MOVE_TO_FOREGROUND || 
-                reusableEvent.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
-                lastPackage = reusableEvent.packageName
+        if (usageEvents != null) {
+            while (usageEvents.hasNextEvent()) {
+                usageEvents.getNextEvent(reusableEvent)
+                if (reusableEvent.eventType == UsageEvents.Event.MOVE_TO_FOREGROUND || 
+                    reusableEvent.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
+                    lastPackage = reusableEvent.packageName
+                }
             }
         }
 
         if (lastPackage == null) {
             try {
-                val stats = usageStatsManager.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, time - 60000, time)
+                val stats = usageStatsManager.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, time - 30000, time)
                 lastPackage = stats?.maxByOrNull { it.lastTimeUsed }?.packageName
             } catch (_: Exception) {}
         }
