@@ -1348,8 +1348,8 @@ fun ScheduleOverlayContent(
     onAllowUse: (Int, Boolean) -> Unit,
     onCloseApp: () -> Unit
 ) {
-    var showContent by remember { mutableStateOf(false) }
-    var isEmergencyUnlocked by remember { mutableStateOf(false) }
+    var showContent by remember(packageName) { mutableStateOf(false) }
+    var isEmergencyUnlocked by remember(packageName) { mutableStateOf(false) }
     val autoKickProgress = remember(packageName) { Animatable(0f) }
     var isEmergencyHolding by remember(packageName) { mutableStateOf(false) }
 

@@ -663,7 +663,7 @@ class AppUsageMonitorService : Service() {
         if (targetPackageName != currentForeground) return
 
         val shield = currentShieldCache ?: allShieldsCache.find { it.packageName == targetPackageName }
-        val prefs = currentPreferences ?: return
+        val prefs = currentPreferences ?: preferencesRepository.userPreferencesFlow.first()
         if (shield != null && !InterceptOverlayManager.isShowing) {
             val totalUsageToday = getTotalUsageToday(targetPackageName)
             val totalGlobalUsageToday = getTotalGlobalUsageToday()
@@ -673,7 +673,7 @@ class AppUsageMonitorService : Service() {
             val lastAction = shield.lastDelayStartTimestamp
 
             val lastSessionEnd = shield.lastSessionEndTimestamp
-            val isGracePeriodActive = lastSessionEnd != 0L && (currentTime - lastSessionEnd > 30 * 60 * 1000L)
+            val isGracePeriodActive = lastSessionEnd != 0L && (currentTime - lastSessionEnd < 5 * 60 * 1000L)
 
             val shieldWithTimestamp = if (shield.isDelayAppEnabled) {
                 if (isGracePeriodActive) {
