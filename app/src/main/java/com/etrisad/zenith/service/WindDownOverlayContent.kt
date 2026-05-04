@@ -26,6 +26,8 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
 import kotlinx.coroutines.delay
@@ -52,10 +54,27 @@ fun WindDownOverlayContent(
 
     var showContent by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    
+
     val delayDurationSeconds = 30
     val delayProgressAnimatable = remember { Animatable(0f) }
     var isDelaying by remember { mutableStateOf(!sessionUsed) }
+    val autoKickProgress = remember { Animatable(0f) }
+
+    LaunchedEffect(sessionUsed) {
+        if (sessionUsed) {
+            delay(2000)
+            autoKickProgress.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = 5000, easing = LinearEasing)
+            )
+            // Kick the user
+            showContent = false
+            delay(400)
+            onCloseApp()
+        } else {
+            autoKickProgress.snapTo(0f)
+        }
+    }
 
     val motivationalMessages = remember {
         listOf(
@@ -257,21 +276,16 @@ fun WindDownOverlayContent(
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    TextButton(
-                        onClick = {
+                    CloseAppTextButton(
+                        onCloseApp = {
                             scope.launch {
                                 showContent = false
                                 delay(400)
                                 onCloseApp()
                             }
                         },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.error
-                        )
-                    ) {
-                        Text("Close App", fontWeight = FontWeight.Bold)
-                    }
+                        autoKickProgress = autoKickProgress.value
+                    )
                 }
             }
         }

@@ -89,10 +89,16 @@ class ZenithAccessibilityService : AccessibilityService() {
             private set
         @Volatile
         var lastEventTime = 0L
+        private var instance: ZenithAccessibilityService? = null
+
+        fun requestHome(): Boolean {
+            return instance?.performGlobalAction(GLOBAL_ACTION_HOME) ?: false
+        }
     }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        instance = this
         isServiceRunning = true
         lastEventTime = System.currentTimeMillis()
         Log.d("ZenithAS", "Accessibility Service connected")
@@ -400,7 +406,7 @@ class ZenithAccessibilityService : AccessibilityService() {
             val lastAction = shield.lastDelayStartTimestamp
 
             val lastSessionEnd = shield.lastSessionEndTimestamp
-            val isGracePeriodActive = lastSessionEnd != 0L && (currentTime - lastSessionEnd > 30 * 60 * 1000L)
+            val isGracePeriodActive = lastSessionEnd != 0L && (currentTime - lastSessionEnd < 5 * 60 * 1000L)
 
             val shieldWithTimestamp = if (shield.isDelayAppEnabled) {
                 if (isGracePeriodActive) {
@@ -566,10 +572,7 @@ class ZenithAccessibilityService : AccessibilityService() {
     }
 
     private fun goToHomeScreen() {
-        val intent = Intent(Intent.ACTION_MAIN)
-        intent.addCategory(Intent.CATEGORY_HOME)
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-        startActivity(intent)
+        performGlobalAction(GLOBAL_ACTION_HOME)
     }
 
     private fun updateBedtimeStatus(prefs: UserPreferences) {

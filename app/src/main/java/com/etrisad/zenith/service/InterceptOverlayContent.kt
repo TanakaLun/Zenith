@@ -182,11 +182,9 @@ fun InterceptOverlayContent(
                         animationSpec = tween(durationMillis = remainingTime, easing = LinearEasing)
                     )
                 }
-                if (autoKickProgress.value >= 1f) {
-                    showContent = false
-                    delay(400)
-                    onCloseApp()
-                }
+                showContent = false
+                delay(400)
+                onCloseApp()
             } else {
                 autoKickProgress.stop()
             }
@@ -197,11 +195,9 @@ fun InterceptOverlayContent(
                 targetValue = 1f,
                 animationSpec = tween(durationMillis = 5000, easing = LinearEasing)
             )
-            if (autoKickProgress.value >= 1f) {
-                showContent = false
-                delay(400)
-                onCloseApp()
-            }
+            showContent = false
+            delay(400)
+            onCloseApp()
         } else {
             autoKickProgress.snapTo(0f)
         }
@@ -1388,11 +1384,9 @@ fun ScheduleOverlayContent(
                         animationSpec = tween(durationMillis = remainingTime, easing = LinearEasing)
                     )
                 }
-                if (autoKickProgress.value >= 1f) {
-                    showContent = false
-                    delay(400)
-                    onCloseApp()
-                }
+                showContent = false
+                delay(400)
+                onCloseApp()
             } else {
                 autoKickProgress.stop()
             }

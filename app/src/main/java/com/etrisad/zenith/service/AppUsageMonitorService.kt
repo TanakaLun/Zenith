@@ -665,7 +665,7 @@ class AppUsageMonitorService : Service() {
             val lastAction = shield.lastDelayStartTimestamp
 
             val lastSessionEnd = shield.lastSessionEndTimestamp
-            val isGracePeriodActive = lastSessionEnd != 0L && (currentTime - lastSessionEnd > 30 * 60 * 1000L)
+            val isGracePeriodActive = lastSessionEnd != 0L && (currentTime - lastSessionEnd < 5 * 60 * 1000L)
 
             val shieldWithTimestamp = if (shield.isDelayAppEnabled) {
                 if (isGracePeriodActive) {
@@ -993,10 +993,17 @@ class AppUsageMonitorService : Service() {
     }
 
     private fun goToHomeScreen() {
-        val intent = Intent(Intent.ACTION_MAIN)
-        intent.addCategory(Intent.CATEGORY_HOME)
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-        startActivity(intent)
+        if (ZenithAccessibilityService.requestHome()) return
+
+        val intent = Intent(Intent.ACTION_MAIN).apply {
+            addCategory(Intent.CATEGORY_HOME)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
+        }
+        try {
+            startActivity(intent)
+        } catch (e: Exception) {
+            Log.e("ZenithAUMS", "Failed to go home", e)
+        }
     }
 
     private fun updateBedtimeStatus(prefs: UserPreferences) {
