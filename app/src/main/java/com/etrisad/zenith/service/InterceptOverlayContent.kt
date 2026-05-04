@@ -80,17 +80,19 @@ fun InterceptOverlayContent(
 
     val isDelayEnabled = shield?.isDelayAppEnabled == true && shield.type == FocusType.SHIELD
     
-    val initialProgress = remember(shield, delayDurationSeconds) {
-        if (isDelayEnabled && shield.lastDelayStartTimestamp > 0 && delayDurationSeconds > 0) {
-            val elapsed = System.currentTimeMillis() - shield.lastDelayStartTimestamp
+    val initialProgress = remember(packageName, delayDurationSeconds) {
+        if (isDelayEnabled && (shield?.lastDelayStartTimestamp ?: 0L) > 0 && delayDurationSeconds > 0) {
+            val elapsed = System.currentTimeMillis() - shield!!.lastDelayStartTimestamp
             (elapsed.toFloat() / (delayDurationSeconds * 1000f)).coerceIn(0f, 1f)
         } else {
             0f
         }
     }
 
-    val delayProgressAnimatable = remember(shield) { Animatable(initialProgress) }
-    var isDelaying by remember(shield) { mutableStateOf(isDelayEnabled && (shield?.lastDelayStartTimestamp ?: 0L) != 0L && initialProgress < 1f) }
+    val delayProgressAnimatable = remember(packageName) { Animatable(initialProgress) }
+    var isDelaying by remember(packageName) { 
+        mutableStateOf(isDelayEnabled && (shield?.lastDelayStartTimestamp ?: 0L) != 0L && initialProgress < 1f) 
+    }
 
     val motivationalMessages = remember {
         listOf(
@@ -143,20 +145,20 @@ fun InterceptOverlayContent(
         }
     }
 
-    val isPeriodExpired = remember(shield) {
+    val isPeriodExpired = remember(packageName, shield?.lastPeriodResetTimestamp) {
         shield != null && (System.currentTimeMillis() - shield.lastPeriodResetTimestamp > shield.refreshPeriodMinutes * 60 * 1000L)
     }
     
-    val currentUses = remember(shield, isPeriodExpired) {
+    val currentUses = remember(packageName, shield?.currentPeriodUses, isPeriodExpired) {
         if (isPeriodExpired) 0 else (shield?.currentPeriodUses ?: 0)
     }
     val maxUses = shield?.maxUsesPerPeriod ?: 5
     val isUsesExceeded = remember(currentUses, maxUses) { currentUses >= maxUses }
-    val isTimeLimitReached = remember(shield, totalUsageToday) {
+    val isTimeLimitReached = remember(packageName, totalUsageToday, shield?.timeLimitMinutes) {
         shield != null && shield.timeLimitMinutes > 0 && totalUsageToday >= (shield.timeLimitMinutes * 60 * 1000L)
     }
 
-    val remainingMinutes = remember(shield, totalUsageToday) {
+    val remainingMinutes = remember(packageName, totalUsageToday, shield?.timeLimitMinutes) {
         shield?.let {
             if (it.timeLimitMinutes <= 0) return@let null
             val limitMillis = it.timeLimitMinutes * 60 * 1000L
@@ -164,32 +166,33 @@ fun InterceptOverlayContent(
         }
     }
 
-    val isBlocked = remember(isUsesExceeded, isTimeLimitReached, remainingMinutes, isEmergencyUnlocked, shield) {
+    val isBlocked = remember(isUsesExceeded, isTimeLimitReached, remainingMinutes, isEmergencyUnlocked, shield?.type) {
         val effectivelyTimeReached = isTimeLimitReached || (remainingMinutes != null && remainingMinutes <= 0)
         (isUsesExceeded || effectivelyTimeReached) && !isEmergencyUnlocked && shield?.type == FocusType.SHIELD
     }
 
-    val autoKickProgress = remember { Animatable(0f) }
-    var isEmergencyHolding by remember { mutableStateOf(false) }
+    val autoKickProgress = remember(packageName) { Animatable(0f) }
+    var isEmergencyHolding by remember(packageName) { mutableStateOf(false) }
 
     LaunchedEffect(isBlocked, isDelaying, isEmergencyHolding, isEmergencyUnlocked) {
         if (isBlocked) {
             if (!isEmergencyHolding) {
-                delay(3000)
+                delay(1000)
                 autoKickProgress.snapTo(0f)
                 autoKickProgress.animateTo(
                     targetValue = 1f,
-                    animationSpec = tween(durationMillis = 5000, easing = LinearEasing)
+                    animationSpec = tween(durationMillis = 4000, easing = LinearEasing)
                 )
                 showContent = false
                 delay(400)
                 onCloseApp()
             } else {
                 autoKickProgress.stop()
+                autoKickProgress.snapTo(0f)
             }
         } else if (!isDelaying && !isEmergencyUnlocked && (shield?.type == FocusType.SHIELD || shield == null)) {
             autoKickProgress.snapTo(0f)
-            delay(10000)
+            delay(8000)
             autoKickProgress.animateTo(
                 targetValue = 1f,
                 animationSpec = tween(durationMillis = 5000, easing = LinearEasing)
@@ -1347,8 +1350,8 @@ fun ScheduleOverlayContent(
 ) {
     var showContent by remember { mutableStateOf(false) }
     var isEmergencyUnlocked by remember { mutableStateOf(false) }
-    val autoKickProgress = remember { Animatable(0f) }
-    var isEmergencyHolding by remember { mutableStateOf(false) }
+    val autoKickProgress = remember(packageName) { Animatable(0f) }
+    var isEmergencyHolding by remember(packageName) { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
     val context = LocalContext.current

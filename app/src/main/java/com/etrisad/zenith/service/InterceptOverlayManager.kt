@@ -60,7 +60,33 @@ class InterceptOverlayManager(private val context: Context) {
     ) {
         Log.d(TAG, "Request to show overlay for $packageName")
         if (isShowing && currentPackage == packageName && overlayView != null) {
-            Log.d(TAG, "Overlay already showing for $packageName, ignoring")
+            Log.d(TAG, "Overlay already showing for $packageName, updating parameters")
+            overlayView?.setContent {
+                ZenithTheme {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        InterceptOverlayContent(
+                            packageName = packageName,
+                            appName = appName,
+                            shield = shield,
+                            totalUsageToday = totalUsageToday,
+                            totalGlobalUsageToday = totalGlobalUsageToday,
+                            delayDurationSeconds = delayDurationSeconds,
+                            onAllowUse = { minutes, isEmergency ->
+                                onAllowUse(minutes, isEmergency)
+                                hideOverlay()
+                            },
+                            onCloseApp = {
+                                onCloseApp()
+                                hideOverlay()
+                            },
+                            onGoalDismiss = {
+                                onGoalDismiss()
+                                hideOverlay()
+                            }
+                        )
+                    }
+                }
+            }
             return
         }
         if (isShowing || overlayView != null) {
@@ -118,7 +144,29 @@ class InterceptOverlayManager(private val context: Context) {
         onAllowUse: (Int, Boolean) -> Unit,
         onCloseApp: () -> Unit
     ) {
-        if (isShowing && currentPackage == packageName && overlayView != null) return
+        if (isShowing && currentPackage == packageName && overlayView != null) {
+            overlayView?.setContent {
+                ZenithTheme {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        ScheduleOverlayContent(
+                            packageName = packageName,
+                            appName = appName,
+                            schedule = schedule,
+                            totalGlobalUsageToday = totalGlobalUsageToday,
+                            onAllowUse = { minutes, isEmergency ->
+                                onAllowUse(minutes, isEmergency)
+                                hideOverlay()
+                            },
+                            onCloseApp = {
+                                onCloseApp()
+                                hideOverlay()
+                            }
+                        )
+                    }
+                }
+            }
+            return
+        }
         if (isShowing || overlayView != null) hideOverlay()
         
         isShowing = true
@@ -202,7 +250,28 @@ class InterceptOverlayManager(private val context: Context) {
         onAllowUse: (Int) -> Unit,
         onCloseApp: () -> Unit
     ) {
-        if (isShowing && currentPackage == packageName && overlayView != null) return
+        if (isShowing && currentPackage == packageName && overlayView != null) {
+            overlayView?.setContent {
+                ZenithTheme {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        WindDownOverlayContent(
+                            packageName = packageName,
+                            appName = appName,
+                            sessionUsed = sessionUsed,
+                            onAllowUse = { minutes ->
+                                onAllowUse(minutes)
+                                hideOverlay()
+                            },
+                            onCloseApp = {
+                                onCloseApp()
+                                hideOverlay()
+                            }
+                        )
+                    }
+                }
+            }
+            return
+        }
         if (isShowing || overlayView != null) hideOverlay()
 
         isShowing = true

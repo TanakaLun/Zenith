@@ -7,7 +7,6 @@ import android.util.Log
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.app.usage.UsageStats
 import android.view.accessibility.AccessibilityEvent
 import androidx.core.app.NotificationCompat
@@ -40,11 +39,11 @@ class ZenithAccessibilityService : AccessibilityService() {
     private lateinit var preferencesRepository: UserPreferencesRepository
     private lateinit var overlayManager: InterceptOverlayManager
     private lateinit var sessionUsageOverlayManager: SessionUsageOverlayManager
-    private val usageStatsManager by lazy { getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager }
-    private val reusableCalendar = java.util.Calendar.getInstance()
+    private val earlyKickManager = EarlyKickManager()
+    private val usageStatsManager by lazy { getSystemService(USAGE_STATS_SERVICE) as UsageStatsManager }
+    private val reusableCalendar = Calendar.getInstance()
 
     private var lastForegroundApp: String? = null
-    private var lastEvaluationTime = 0L
     @Volatile
     private var currentShieldCache: ShieldEntity? = null
     private var lastUsageFetchTime = 0L
@@ -90,10 +89,6 @@ class ZenithAccessibilityService : AccessibilityService() {
         @Volatile
         var lastEventTime = 0L
         private var instance: ZenithAccessibilityService? = null
-
-        fun requestHome(): Boolean {
-            return instance?.performGlobalAction(GLOBAL_ACTION_HOME) ?: false
-        }
     }
 
     override fun onServiceConnected() {
@@ -225,6 +220,7 @@ class ZenithAccessibilityService : AccessibilityService() {
                     cachedTotalUsage = 0L
                     currentShieldCache = null
                     notifiedGoals.clear()
+                    earlyKickManager.reset()
 
                     baseUsageAtSessionStart = 0L
                     sessionStartTime = currentTime
@@ -248,6 +244,19 @@ class ZenithAccessibilityService : AccessibilityService() {
 
             val shield = currentShieldCache
             val isAppPaused = shield != null && isPaused(shield)
+
+            if (shield != null && shield.type != FocusType.GOAL && !isAppPaused) {
+                val limitMillis = shield.timeLimitMinutes * 60 * 1000L
+                val actualRemaining = (limitMillis - cachedTotalUsage).coerceAtLeast(0L)
+                val prefs = currentPreferences ?: preferencesRepository.userPreferencesFlow.first()
+                
+                if (!InterceptOverlayManager.isShowing && (allowedApps[currentApp] ?: 0L) <= currentTime && 
+                    earlyKickManager.shouldKick(currentApp, actualRemaining, prefs.earlyKickEnabled)) {
+                    goToHomeScreen()
+                    delay(1000)
+                    continue
+                }
+            }
 
             if (shield != null && shield.type == FocusType.GOAL && !isAppPaused) {
                 val limitMillis = shield.timeLimitMinutes * 60 * 1000L
@@ -307,7 +316,7 @@ class ZenithAccessibilityService : AccessibilityService() {
         }
     }
 
-    private suspend fun updateUsageTime(packageName: String) {
+    private fun updateUsageTime(packageName: String) {
         val shield = currentShieldCache ?: return
         val currentTime = System.currentTimeMillis()
 
@@ -370,13 +379,11 @@ class ZenithAccessibilityService : AccessibilityService() {
         val channelId = "zenith_goal_channel"
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            if (manager.getNotificationChannel(channelId) == null) {
-                val channel = NotificationChannel(
-                    channelId, "Goal Reminders", NotificationManager.IMPORTANCE_DEFAULT
-                )
-                manager.createNotificationChannel(channel)
-            }
+        if (manager.getNotificationChannel(channelId) == null) {
+            val channel = NotificationChannel(
+                channelId, "Goal Reminders", NotificationManager.IMPORTANCE_DEFAULT
+            )
+            manager.createNotificationChannel(channel)
         }
 
         val notification = NotificationCompat.Builder(this, channelId)
@@ -731,10 +738,6 @@ class ZenithAccessibilityService : AccessibilityService() {
 
         if (packageName.contains("launcher", ignoreCase = true) || packageName.contains("home", ignoreCase = true)) return true
         return false
-    }
-
-    private fun isTimeInInterval(current: String, start: String, end: String): Boolean {
-        return if (start <= end) current in start..end else current >= start || current <= end
     }
 
     private fun showScheduleOverlay(packageName: String, schedule: ScheduleEntity) {
