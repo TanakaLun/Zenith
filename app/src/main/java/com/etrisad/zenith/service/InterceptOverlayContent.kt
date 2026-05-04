@@ -89,8 +89,8 @@ fun InterceptOverlayContent(
         }
     }
 
-    val delayProgressAnimatable = remember { Animatable(initialProgress) }
-    var isDelaying by remember { mutableStateOf(isDelayEnabled && shield.lastDelayStartTimestamp != 0L && initialProgress < 1f) }
+    val delayProgressAnimatable = remember(shield) { Animatable(initialProgress) }
+    var isDelaying by remember(shield) { mutableStateOf(isDelayEnabled && (shield?.lastDelayStartTimestamp ?: 0L) != 0L && initialProgress < 1f) }
 
     val motivationalMessages = remember {
         listOf(
@@ -153,11 +153,12 @@ fun InterceptOverlayContent(
     val maxUses = shield?.maxUsesPerPeriod ?: 5
     val isUsesExceeded = remember(currentUses, maxUses) { currentUses >= maxUses }
     val isTimeLimitReached = remember(shield, totalUsageToday) {
-        shield != null && totalUsageToday >= (shield.timeLimitMinutes * 60 * 1000L)
+        shield != null && shield.timeLimitMinutes > 0 && totalUsageToday >= (shield.timeLimitMinutes * 60 * 1000L)
     }
 
     val remainingMinutes = remember(shield, totalUsageToday) {
         shield?.let {
+            if (it.timeLimitMinutes <= 0) return@let null
             val limitMillis = it.timeLimitMinutes * 60 * 1000L
             ((limitMillis - totalUsageToday) / (60 * 1000L)).toInt().coerceAtLeast(0)
         }
@@ -174,14 +175,12 @@ fun InterceptOverlayContent(
     LaunchedEffect(isBlocked, isDelaying, isEmergencyHolding, isEmergencyUnlocked) {
         if (isBlocked) {
             if (!isEmergencyHolding) {
-                val remainingProgress = 1f - autoKickProgress.value
-                val remainingTime = (remainingProgress * 5000).toInt()
-                if (remainingTime > 0) {
-                    autoKickProgress.animateTo(
-                        targetValue = 1f,
-                        animationSpec = tween(durationMillis = remainingTime, easing = LinearEasing)
-                    )
-                }
+                delay(3000)
+                autoKickProgress.snapTo(0f)
+                autoKickProgress.animateTo(
+                    targetValue = 1f,
+                    animationSpec = tween(durationMillis = 5000, easing = LinearEasing)
+                )
                 showContent = false
                 delay(400)
                 onCloseApp()
@@ -1376,14 +1375,12 @@ fun ScheduleOverlayContent(
     LaunchedEffect(isEmergencyUnlocked, isEmergencyHolding) {
         if (!isEmergencyUnlocked) {
             if (!isEmergencyHolding) {
-                val remainingProgress = 1f - autoKickProgress.value
-                val remainingTime = (remainingProgress * 5000).toInt()
-                if (remainingTime > 0) {
-                    autoKickProgress.animateTo(
-                        targetValue = 1f,
-                        animationSpec = tween(durationMillis = remainingTime, easing = LinearEasing)
-                    )
-                }
+                delay(10000)
+                autoKickProgress.snapTo(0f)
+                autoKickProgress.animateTo(
+                    targetValue = 1f,
+                    animationSpec = tween(durationMillis = 5000, easing = LinearEasing)
+                )
                 showContent = false
                 delay(400)
                 onCloseApp()
