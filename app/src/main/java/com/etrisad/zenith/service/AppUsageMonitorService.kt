@@ -475,27 +475,32 @@ class AppUsageMonitorService : Service() {
                             }
                         }
 
-                        if (!isAppPaused && currentTime > allowedUntil && !InterceptOverlayManager.isShowing) {
+                        val isBedtimeBlocking = isBedtimeActive || (isWindDownActive && currentPreferences?.bedtimeWindDownEnabled == true)
+                        val shouldCheckSchedules = (isBedtimeBlocking && currentApp !in bedtimeWhitelistedPackages) || currentTime > allowedUntil
+
+                        if (!isAppPaused && shouldCheckSchedules && !InterceptOverlayManager.isShowing) {
                             if (checkSchedules(currentApp)) {
                                 lastForegroundApp = currentApp
                                 delay(1000)
                                 continue
                             }
 
-                            val shield = currentShieldCache
-                            if (shield != null) {
-                                if (shield.isAutoQuitEnabled && allowedUntil > 0) {
-                                    goToHomeScreen()
-                                    allowedApps.remove(currentApp)
-                                    if (shield.isDelayAppEnabled) {
-                                        serviceScope.launch {
-                                            shieldRepository.updateShield(shield.copy(lastDelayStartTimestamp = 0L))
+                            if (currentTime > allowedUntil) {
+                                val shield = currentShieldCache
+                                if (shield != null) {
+                                    if (shield.isAutoQuitEnabled && allowedUntil > 0) {
+                                        goToHomeScreen()
+                                        allowedApps.remove(currentApp)
+                                        if (shield.isDelayAppEnabled) {
+                                            serviceScope.launch {
+                                                shieldRepository.updateShield(shield.copy(lastDelayStartTimestamp = 0L))
+                                            }
+                                            currentShieldCache = currentShieldCache?.copy(lastDelayStartTimestamp = 0L)
                                         }
-                                        currentShieldCache = currentShieldCache?.copy(lastDelayStartTimestamp = 0L)
+                                    } else {
+                                        checkIfAppIsShielded(currentApp)
+                                        if (allowedUntil > 0) allowedApps[currentApp] = 0L
                                     }
-                                } else {
-                                    checkIfAppIsShielded(currentApp)
-                                    if (allowedUntil > 0) allowedApps[currentApp] = 0L
                                 }
                             }
                         }
