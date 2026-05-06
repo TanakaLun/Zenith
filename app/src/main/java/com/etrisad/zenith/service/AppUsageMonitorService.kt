@@ -857,6 +857,8 @@ class AppUsageMonitorService : Service() {
             }
         }
 
+
+        //test for push, dont see//
         shields.forEach { shield ->
             val isAlreadyUpdatedToday = synchronized(reusableCalendar) {
                 reusableCalendar.timeInMillis = shield.lastStreakUpdateTimestamp
