@@ -56,16 +56,34 @@ fun AllowedBedAppsBottomSheet(
         withContext(Dispatchers.IO) {
             val installedApps = pm.getInstalledApplications(PackageManager.GET_META_DATA)
             apps = installedApps.asSequence()
-                .filter { (it.flags and (ApplicationInfo.FLAG_SYSTEM or ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) == 0 }
-                .filter { it.packageName !in generalWhitelisted }
                 .map {
+                    val isSystemFlag = (it.flags and (ApplicationInfo.FLAG_SYSTEM or ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) != 0
+                    val hasLauncher = pm.getLaunchIntentForPackage(it.packageName) != null
+                    val pkg = it.packageName
+
+                    val isCoreComponent = pkg == "android" ||
+                            pkg.startsWith("com.android.settings") ||
+                            pkg.startsWith("com.android.systemui") ||
+                            pkg.startsWith("com.android.shell") ||
+                            pkg.startsWith("com.android.phone") ||
+                            pkg.startsWith("com.android.angle") ||
+                            pkg.startsWith("com.android.providers") ||
+                            pkg.startsWith("com.google.android.angle") ||
+                            pkg.startsWith("com.google.android.setupwizard") ||
+                            pkg.contains("restore") ||
+                            pkg.contains("overlay") ||
+                            pkg.contains("documentsui")
+
                     WhitelistAppInfo(
-                        packageName = it.packageName,
+                        packageName = pkg,
                         appName = pm.getApplicationLabel(it).toString(),
                         icon = pm.getApplicationIcon(it),
-                        isSystemApp = false
+                        isSystemApp = isSystemFlag && (!hasLauncher || isCoreComponent),
+                        isPreinstalledApp = isSystemFlag && hasLauncher && !isCoreComponent
                     )
                 }
+                .filter { !it.isSystemApp } // Only show user apps and preinstalled apps (like YouTube)
+                .filter { it.packageName !in generalWhitelisted }
                 .sortedBy { it.appName.lowercase() }
                 .toList()
             isLoading = false
@@ -241,7 +259,18 @@ fun AllowedAppItem(
     ) {
         ListItem(
             headlineContent = { Text(app.appName, fontWeight = FontWeight.Bold) },
-            supportingContent = { Text(app.packageName, style = MaterialTheme.typography.bodySmall) },
+            supportingContent = {
+                Column {
+                    Text(app.packageName, style = MaterialTheme.typography.bodySmall)
+                    if (app.isPreinstalledApp) {
+                        Text(
+                            text = "Preinstalled",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                    }
+                }
+            },
             leadingContent = {
                 app.icon?.let {
                     Image(

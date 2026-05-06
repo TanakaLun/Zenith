@@ -39,7 +39,8 @@ data class WhitelistAppInfo(
     val packageName: String,
     val appName: String,
     val icon: Drawable?,
-    val isSystemApp: Boolean
+    val isSystemApp: Boolean,
+    val isPreinstalledApp: Boolean = false
 )
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -64,14 +65,31 @@ fun WhitelistBottomSheet(
         withContext(Dispatchers.IO) {
             val installedApps = pm.getInstalledApplications(PackageManager.GET_META_DATA)
             val mappedApps = installedApps.map {
-                val isSystem = (it.flags and (ApplicationInfo.FLAG_SYSTEM or ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) != 0
+                val isSystemFlag = (it.flags and (ApplicationInfo.FLAG_SYSTEM or ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) != 0
+                val hasLauncher = pm.getLaunchIntentForPackage(it.packageName) != null
+                val pkg = it.packageName
+
+                val isCoreComponent = pkg == "android" ||
+                        pkg.startsWith("com.android.settings") ||
+                        pkg.startsWith("com.android.systemui") ||
+                        pkg.startsWith("com.android.shell") ||
+                        pkg.startsWith("com.android.phone") ||
+                        pkg.startsWith("com.android.angle") ||
+                        pkg.startsWith("com.android.providers") ||
+                        pkg.startsWith("com.google.android.angle") ||
+                        pkg.startsWith("com.google.android.setupwizard") ||
+                        pkg.contains("restore") ||
+                        pkg.contains("overlay") ||
+                        pkg.contains("documentsui")
+
                 WhitelistAppInfo(
-                    packageName = it.packageName,
+                    packageName = pkg,
                     appName = pm.getApplicationLabel(it).toString(),
                     icon = pm.getApplicationIcon(it),
-                    isSystemApp = isSystem
+                    isSystemApp = isSystemFlag && (!hasLauncher || isCoreComponent),
+                    isPreinstalledApp = isSystemFlag && hasLauncher && !isCoreComponent
                 )
-            }.sortedWith(compareBy({ it.isSystemApp }, { it.appName.lowercase() }))
+            }.sortedWith(compareBy({ it.isPreinstalledApp || it.isSystemApp }, { it.isSystemApp }, { it.appName.lowercase() }))
             
             apps = mappedApps
 
@@ -87,7 +105,8 @@ fun WhitelistBottomSheet(
         else apps.filter { it.appName.contains(searchQuery, ignoreCase = true) || it.packageName.contains(searchQuery, ignoreCase = true) }
     }
 
-    val userApps = remember(filteredApps) { filteredApps.filter { !it.isSystemApp } }
+    val userApps = remember(filteredApps) { filteredApps.filter { !it.isSystemApp && !it.isPreinstalledApp } }
+    val preinstalledApps = remember(filteredApps) { filteredApps.filter { it.isPreinstalledApp } }
     val systemApps = remember(filteredApps) { filteredApps.filter { it.isSystemApp } }
     var isSystemAppsExpanded by remember { mutableStateOf(false) }
 
@@ -184,24 +203,64 @@ fun WhitelistBottomSheet(
                                 )
                             }
                         } else {
-                            // User Apps Section
-                            itemsIndexed(
-                                userApps,
-                                key = { _, app -> app.packageName }
-                            ) { index, app ->
-                                WhitelistAppItem(
-                                    app = app,
-                                    isSelected = app.packageName in selectedApps,
-                                    shape = getAdaptiveShape(index, userApps.size),
-                                    modifier = Modifier.animateItem(),
-                                    onToggle = {
-                                        selectedApps = if (app.packageName in selectedApps) {
-                                            selectedApps - app.packageName
-                                        } else {
-                                            selectedApps + app.packageName
+                            if (userApps.isNotEmpty()) {
+                                item(key = "user_apps_header") {
+                                    Text(
+                                        "User Apps",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(top = 8.dp, bottom = 8.dp, start = 4.dp)
+                                    )
+                                }
+                                itemsIndexed(
+                                    userApps,
+                                    key = { _, app -> app.packageName }
+                                ) { index, app ->
+                                    WhitelistAppItem(
+                                        app = app,
+                                        isSelected = app.packageName in selectedApps,
+                                        shape = getAdaptiveShape(index, userApps.size),
+                                        modifier = Modifier.animateItem(),
+                                        onToggle = {
+                                            selectedApps = if (app.packageName in selectedApps) {
+                                                selectedApps - app.packageName
+                                            } else {
+                                                selectedApps + app.packageName
+                                            }
                                         }
-                                    }
-                                )
+                                    )
+                                }
+                            }
+
+                            if (preinstalledApps.isNotEmpty()) {
+                                item(key = "preinstalled_apps_header") {
+                                    Text(
+                                        "Preinstalled Apps",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.secondary,
+                                        modifier = Modifier.padding(top = 16.dp, bottom = 8.dp, start = 4.dp)
+                                    )
+                                }
+                                itemsIndexed(
+                                    preinstalledApps,
+                                    key = { _, app -> app.packageName }
+                                ) { index, app ->
+                                    WhitelistAppItem(
+                                        app = app,
+                                        isSelected = app.packageName in selectedApps,
+                                        shape = getAdaptiveShape(index, preinstalledApps.size),
+                                        modifier = Modifier.animateItem(),
+                                        onToggle = {
+                                            selectedApps = if (app.packageName in selectedApps) {
+                                                selectedApps - app.packageName
+                                            } else {
+                                                selectedApps + app.packageName
+                                            }
+                                        }
+                                    )
+                                }
                             }
 
                             if (systemApps.isNotEmpty()) {
@@ -335,9 +394,15 @@ fun WhitelistAppItem(
                     Text(app.packageName, style = MaterialTheme.typography.bodySmall)
                     if (app.isSystemApp) {
                         Text(
-                            text = "System App",
+                            text = "System Core",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary
+                        )
+                    } else if (app.isPreinstalledApp) {
+                        Text(
+                            text = "Preinstalled",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.secondary
                         )
                     }
                 }
