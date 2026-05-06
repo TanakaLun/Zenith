@@ -61,10 +61,6 @@ class ZenithAccessibilityService : AccessibilityService() {
     @Volatile
     private var allShieldsCache = listOf<ShieldEntity>()
     @Volatile
-    private var restrictedPackages = emptySet<String>()
-    @Volatile
-    private var hasGlobalAllowSchedule = false
-    @Volatile
     private var usageStatsCache: List<UsageStats>? = null
     private var lastUsageCacheTime = 0L
     private var lastCheckedDay = -1
@@ -76,7 +72,6 @@ class ZenithAccessibilityService : AccessibilityService() {
     private var cachedBedtimeEndMinutes = -1
     private val windDownUsedPackages = ConcurrentHashMap<String, Boolean>()
     private var bedtimeWhitelistedPackages = emptySet<String>()
-    private val systemAppCache = ConcurrentHashMap<String, Boolean>()
 
     private class ParsedSchedule(
         val id: Long,
@@ -119,7 +114,6 @@ class ZenithAccessibilityService : AccessibilityService() {
                 lastForegroundApp?.let { currentPkg ->
                     currentShieldCache = shields.find { it.packageName == currentPkg }
                 }
-                updateRestrictedPackages()
             }
         }
 
@@ -137,7 +131,6 @@ class ZenithAccessibilityService : AccessibilityService() {
                         packageNames = s.packageNames.toSet()
                     )
                 }
-                updateRestrictedPackages()
             }
         }
 
@@ -743,41 +736,9 @@ class ZenithAccessibilityService : AccessibilityService() {
             if (packageName in whitelistedPackages) return true
         }
 
-        if (packageName in CRITICAL_SYSTEM_PACKAGES) return true
         if (packageName.contains("launcher", ignoreCase = true) || packageName.contains("home", ignoreCase = true)) return true
-
-        val isSystem = systemAppCache.getOrPut(packageName) {
-            try {
-                val appInfo = packageManager.getApplicationInfo(packageName, 0)
-                (appInfo.flags and (android.content.pm.ApplicationInfo.FLAG_SYSTEM or android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) != 0
-            } catch (_: Exception) { false }
-        }
-
-        if (isSystem) {
-            if (packageName.contains("car.mode", ignoreCase = true)) return true
-            return !(packageName in restrictedPackages || hasGlobalAllowSchedule)
-        }
-
         return false
     }
-
-    private fun updateRestrictedPackages() {
-        val shieldPkgs = allShieldsCache.map { it.packageName }.toSet()
-        val schedulePkgs = activeSchedules.filter { it.mode == ScheduleMode.BLOCK }
-            .flatMap { it.packageNames }.toSet()
-        hasGlobalAllowSchedule = activeSchedules.any { it.mode == ScheduleMode.ALLOW }
-        restrictedPackages = shieldPkgs + schedulePkgs + BLOCKABLE_SYSTEM_APPS
-    }
-
-    private val CRITICAL_SYSTEM_PACKAGES = setOf(
-        "android", "com.android.systemui", "com.android.settings", "com.android.phone",
-        "com.android.server.telecom", "com.google.android.packageinstaller",
-        "com.android.packageinstaller", "com.google.android.permissioncontroller"
-    )
-    private val BLOCKABLE_SYSTEM_APPS = setOf(
-        "com.google.android.youtube", "com.android.chrome",
-        "com.google.android.apps.youtube.music", "com.android.vending"
-    )
 
     private fun showScheduleOverlay(packageName: String, schedule: ScheduleEntity) {
         val totalGlobalUsageToday = getTotalGlobalUsageToday()
@@ -842,7 +803,6 @@ class ZenithAccessibilityService : AccessibilityService() {
             lastUsageFetchTime = 0L
             usageStatsCache = null
             lastUsageCacheTime = 0L
-            systemAppCache.clear()
             try {
                 ZenithDatabase.getDatabase(this).openHelper.writableDatabase.execSQL("PRAGMA shrink_memory")
             } catch (_: Exception) {}
