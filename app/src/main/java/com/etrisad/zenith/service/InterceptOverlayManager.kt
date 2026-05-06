@@ -31,7 +31,6 @@ class InterceptOverlayManager(private val context: Context) {
         private const val TAG = "InterceptOverlayManager"
         @Volatile
         var isShowing = false
-            private set
         private var overlayView: ComposeView? = null
         private var lifecycleOwner: MyLifecycleOwner? = null
         private var viewModelStore: ViewModelStore? = null
@@ -58,6 +57,12 @@ class InterceptOverlayManager(private val context: Context) {
         onCloseApp: () -> Unit,
         onGoalDismiss: () -> Unit
     ) {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            mainHandler.post {
+                showOverlay(packageName, appName, shield, totalUsageToday, totalGlobalUsageToday, delayDurationSeconds, onAllowUse, onCloseApp, onGoalDismiss)
+            }
+            return
+        }
         Log.d(TAG, "Request to show overlay for $packageName")
         if (isShowing && currentPackage == packageName && overlayView != null) {
             Log.d(TAG, "Overlay already showing for $packageName, updating parameters")
@@ -144,6 +149,12 @@ class InterceptOverlayManager(private val context: Context) {
         onAllowUse: (Int, Boolean) -> Unit,
         onCloseApp: () -> Unit
     ) {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            mainHandler.post {
+                showScheduleOverlay(packageName, appName, schedule, totalGlobalUsageToday, onAllowUse, onCloseApp)
+            }
+            return
+        }
         if (isShowing && currentPackage == packageName && overlayView != null) {
             overlayView?.setContent {
                 ZenithTheme {
@@ -210,6 +221,12 @@ class InterceptOverlayManager(private val context: Context) {
         appName: String,
         onCloseApp: () -> Unit
     ) {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            mainHandler.post {
+                showBedtimeOverlay(packageName, appName, onCloseApp)
+            }
+            return
+        }
         if (isShowing && currentPackage == packageName && overlayView != null) return
         if (isShowing || overlayView != null) hideOverlay()
         
@@ -250,6 +267,12 @@ class InterceptOverlayManager(private val context: Context) {
         onAllowUse: (Int) -> Unit,
         onCloseApp: () -> Unit
     ) {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            mainHandler.post {
+                showWindDownOverlay(packageName, appName, sessionUsed, onAllowUse, onCloseApp)
+            }
+            return
+        }
         if (isShowing && currentPackage == packageName && overlayView != null) {
             overlayView?.setContent {
                 ZenithTheme {
@@ -352,15 +375,13 @@ class InterceptOverlayManager(private val context: Context) {
         }
     }
 
-    suspend fun checkAndHide(newPackage: String) {
+    fun checkAndHide(newPackage: String) {
         if (!isShowing) return
         
         val target = currentPackage ?: return
 
         if (newPackage != target && newPackage != context.packageName && !SYSTEM_UI_PACKAGES.contains(newPackage)) {
-            withContext(Dispatchers.Main) {
-                hideOverlay()
-            }
+            hideOverlay()
         }
     }
 

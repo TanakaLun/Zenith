@@ -76,6 +76,7 @@ class AppUsageMonitorService : Service() {
     private var lastCheckedDayTimestamp = 0L
     private var isScreenOn = true
     private var isPowerSaveMode = false
+    private var overlayShowingSince = 0L
 
     private val notificationManager by lazy { getSystemService(NotificationManager::class.java) }
 
@@ -329,6 +330,16 @@ class AppUsageMonitorService : Service() {
                         continue
                     }
 
+                    if (InterceptOverlayManager.isShowing) {
+                        if (overlayShowingSince == 0L) overlayShowingSince = currentTime
+                        else if (currentTime - overlayShowingSince > 30000L) {
+                            InterceptOverlayManager.isShowing = false
+                            overlayShowingSince = 0L
+                        }
+                    } else {
+                        overlayShowingSince = 0L
+                    }
+
                     val currentApp = getForegroundApp()
 
                     if (currentApp != null) {
@@ -350,8 +361,10 @@ class AppUsageMonitorService : Service() {
                         if (currentApp != lastForegroundApp || currentShieldCache == null) {
                             currentShieldCache = allShieldsCache.find { it.packageName == currentApp }
                             if (currentApp != lastForegroundApp) {
-                                lastUsageFetchTime = 0L 
+                                lastUsageFetchTime = 0L
                                 lastHUDUpdateTime = 0L
+                                lastUsageCacheTime = 0L
+                                usageStatsCache = null
                                 sessionStartTime = currentTime
                                 
                                 val systemUsage = getTotalUsageToday(currentApp)
@@ -659,8 +672,7 @@ class AppUsageMonitorService : Service() {
     }
 
     private suspend fun checkIfAppIsShielded(targetPackageName: String) {
-        val currentForeground = getForegroundApp()
-        if (targetPackageName != currentForeground) return
+        if (targetPackageName != lastForegroundApp) return
 
         val shield = currentShieldCache ?: allShieldsCache.find { it.packageName == targetPackageName }
         val prefs = currentPreferences ?: preferencesRepository.userPreferencesFlow.first()
@@ -1286,14 +1298,19 @@ class AppUsageMonitorService : Service() {
             usageStatsManager.queryEvents(time - 10000, time)
         } catch (_: Exception) { null } ?: return lastForegroundApp
         
-        var lastPackage: String? = null
+        var moveToFgPackage: String? = null
+        var resumedPackage: String? = null
         while (usageEvents.hasNextEvent()) {
             usageEvents.getNextEvent(reusableEvent)
-            if (reusableEvent.eventType == UsageEvents.Event.MOVE_TO_FOREGROUND || 
-                reusableEvent.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
-                lastPackage = reusableEvent.packageName
+            val eventType = reusableEvent.eventType
+            if (eventType == UsageEvents.Event.MOVE_TO_FOREGROUND) {
+                moveToFgPackage = reusableEvent.packageName
+            }
+            if (eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
+                resumedPackage = reusableEvent.packageName
             }
         }
+        var lastPackage = moveToFgPackage ?: resumedPackage
 
         if (lastPackage == null) {
             try {
