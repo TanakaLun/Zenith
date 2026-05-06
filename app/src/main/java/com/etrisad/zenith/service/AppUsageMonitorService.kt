@@ -64,7 +64,8 @@ class AppUsageMonitorService : Service() {
     private var goalShieldsCache = listOf<ShieldEntity>()
     private var launcherAppsCache = emptySet<String>()
     private var lastLauncherAppsRefreshTime = 0L
-    
+
+    //test
     private var isBedtimeActive = false
     private var isWindDownActive = false
     private var isBedtimeBlockingActive = false
