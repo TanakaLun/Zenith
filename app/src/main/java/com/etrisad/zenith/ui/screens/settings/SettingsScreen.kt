@@ -1616,14 +1616,26 @@ fun HUDAppearanceSettings(
                     Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.2f)))
                 }
 
-                val scale = size / 100f
+                val animatedScale by animateFloatAsState(
+                    targetValue = size / 100f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioNoBouncy,
+                        stiffness = Spring.StiffnessMediumLow
+                    ),
+                    label = "HUDScale"
+                )
+                val animatedOpacity by animateFloatAsState(
+                    targetValue = opacity / 100f,
+                    label = "HUDOpacity"
+                )
+
                 Box(
                     modifier = Modifier
                         .size(80.dp)
                         .graphicsLayer {
-                            scaleX = scale
-                            scaleY = scale
-                            alpha = opacity / 100f
+                            scaleX = animatedScale
+                            scaleY = animatedScale
+                            alpha = animatedOpacity
                         }
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.surface)
@@ -1635,8 +1647,8 @@ fun HUDAppearanceSettings(
                         modifier = Modifier.fillMaxSize(),
                         color = MaterialTheme.colorScheme.primary,
                         trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        amplitude = { 1.5f },
-                        wavelength = 20.dp
+                        wavelength = 20.dp,
+                        waveSpeed = 0.dp
                     )
                     Text(
                         text = "15m",
