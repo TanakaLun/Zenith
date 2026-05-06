@@ -1536,6 +1536,9 @@ fun HUDAppearanceSettings(
         }
     }
 
+    var localSize by remember(size) { mutableFloatStateOf(size.toFloat()) }
+    var localOpacity by remember(opacity) { mutableFloatStateOf(opacity.toFloat()) }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = shape,
@@ -1556,15 +1559,16 @@ fun HUDAppearanceSettings(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Outlined.PhotoSizeSelectSmall, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 Slider(
-                    value = size.toFloat(),
-                    onValueChange = { onSizeChange(it.toInt()) },
+                    value = localSize,
+                    onValueChange = { localSize = it },
+                    onValueChangeFinished = { onSizeChange(localSize.toInt()) },
                     valueRange = 50f..200f,
                     modifier = Modifier.weight(1f).padding(horizontal = 16.dp)
                 )
                 Icon(Icons.Outlined.PhotoSizeSelectLarge, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Text(
-                text = "Size: $size%",
+                text = "Size: ${localSize.toInt()}%",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.align(Alignment.CenterHorizontally)
@@ -1575,15 +1579,16 @@ fun HUDAppearanceSettings(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Outlined.Opacity, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 Slider(
-                    value = opacity.toFloat(),
-                    onValueChange = { onOpacityChange(it.toInt()) },
+                    value = localOpacity,
+                    onValueChange = { localOpacity = it },
+                    onValueChangeFinished = { onOpacityChange(localOpacity.toInt()) },
                     valueRange = 20f..100f,
                     modifier = Modifier.weight(1f).padding(horizontal = 16.dp)
                 )
                 Icon(Icons.Outlined.Contrast, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Text(
-                text = "Opacity: $opacity%",
+                text = "Opacity: ${localOpacity.toInt()}%",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.align(Alignment.CenterHorizontally)
@@ -1617,15 +1622,11 @@ fun HUDAppearanceSettings(
                 }
 
                 val animatedScale by animateFloatAsState(
-                    targetValue = size / 100f,
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioNoBouncy,
-                        stiffness = Spring.StiffnessMediumLow
-                    ),
+                    targetValue = localSize / 100f,
                     label = "HUDScale"
                 )
                 val animatedOpacity by animateFloatAsState(
-                    targetValue = opacity / 100f,
+                    targetValue = localOpacity / 100f,
                     label = "HUDOpacity"
                 )
 
