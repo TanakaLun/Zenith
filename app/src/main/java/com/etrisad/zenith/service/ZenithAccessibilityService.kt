@@ -280,14 +280,14 @@ class ZenithAccessibilityService : AccessibilityService() {
             if (!isAppPaused) {
                 val allowedUntil = allowedApps[currentApp] ?: 0L
                 if (System.currentTimeMillis() > allowedUntil && !InterceptOverlayManager.isShowing) {
-            if (!checkSchedules(currentApp) && shield != null) {
-                if (shield.isAutoQuitEnabled && (allowedApps[currentApp] ?: 0L) > 0) {
-                    goToHomeScreen()
-                    allowedApps.remove(currentApp)
-                } else {
-                    checkIfAppIsShielded(currentApp)
-                }
-            }
+                    if (!checkSchedules(currentApp) && shield != null) {
+                        if (shield.isAutoQuitEnabled && allowedUntil > 0) {
+                            goToHomeScreen()
+                            allowedApps.remove(currentApp)
+                        } else {
+                            checkIfAppIsShielded(currentApp)
+                        }
+                    }
                 }
             }
 
