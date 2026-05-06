@@ -1203,14 +1203,15 @@ class AppUsageMonitorService : Service() {
     private fun shouldBypassBlocking(packageName: String): Boolean {
         if (packageName == this.packageName) return true
 
-        if (isBedtimeBlockingActive) {
-            if (packageName in bedtimeWhitelistedPackages) return true
+        val isWhitelisted = if (isBedtimeBlockingActive) {
+            packageName in bedtimeWhitelistedPackages
         } else {
-            if (packageName in whitelistedPackages) return true
+            packageName in whitelistedPackages
         }
 
-        if (packageName in CRITICAL_SYSTEM_PACKAGES) return true
+        if (isWhitelisted) return true
 
+        if (packageName in CRITICAL_SYSTEM_PACKAGES) return true
         if (launcherPackages.contains(packageName)) return true
 
         val isSystem = systemAppCache.getOrPut(packageName) {
@@ -1226,7 +1227,7 @@ class AppUsageMonitorService : Service() {
                 packageName.contains("car.mode", ignoreCase = true)) {
                 return true
             }
-            return packageName !in BLOCKABLE_SYSTEM_APPS
+            return false
         }
 
         return false

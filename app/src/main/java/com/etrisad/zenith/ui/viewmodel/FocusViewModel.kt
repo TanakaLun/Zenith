@@ -12,9 +12,11 @@ import com.etrisad.zenith.data.local.entity.ScheduleMode
 import com.etrisad.zenith.data.local.entity.ShieldEntity
 import com.etrisad.zenith.data.repository.ShieldRepository
 import kotlinx.coroutines.Dispatchers
+import com.etrisad.zenith.data.preferences.UserPreferencesRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -48,7 +50,8 @@ data class FocusUiState(
 
 class FocusViewModel(
     private val context: Context,
-    private val shieldRepository: ShieldRepository
+    private val shieldRepository: ShieldRepository,
+    private val preferencesRepository: UserPreferencesRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(FocusUiState())
@@ -56,6 +59,7 @@ class FocusViewModel(
 
     private val _allInstalledApps = MutableStateFlow<List<AppInfo>>(emptyList())
     private var allShields: List<ShieldEntity> = emptyList()
+    private var whitelistedPackages: Set<String> = emptySet()
 
     init {
         viewModelScope.launch {
@@ -66,11 +70,18 @@ class FocusViewModel(
             }
         }
         viewModelScope.launch {
+            preferencesRepository.userPreferencesFlow.collectLatest { prefs ->
+                if (whitelistedPackages != prefs.whitelistedPackages) {
+                    whitelistedPackages = prefs.whitelistedPackages
+                    loadInstalledApps()
+                }
+            }
+        }
+        viewModelScope.launch {
             shieldRepository.allSchedules.collect { schedules ->
                 _uiState.value = _uiState.value.copy(activeSchedules = schedules)
             }
         }
-        loadInstalledApps()
         startRealTimeUpdates()
     }
 
@@ -136,7 +147,10 @@ class FocusViewModel(
                 val pm = context.packageManager
                 val installedApps = pm.getInstalledApplications(PackageManager.GET_META_DATA)
                 installedApps
-                    .filter { (it.flags and ApplicationInfo.FLAG_SYSTEM) == 0 }
+                    .filter { app ->
+                        val isSystem = (app.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+                        !isSystem || app.packageName !in whitelistedPackages
+                    }
                     .filter { it.packageName != context.packageName }
                     .map {
                         AppInfo(
