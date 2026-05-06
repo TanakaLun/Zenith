@@ -45,9 +45,22 @@ fun ZenithHeader(
 
     val sideSlotWidth = 68.dp
 
+    val smoothedAlpha by animateFloatAsState(
+        targetValue = (1f - scrollBehavior.state.collapsedFraction).coerceIn(0f, 1f),
+        animationSpec = spring(stiffness = Spring.StiffnessLow),
+        label = "SmoothedHeaderAlpha"
+    )
+    val smoothedOffset by animateFloatAsState(
+        targetValue = scrollBehavior.state.heightOffset,
+        animationSpec = spring(stiffness = Spring.StiffnessLow),
+        label = "SmoothedHeaderOffset"
+    )
+    val smoothedFraction = 1f - smoothedAlpha
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
+            .graphicsLayer { alpha = smoothedAlpha }
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
@@ -82,13 +95,10 @@ fun ZenithHeader(
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.statusBars)
                 .height(64.dp)
-                .offset { IntOffset(0, scrollBehavior.state.heightOffset.roundToInt()) }
+                .offset { IntOffset(0, smoothedOffset.roundToInt()) }
                 .graphicsLayer {
-                    // Use a more expressive easing for the scroll-to-hide transition
-                    val fraction = scrollBehavior.state.collapsedFraction
-                    alpha = (1f - fraction).coerceAtLeast(0f)
-                    // Add a subtle scale effect to make it feel less "stiff"
-                    val scale = 1f - (fraction * 0.08f)
+                    alpha = smoothedAlpha
+                    val scale = 1f - (smoothedFraction * 0.08f)
                     scaleX = scale
                     scaleY = scale
                 }
@@ -160,14 +170,13 @@ fun ZenithHeader(
         Box(
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .offset { IntOffset(0, scrollBehavior.state.heightOffset.roundToInt()) }
+                .offset { IntOffset(0, smoothedOffset.roundToInt()) }
                 .windowInsetsPadding(WindowInsets.statusBars)
                 .height(64.dp)
                 .widthIn(min = sideSlotWidth)
                 .graphicsLayer {
-                    val fraction = scrollBehavior.state.collapsedFraction
-                    alpha = (1f - fraction).coerceAtLeast(0f)
-                    val scale = 1f - (fraction * 0.12f)
+                    alpha = smoothedAlpha
+                    val scale = 1f - (smoothedFraction * 0.12f)
                     scaleX = scale
                     scaleY = scale
                 }
@@ -209,14 +218,13 @@ fun ZenithHeader(
         Box(
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .offset { IntOffset(0, scrollBehavior.state.heightOffset.roundToInt()) }
+                .offset { IntOffset(0, smoothedOffset.roundToInt()) }
                 .windowInsetsPadding(WindowInsets.statusBars)
                 .height(64.dp)
                 .widthIn(min = sideSlotWidth)
                 .graphicsLayer {
-                    val fraction = scrollBehavior.state.collapsedFraction
-                    alpha = (1f - fraction).coerceAtLeast(0f)
-                    val scale = 1f - (fraction * 0.12f)
+                    alpha = smoothedAlpha
+                    val scale = 1f - (smoothedFraction * 0.12f)
                     scaleX = scale
                     scaleY = scale
                 }

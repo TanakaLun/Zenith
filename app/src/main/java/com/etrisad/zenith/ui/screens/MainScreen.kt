@@ -87,6 +87,14 @@ fun MainScreen(
 
     val scrollBehavior = if (isDeepScreen) pinnedScrollBehavior else enterAlwaysScrollBehavior
 
+    // Reset scroll behavior when switching between top-level screens or returning from deep screens
+    LaunchedEffect(currentRoute) {
+        if (!isDeepScreen) {
+            enterAlwaysScrollBehavior.state.heightOffset = 0f
+            enterAlwaysScrollBehavior.state.contentOffset = 0f
+        }
+    }
+
     val preferences by userPreferencesRepository.userPreferencesFlow.collectAsState(
         initial = UserPreferences()
     )
