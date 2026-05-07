@@ -36,6 +36,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.graphics.shapes.toPath
 import com.etrisad.zenith.R
+import com.etrisad.zenith.BuildConfig
 import com.etrisad.zenith.data.preferences.FontOption
 import com.etrisad.zenith.data.preferences.ThemeConfig
 import com.etrisad.zenith.data.preferences.UserPreferences
@@ -286,13 +287,7 @@ fun SettingsScreenContent(
     var showDelayAppSheet by remember { mutableStateOf(false) }
 
     val context = androidx.compose.ui.platform.LocalContext.current
-    val versionName = remember {
-        try {
-            context.packageManager.getPackageInfo(context.packageName, 0).versionName
-        } catch (e: Exception) {
-            "1.4"
-        }
-    }
+    val versionName = BuildConfig.VERSION_NAME
 
     LazyColumn(
         modifier = Modifier
@@ -566,7 +561,7 @@ fun SettingsScreenContent(
 
             item {
                 AppInfoCard(
-                    versionName = versionName ?: "1.4",
+                    versionName = versionName,
                     shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
                 )
             }
