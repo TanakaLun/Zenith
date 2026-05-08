@@ -107,8 +107,12 @@ fun ExpandableUsageGroup(
             ),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (group.isMissing) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
-            else MaterialTheme.colorScheme.surfaceContainer
+            containerColor = when {
+                group.isMissing -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                group.isLive -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
+                group.hasDatabaseRecord -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                else -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
+            }
         )
     ) {
         Column {
@@ -119,25 +123,42 @@ fun ExpandableUsageGroup(
                     .fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                val statusColor = when {
+                    group.isMissing -> MaterialTheme.colorScheme.error
+                    group.isLive -> MaterialTheme.colorScheme.tertiary
+                    group.hasDatabaseRecord -> MaterialTheme.colorScheme.primary
+                    else -> MaterialTheme.colorScheme.secondary
+                }
+                
+                val statusContainerColor = when {
+                    group.isMissing -> MaterialTheme.colorScheme.errorContainer
+                    group.isLive -> MaterialTheme.colorScheme.tertiaryContainer
+                    group.hasDatabaseRecord -> MaterialTheme.colorScheme.primaryContainer
+                    else -> MaterialTheme.colorScheme.secondaryContainer
+                }
+
+                val onStatusContainerColor = when {
+                    group.isMissing -> MaterialTheme.colorScheme.onErrorContainer
+                    group.isLive -> MaterialTheme.colorScheme.onTertiaryContainer
+                    group.hasDatabaseRecord -> MaterialTheme.colorScheme.onPrimaryContainer
+                    else -> MaterialTheme.colorScheme.onSecondaryContainer
+                }
+
                 Box(
                     modifier = Modifier
                         .size(48.dp)
-                        .background(
-                            if (group.isMissing) MaterialTheme.colorScheme.errorContainer
-                            else if (group.isLive) MaterialTheme.colorScheme.secondaryContainer
-                            else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
-                            CircleShape
-                        ),
+                        .background(statusContainerColor, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = if (group.isMissing) Icons.Outlined.History 
-                                      else if (group.hasDatabaseRecord) Icons.Outlined.CloudDone
-                                      else Icons.Outlined.History,
+                        imageVector = when {
+                            group.isMissing -> Icons.Outlined.History
+                            group.isLive -> Icons.Outlined.Bolt
+                            group.hasDatabaseRecord -> Icons.Outlined.CloudDone
+                            else -> Icons.Outlined.Assessment
+                        },
                         contentDescription = null,
-                        tint = if (group.isMissing) MaterialTheme.colorScheme.onErrorContainer
-                               else if (group.isLive) MaterialTheme.colorScheme.onSecondaryContainer
-                               else MaterialTheme.colorScheme.onPrimaryContainer
+                        tint = onStatusContainerColor
                     )
                 }
 
@@ -152,32 +173,28 @@ fun ExpandableUsageGroup(
                         )
                         if (group.isLive) {
                             Surface(
-                                color = MaterialTheme.colorScheme.primary,
+                                color = MaterialTheme.colorScheme.tertiary,
                                 shape = CircleShape,
                                 modifier = Modifier.padding(start = 8.dp)
                             ) {
                                 Text(
                                     "LIVE",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    color = MaterialTheme.colorScheme.onTertiary,
                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                 )
                             }
                         }
-                        if (group.hasDatabaseRecord) {
-                            Icon(
-                                imageVector = Icons.Outlined.CheckCircle,
-                                contentDescription = "Saved",
-                                modifier = Modifier.padding(start = 8.dp).size(16.dp),
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
                     }
                     Text(
-                        text = if (group.isMissing) "No record found" 
-                               else "Total: ${viewModel.formatDuration(group.totalTimeMillis)}",
+                        text = when {
+                            group.isMissing -> "No data found anywhere"
+                            group.isLive -> "Live monitoring data"
+                            group.hasDatabaseRecord -> "Saved in Database"
+                            else -> "Found in System Stats only"
+                        },
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (group.isMissing) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                        color = statusColor
                     )
                 }
 
@@ -260,8 +277,8 @@ fun UsageRecordItem(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = shape,
-        color = if (isDatabase) MaterialTheme.colorScheme.surfaceContainerLow 
-                else MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
+        color = if (isDatabase) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)
+                else MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.2f)
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
@@ -271,7 +288,7 @@ fun UsageRecordItem(
                 imageVector = if (packageName == "TOTAL") Icons.Outlined.History else Icons.Outlined.SdStorage,
                 contentDescription = null,
                 modifier = Modifier.size(20.dp),
-                tint = if (packageName == "TOTAL") MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary
+                tint = if (isDatabase) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary
             )
 
             Spacer(modifier = Modifier.width(12.dp))
@@ -283,7 +300,7 @@ fun UsageRecordItem(
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = if (isDatabase) "Saved: $formattedTime" else "Source: Live",
+                    text = if (isDatabase) "Saved in Database: $formattedTime" else "Fetched from App Usage",
                     style = MaterialTheme.typography.labelSmall,
                     fontSize = MaterialTheme.typography.labelSmall.fontSize * 0.9f,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -294,7 +311,7 @@ fun UsageRecordItem(
                 text = formattedDuration,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.ExtraBold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = if (isDatabase) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary
             )
         }
     }

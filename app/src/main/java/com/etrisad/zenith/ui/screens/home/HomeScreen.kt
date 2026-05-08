@@ -797,7 +797,14 @@ fun UsageGraph(
                     ) {
                         pageData.forEach { usage ->
                             val isSelected = selectedDate == usage.date
-                            val indicatorColor = if (usage.hasDatabaseRecord) Color(0xFFFFD700) else Color(0xFFFF5252)
+                            val indicatorColor = when {
+                                usage.totalTime == 0L && !usage.isLive -> MaterialTheme.colorScheme.error
+                                usage.isLive -> MaterialTheme.colorScheme.tertiary
+                                usage.hasDatabaseRecord -> MaterialTheme.colorScheme.primary
+                                usage.hasSystemData -> MaterialTheme.colorScheme.secondary
+                                else -> MaterialTheme.colorScheme.error
+                            }
+
                             val animatedIndicatorColor by animateColorAsState(
                                 targetValue = if (animateTrigger) indicatorColor else indicatorColor.copy(alpha = 0f),
                                 animationSpec = spring(Spring.DampingRatioNoBouncy, Spring.StiffnessVeryLow)

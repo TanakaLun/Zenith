@@ -27,7 +27,9 @@ data class AppUsageInfo(
 data class DailyUsage(
     val date: Long,
     val totalTime: Long,
-    val hasDatabaseRecord: Boolean = false
+    val hasDatabaseRecord: Boolean = false,
+    val hasSystemData: Boolean = false,
+    val isLive: Boolean = false
 )
 
 data class AppDetailUiState(
@@ -71,6 +73,7 @@ data class UsageHistoryGroup(
     val records: List<UsageRecord>,
     val totalTimeMillis: Long,
     val hasDatabaseRecord: Boolean = false,
+    val hasSystemData: Boolean = false,
     val isMissing: Boolean = false,
     val isLive: Boolean = false
 )
@@ -106,6 +109,7 @@ class HomeViewModel(
             
             val dbRecords = dbList.filter { it.date == dateStr }
             val dbTotal = dbRecords.find { it.packageName == "TOTAL" }?.usageTimeMillis ?: 0L
+            val systemTotal = globalFallbackMap[dateStr] ?: 0L
             
             if (isToday) {
                 val liveRecords = mutableListOf<UsageRecord>()
@@ -122,21 +126,30 @@ class HomeViewModel(
                     records = liveRecords, 
                     totalTimeMillis = maxOf(dbTotal, liveTotal),
                     hasDatabaseRecord = dbRecords.isNotEmpty(),
+                    hasSystemData = true,
                     isLive = true
                 ))
-            } else if (dbRecords.isEmpty()) {
+            } else if (dbRecords.isEmpty() && systemTotal == 0L) {
                 groups.add(UsageHistoryGroup(
                     date = dateStr, 
                     records = emptyList(), 
                     totalTimeMillis = 0L,
                     isMissing = true
                 ))
+            } else if (dbRecords.isEmpty() && systemTotal > 0L) {
+                groups.add(UsageHistoryGroup(
+                    date = dateStr,
+                    records = listOf(UsageRecord.Live("TOTAL", systemTotal)),
+                    totalTimeMillis = systemTotal,
+                    hasSystemData = true
+                ))
             } else {
                 groups.add(UsageHistoryGroup(
                     date = dateStr, 
                     records = dbRecords.map { UsageRecord.Database(it) },
                     totalTimeMillis = dbTotal,
-                    hasDatabaseRecord = true
+                    hasDatabaseRecord = true,
+                    hasSystemData = systemTotal > 0L
                 ))
             }
             
@@ -308,6 +321,7 @@ class HomeViewModel(
             val dateStr = dateFormat.format(Date(dStart))
             
             val dbEntry = globalHistory.find { it.date == dateStr }
+            val hasSystemData = globalFallbackMap[dateStr] != null
             val dayTotal = if (i == 0) {
                 totalToday
             } else {
@@ -315,7 +329,13 @@ class HomeViewModel(
                     ?: globalFallbackMap[dateStr] 
                     ?: 0L
             }
-            DailyUsage(dStart, dayTotal, hasDatabaseRecord = dbEntry != null)
+            DailyUsage(
+                date = dStart, 
+                totalTime = dayTotal, 
+                hasDatabaseRecord = dbEntry != null,
+                hasSystemData = hasSystemData,
+                isLive = i == 0
+            )
         }
 
         val percentageChange = when {
@@ -448,6 +468,7 @@ class HomeViewModel(
                     val dateStr = dateFormat.format(Date(dStart))
                     
                     val dbEntry = historyFromDb.find { it.date == dateStr }
+                    val hasSystemData = detailFallbackMap[dateStr] != null
                     val dayTotal = if (i == 0) {
                         currentTodayUsage
                     } else {
@@ -455,7 +476,13 @@ class HomeViewModel(
                             ?: detailFallbackMap[dateStr]
                             ?: 0L
                     }
-                    DailyUsage(dStart, dayTotal, hasDatabaseRecord = dbEntry != null)
+                    DailyUsage(
+                        date = dStart, 
+                        totalTime = dayTotal, 
+                        hasDatabaseRecord = dbEntry != null,
+                        hasSystemData = hasSystemData,
+                        isLive = i == 0
+                    )
                 }
 
                 val percentageChange = when {
