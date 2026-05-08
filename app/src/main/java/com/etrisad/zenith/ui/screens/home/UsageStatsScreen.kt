@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
+import com.etrisad.zenith.data.local.entity.FocusType
 import com.etrisad.zenith.ui.components.SnapshotCard
 import com.etrisad.zenith.ui.components.UsageHistoryCard
 import com.etrisad.zenith.ui.viewmodel.AppUsageInfo
@@ -47,6 +48,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 fun UsageStatsScreen(
     viewModel: HomeViewModel,
     innerPadding: PaddingValues,
+    showDatabaseIndicator: Boolean,
     onAppClick: (String) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -69,6 +71,24 @@ fun UsageStatsScreen(
         } else null
     }
 
+    val hourlyGroupTotal = remember(hourlyAppsData, isOtherHourAppsExpanded) {
+        val appsCount = if (hourlyAppsData != null) {
+            val (_, regular, lowData) = hourlyAppsData
+            val (low, totalLowTime, _) = lowData
+            regular.size + (if (totalLowTime > 0) (if (isOtherHourAppsExpanded) 1 + low.size else 1) else 0)
+        } else 0
+        2 + appsCount // HourlyStats, UsageTrends, Apps (Snapshot separated)
+    }
+
+    fun getGroupShape(index: Int, total: Int): RoundedCornerShape {
+        return when {
+            total == 1 -> RoundedCornerShape(28.dp)
+            index == 0 -> RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp, bottomStart = 12.dp, bottomEnd = 12.dp)
+            index == total - 1 -> RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp, bottomStart = 28.dp, bottomEnd = 28.dp)
+            else -> RoundedCornerShape(12.dp)
+        }
+    }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -78,9 +98,13 @@ fun UsageStatsScreen(
             bottom = innerPadding.calculateBottomPadding() + 24.dp
         )
     ) {
-        item(key = "hourly_usage_group") {
+        item(key = "hourly_stats_header") {
             Column(modifier = Modifier.animateItem()) {
-                GroupedCard(index = 0, total = 2) {
+                GroupedCard(
+                    index = 0, 
+                    total = hourlyGroupTotal,
+                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                ) {
                     HourlyStatsContent(
                         hourlyUsage = uiState.hourlyUsage,
                         selectedHour = selectedHour,
@@ -93,54 +117,25 @@ fun UsageStatsScreen(
                         dateMillis = uiState.selectedDateMillis
                     )
                 }
-                Spacer(modifier = Modifier.height(4.dp))
-                UsageHistoryCard(
-                    history = uiState.dailyUsageHistory,
-                    targetMillis = uiState.targetMillis,
-                    selectedDateMillis = uiState.selectedDateMillis,
-                    formatDuration = viewModel::formatDuration,
-                    onDaySelected = { usage ->
-                        viewModel.selectDate(usage?.date)
-                    },
-                    title = "Usage Trends",
-                    showDatabaseIndicator = true,
-                    shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp, bottomStart = 28.dp, bottomEnd = 28.dp),
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                )
+                if (hourlyAppsData != null) Spacer(modifier = Modifier.height(4.dp))
             }
         }
 
         if (hourlyAppsData != null) {
             val (_, regularHourApps, lowData) = hourlyAppsData
             val (lowUsageHourApps, totalLowUsageHourTime, currentTargetHour) = lowData
-            
-            val totalItems = regularHourApps.size + (if (totalLowUsageHourTime > 0) {
-                if (isOtherHourAppsExpanded) 1 + lowUsageHourApps.size else 1
-            } else 0)
-
-            item(key = "hourly_title_$currentTargetHour") {
-                Text(
-                    text = "Apps at $currentTargetHour:00",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier
-                        .animateItem()
-                        .padding(horizontal = 8.dp, vertical = 8.dp)
-                        .padding(top = 16.dp),
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
 
             itemsIndexed(
                 items = regularHourApps,
                 key = { _, app -> "hourly-$currentTargetHour-${app.packageName}" }
             ) { index, app ->
+                val groupIndex = 1 + index
                 Column(modifier = Modifier.animateItem()) {
                     UsageItem(
                         app = app,
                         formatDuration = viewModel::formatDuration,
-                        index = index,
-                        total = totalItems,
+                        index = groupIndex,
+                        total = hourlyGroupTotal,
                         onClick = { onAppClick(app.packageName) }
                     )
                     Spacer(modifier = Modifier.height(4.dp))
@@ -148,12 +143,12 @@ fun UsageStatsScreen(
             }
 
             if (totalLowUsageHourTime > 0) {
-                val otherIndex = regularHourApps.size
+                val otherIndexInGroup = 1 + regularHourApps.size
                 item(key = "hourly_other_header_$currentTargetHour") {
                     Column(modifier = Modifier.animateItem()) {
                         GroupedCard(
-                            index = otherIndex,
-                            total = totalItems,
+                            index = otherIndexInGroup,
+                            total = hourlyGroupTotal,
                             onClick = { isOtherHourAppsExpanded = !isOtherHourAppsExpanded }
                         ) {
                             ListItem(
@@ -208,7 +203,7 @@ fun UsageStatsScreen(
                                 )
                             )
                         }
-                        if (isOtherHourAppsExpanded) Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
                     }
                 }
 
@@ -217,29 +212,55 @@ fun UsageStatsScreen(
                         items = lowUsageHourApps,
                         key = { _, app -> "hourly-low-$currentTargetHour-${app.packageName}" }
                     ) { index, app ->
+                        val groupIndex = 1 + regularHourApps.size + 1 + index
                         Column(modifier = Modifier.animateItem()) {
                             UsageItem(
                                 app = app,
                                 formatDuration = viewModel::formatDuration,
-                                index = otherIndex + 1 + index,
-                                total = totalItems,
+                                index = groupIndex,
+                                total = hourlyGroupTotal,
                                 onClick = { onAppClick(app.packageName) }
                             )
-                            if (index < lowUsageHourApps.size - 1) Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.height(4.dp))
                         }
                     }
                 }
             }
         }
 
+        item(key = "usage_trends_group_item") {
+            Column(modifier = Modifier.animateItem()) {
+                UsageHistoryCard(
+                    history = uiState.dailyUsageHistory,
+                    targetMillis = uiState.targetMillis,
+                    selectedDateMillis = uiState.selectedDateMillis,
+                    formatDuration = viewModel::formatDuration,
+                    onDaySelected = { usage ->
+                        viewModel.selectDate(usage?.date)
+                    },
+                    title = "Usage Trends",
+                    showDatabaseIndicator = showDatabaseIndicator,
+                    shape = getGroupShape(hourlyGroupTotal - 1, hourlyGroupTotal),
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                )
+            }
+        }
+
         item(key = "snapshot_stamps") {
             Column(modifier = Modifier.animateItem()) {
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 SnapshotCard(
                     stamps = uiState.snapshotStamps,
                     selectedDateMillis = uiState.selectedDateMillis,
+                    getAppType = { pkg ->
+                        uiState.activeGoals.find { it.packageName == pkg }?.type
+                            ?: uiState.activeShields.find { it.packageName == pkg }?.type
+                    },
                     onDaySelected = { viewModel.selectDate(it) },
-                    formatDuration = viewModel::formatDuration
+                    formatDuration = viewModel::formatDuration,
+                    showDatabaseIndicator = showDatabaseIndicator,
+                    shape = RoundedCornerShape(28.dp),
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                 )
             }
         }
@@ -371,6 +392,7 @@ fun GroupedCard(
     total: Int,
     onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceContainerLow,
     content: @Composable () -> Unit
 ) {
     val shape = when {
@@ -385,7 +407,7 @@ fun GroupedCard(
             .clip(shape)
             .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
         shape = shape,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
         content = { content() }
     )
 }
@@ -456,7 +478,10 @@ fun HourlyStatsContent(
             AnimatedContent(
                 targetState = selectedHour,
                 transitionSpec = {
-                    (fadeIn() + slideInVertically { it / 2 }).togetherWith(fadeOut() + slideOutVertically { -it / 2 })
+                    (fadeIn(animationSpec = spring(stiffness = Spring.StiffnessLow)) + 
+                     slideInVertically(animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)) { it / 2 })
+                        .togetherWith(fadeOut(animationSpec = spring(stiffness = Spring.StiffnessLow)) + 
+                                     slideOutVertically(animationSpec = spring(stiffness = Spring.StiffnessLow)) { -it / 2 })
                 },
                 label = "SelectedHourText"
             ) { hour ->
@@ -467,6 +492,12 @@ fun HourlyStatsContent(
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.ExtraBold,
                         color = MaterialTheme.colorScheme.primary
+                    )
+                } else {
+                    Text(
+                        text = "Tap a bar to see the apps",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                     )
                 }
             }

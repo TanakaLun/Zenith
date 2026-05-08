@@ -573,6 +573,7 @@ fun MainScreen(
                         UsageStatsScreen(
                             viewModel = homeViewModel,
                             innerPadding = innerPadding,
+                            showDatabaseIndicator = preferences.showDatabaseIndicator,
                             onAppClick = { packageName ->
                                 navController.navigate(Screen.AppDetail.createRoute(packageName))
                             }
