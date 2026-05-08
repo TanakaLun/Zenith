@@ -73,6 +73,10 @@ data class HomeUiState(
     val globalCurrentStreak: Int = 0,
     val globalBestStreak: Int = 0,
     val targetMillis: Long = 0L,
+    val bedtimeEnabled: Boolean = false,
+    val bedtimeStartTime: String = "22:00",
+    val bedtimeEndTime: String = "07:00",
+    val bedtimeDays: Set<Int> = setOf(1, 2, 3, 4, 5, 6, 7),
     val selectedDateMillis: Long = Calendar.getInstance().apply {
         set(Calendar.HOUR_OF_DAY, 0)
         set(Calendar.MINUTE, 0)
@@ -235,6 +239,12 @@ class HomeViewModel(
             userPreferencesRepository.userPreferencesFlow.collect { prefs ->
                 currentTargetMinutes = prefs.screenTimeTargetMinutes
                 prefGlobalBestStreak = prefs.globalBestStreak
+                _uiState.update { it.copy(
+                    bedtimeEnabled = prefs.bedtimeEnabled,
+                    bedtimeStartTime = prefs.bedtimeStartTime,
+                    bedtimeEndTime = prefs.bedtimeEndTime,
+                    bedtimeDays = prefs.bedtimeDays
+                ) }
                 refreshUsageStats()
             }
         }

@@ -85,7 +85,12 @@ fun UsageStatsScreen(
                         hourlyUsage = uiState.hourlyUsage,
                         selectedHour = selectedHour,
                         onHourClick = { selectedHour = if (selectedHour == it) null else it },
-                        formatDuration = viewModel::formatDuration
+                        formatDuration = viewModel::formatDuration,
+                        bedtimeEnabled = uiState.bedtimeEnabled,
+                        bedtimeStartTime = uiState.bedtimeStartTime,
+                        bedtimeEndTime = uiState.bedtimeEndTime,
+                        bedtimeDays = uiState.bedtimeDays,
+                        dateMillis = uiState.selectedDateMillis
                     )
                 }
                 Spacer(modifier = Modifier.height(4.dp))
@@ -390,9 +395,42 @@ fun HourlyStatsContent(
     hourlyUsage: List<HourlyUsageInfo>,
     selectedHour: Int?,
     onHourClick: (Int) -> Unit,
-    formatDuration: (Long) -> String
+    formatDuration: (Long) -> String,
+    bedtimeEnabled: Boolean,
+    bedtimeStartTime: String,
+    bedtimeEndTime: String,
+    bedtimeDays: Set<Int>,
+    dateMillis: Long
 ) {
     val maxUsage = hourlyUsage.maxOfOrNull { it.usageTimeMillis }?.coerceAtLeast(1L) ?: 1L
+    
+    val bedtimeSettings = remember(dateMillis, bedtimeEnabled, bedtimeStartTime, bedtimeEndTime, bedtimeDays) {
+        val cal = Calendar.getInstance()
+        cal.timeInMillis = dateMillis
+        val todayDay = cal.get(Calendar.DAY_OF_WEEK)
+        
+        cal.add(Calendar.DAY_OF_YEAR, -1)
+        val yesterdayDay = cal.get(Calendar.DAY_OF_WEEK)
+        
+        val startH = bedtimeStartTime.split(":").firstOrNull()?.toIntOrNull() ?: 22
+        val endH = bedtimeEndTime.split(":").firstOrNull()?.toIntOrNull() ?: 7
+        
+        val todayActive = bedtimeEnabled && todayDay in bedtimeDays
+        val yesterdayActive = bedtimeEnabled && yesterdayDay in bedtimeDays
+        
+        { hour: Int ->
+            if (startH <= endH) {
+                todayActive && hour in startH until endH
+            } else {
+                // Spans midnight: 
+                // Late night today (e.g. 22-23) if today is active
+                // Early morning today (e.g. 0-6) if yesterday was active
+                (todayActive && hour >= startH) || (yesterdayActive && hour < endH)
+            }
+        }
+    }
+    
+    val isBedtimeHour = bedtimeSettings
     
     Column(modifier = Modifier.padding(16.dp)) {
         Row(
@@ -452,10 +490,13 @@ fun HourlyStatsContent(
                     label = "HourlyBarHeight"
                 )
                 
+                val isBedtime = isBedtimeHour(hourInfo.hour)
+                val baseColor = if (isBedtime) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary
+
                 val barColor = when {
-                    isSelected -> MaterialTheme.colorScheme.primary
-                    isCurrentHour -> MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
-                    else -> MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                    isSelected -> baseColor
+                    isCurrentHour -> baseColor.copy(alpha = 0.7f)
+                    else -> baseColor.copy(alpha = 0.3f)
                 }
 
                 Box(
