@@ -9,6 +9,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -31,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
+import com.etrisad.zenith.ui.components.SnapshotCard
 import com.etrisad.zenith.ui.components.UsageHistoryCard
 import com.etrisad.zenith.ui.viewmodel.AppUsageInfo
 import com.etrisad.zenith.ui.viewmodel.HomeViewModel
@@ -95,6 +98,7 @@ fun UsageStatsScreen(
                         viewModel.selectDate(usage?.date)
                     },
                     title = "Usage Trends",
+                    showDatabaseIndicator = true,
                     shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp, bottomStart = 28.dp, bottomEnd = 28.dp),
                     containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                 )
@@ -223,10 +227,15 @@ fun UsageStatsScreen(
             }
         }
 
-        item(key = "seven_day_stamps") {
+        item(key = "snapshot_stamps") {
             Column(modifier = Modifier.animateItem()) {
                 Spacer(modifier = Modifier.height(16.dp))
-                SevenDayStampsCard(stamps = uiState.sevenDayStamps)
+                SnapshotCard(
+                    stamps = uiState.snapshotStamps,
+                    selectedDateMillis = uiState.selectedDateMillis,
+                    onDaySelected = { viewModel.selectDate(it) },
+                    formatDuration = viewModel::formatDuration
+                )
             }
         }
 
@@ -468,81 +477,6 @@ fun HourlyStatsContent(
             Text("00:00", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("12:00", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("23:59", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
-@Composable
-fun SevenDayStampsCard(
-    stamps: List<AppUsageInfo>
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-        )
-    ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Outlined.Stars,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = "7-Day Stamps",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.ExtraBold
-                )
-            }
-            Spacer(modifier = Modifier.height(20.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                stamps.forEachIndexed { index, app ->
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Box(
-                            modifier = Modifier
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (app.icon != null) {
-                                Image(
-                                    painter = BitmapPainter(app.icon.toBitmap().asImageBitmap()),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(30.dp).clip(CircleShape),
-                                    contentScale = ContentScale.Crop
-                                )
-                            } else {
-                                Box(
-                                    modifier = Modifier
-                                        .size(24.dp)
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(6.dp))
-                        val dayLabel = remember(index) {
-                            val cal = Calendar.getInstance()
-                            cal.add(Calendar.DAY_OF_YEAR, -(7 - index))
-                            SimpleDateFormat("E", Locale.getDefault()).format(cal.time).first().toString()
-                        }
-                        Text(
-                            text = dayLabel,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
         }
     }
 }

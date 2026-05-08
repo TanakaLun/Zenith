@@ -139,10 +139,23 @@ fun UsageGraph(
     val pagerState = rememberPagerState(pageCount = { pageCount }, initialPage = initialPage)
 
     var hasInitializedPager by remember { mutableStateOf(false) }
-    LaunchedEffect(history) {
-        if (history.isNotEmpty() && !hasInitializedPager) {
-            val targetPage = (history.chunked(7).size - 1).coerceAtLeast(0)
-            pagerState.scrollToPage(targetPage)
+    LaunchedEffect(history, selectedDateMillis) {
+        if (history.isNotEmpty()) {
+            val targetIndex = if (selectedDateMillis != null) {
+                history.indexOfFirst { it.date == selectedDateMillis }
+            } else -1
+            
+            val targetPage = if (targetIndex != -1) {
+                targetIndex / 7
+            } else if (!hasInitializedPager) {
+                (history.size - 1).coerceAtLeast(0) / 7
+            } else {
+                -1
+            }
+
+            if (targetPage != -1 && targetPage != pagerState.currentPage) {
+                pagerState.animateScrollToPage(targetPage)
+            }
             hasInitializedPager = true
         }
     }

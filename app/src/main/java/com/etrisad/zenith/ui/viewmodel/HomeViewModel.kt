@@ -21,7 +21,10 @@ data class AppUsageInfo(
     val packageName: String,
     val appName: String,
     val totalTimeVisible: Long,
-    val icon: android.graphics.drawable.Drawable? = null
+    val icon: android.graphics.drawable.Drawable? = null,
+    val hasDatabaseRecord: Boolean = false,
+    val hasSystemData: Boolean = false,
+    val isLive: Boolean = false
 )
 
 data class DailyUsage(
@@ -60,7 +63,7 @@ data class HomeUiState(
     val percentageChange: Float = 0f,
     val dailyUsageHistory: List<DailyUsage> = emptyList(),
     val hourlyUsage: List<HourlyUsageInfo> = emptyList(),
-    val sevenDayStamps: List<AppUsageInfo> = emptyList(),
+    val snapshotStamps: List<AppUsageInfo> = emptyList(),
     val topApps: List<AppUsageInfo> = emptyList(),
     val allAppsUsage: List<AppUsageInfo> = emptyList(),
     val activeShields: List<ShieldEntity> = emptyList(),
@@ -186,6 +189,7 @@ class HomeViewModel(
     private var appDetailJob: Job? = null
 
     private var globalHistory: List<DailyUsageEntity> = emptyList()
+    private var allHistory: List<DailyUsageEntity> = emptyList()
     private var globalFallbackMap: Map<String, Long> = emptyMap()
     private var detailFallbackMap: Map<String, Long> = emptyMap()
     private var currentTargetMinutes: Int = 0
@@ -209,6 +213,13 @@ class HomeViewModel(
                         bestStreak = shield?.bestStreak ?: 0
                     ) }
                 }
+            }
+        }
+
+        viewModelScope.launch {
+            shieldRepository.getAllUsage().collect { history ->
+                allHistory = history
+                refreshUsageStats()
             }
         }
 
@@ -470,40 +481,48 @@ class HomeViewModel(
                 else               -> 0f
             }
 
-            // 5. Calculate 7-Day Stamps (Only if not already set for today)
-            val currentSevenDayStamps = _uiState.value.sevenDayStamps
-            val sevenDayStamps = if (currentSevenDayStamps.isEmpty() || isSelectedToday) {
-                (1..7).map { i ->
+            // 5. Calculate Snapshot Stamps (Only if not already set for today)
+            val currentSnapshotStamps = _uiState.value.snapshotStamps
+            val snapshotStamps = if (currentSnapshotStamps.isEmpty() || isSelectedToday) {
+                (0..20).map { i ->
                     val dStart = getMidnight(i)
-                    val dEnd = dStart + (24 * 60 * 60 * 1000L)
-                    val dayStatsMap = usm.queryAndAggregateUsageStats(dStart, dEnd)
-                    val topPackage = dayStatsMap.filter { (pkg, _) -> 
+                    val dEnd = if (i == 0) now else dStart + (24 * 60 * 60 * 1000L)
+                    val dateStr = dateFormat.format(Date(dStart))
+                    
+                    val dayStatsMap = if (i == 0) trueTodayStats else usm.queryAndAggregateUsageStats(dStart, dEnd)
+                    val topEntry = dayStatsMap.filter { (pkg, _) -> 
                         pkg !in excludePackages && pkg in launcherApps 
                     }.maxByOrNull { (_, stat) -> 
                         stat.totalTimeVisible.coerceAtLeast(stat.totalTimeInForeground) 
-                    }?.key
+                    }
                     
+                    val topPackage = topEntry?.key
+                    val usageTime = topEntry?.value?.let { it.totalTimeVisible.coerceAtLeast(it.totalTimeInForeground) } ?: 0L
+
+                    val hasDb = allHistory.any { it.date == dateStr && it.packageName != "TOTAL" }
+                    val hasSys = globalFallbackMap[dateStr] != null
+
                     if (topPackage != null) {
                         val cached = appInfoCache[topPackage]
                         if (cached != null) {
-                            AppUsageInfo(topPackage, cached.first, 0, cached.second)
+                            AppUsageInfo(topPackage, cached.first, usageTime, cached.second, hasDb, hasSys, i == 0)
                         } else {
                             try {
                                 val appInfo = pm.getApplicationInfo(topPackage, 0)
                                 val label = pm.getApplicationLabel(appInfo).toString()
                                 val icon = pm.getApplicationIcon(appInfo)
                                 appInfoCache[topPackage] = label to icon
-                                AppUsageInfo(topPackage, label, 0, icon)
+                                AppUsageInfo(topPackage, label, usageTime, icon, hasDb, hasSys, i == 0)
                             } catch (_: Exception) {
-                                AppUsageInfo("", "", 0)
+                                AppUsageInfo("", "", 0, hasDatabaseRecord = hasDb, hasSystemData = hasSys, isLive = i == 0)
                             }
                         }
                     } else {
-                        AppUsageInfo("", "", 0)
+                        AppUsageInfo("", "", 0, hasDatabaseRecord = hasDb, hasSystemData = hasSys, isLive = i == 0)
                     }
                 }.reversed()
             } else {
-                currentSevenDayStamps
+                currentSnapshotStamps
             }
 
             val liveShields = allShields.map { shield ->
@@ -556,7 +575,7 @@ class HomeViewModel(
                 percentageChange     = percentageChange,
                 dailyUsageHistory    = history.reversed(),
                 hourlyUsage          = hourlyUsage,
-                sevenDayStamps       = sevenDayStamps,
+                snapshotStamps       = snapshotStamps,
                 topApps              = topApps,
                 allAppsUsage         = allAppsUsage,
                 activeShields = sortShields(liveShields.filter { it.type == com.etrisad.zenith.data.local.entity.FocusType.SHIELD }, state.shieldSortType),
