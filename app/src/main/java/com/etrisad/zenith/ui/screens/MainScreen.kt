@@ -446,10 +446,12 @@ fun MainScreen(
                         val isTargetDeep =
                             targetRoute == Screen.UsageStats.route ||
                                     targetRoute == Screen.Bedtime.route ||
+                                    targetRoute == Screen.DatabaseDebug.route ||
                                     targetRoute?.startsWith("app_detail") == true
                         val isInitialDeep =
                             initialRoute == Screen.UsageStats.route ||
                                     initialRoute == Screen.Bedtime.route ||
+                                    initialRoute == Screen.DatabaseDebug.route ||
                                     initialRoute?.startsWith("app_detail") == true
 
                         val animationSpec = spring<IntOffset>(
@@ -486,6 +488,7 @@ fun MainScreen(
                         val isTargetDeep =
                             targetRoute == Screen.UsageStats.route ||
                                     targetRoute == Screen.Bedtime.route ||
+                                    targetRoute == Screen.DatabaseDebug.route ||
                                     targetRoute?.startsWith("app_detail") == true
 
                         val animationSpec = spring<IntOffset>(
