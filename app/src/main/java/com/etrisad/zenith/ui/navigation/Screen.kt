@@ -32,6 +32,8 @@ sealed class Screen(
     }
 
     object DatabaseDebug : Screen("database_debug", "Database Records", Icons.Filled.Settings, Icons.Outlined.Settings)
+
+    object DataRepairment : Screen("data_repairment", "Data Repairment", Icons.Filled.Settings, Icons.Outlined.Settings)
 }
 
 val navItems = listOf(

@@ -249,6 +249,9 @@ fun SettingsScreen(
         },
         onNavigateToDatabaseDebug = {
             navController.navigate(Screen.DatabaseDebug.route)
+        },
+        onNavigateToDataRepairment = {
+            navController.navigate(Screen.DataRepairment.route)
         }
     )
 
@@ -305,7 +308,8 @@ fun SettingsScreenContent(
     onInterceptAudioFocusEnabledChange: (Boolean) -> Unit,
     onShowDatabaseIndicatorChange: (Boolean) -> Unit,
     onDeveloperModeEnabledChange: (Boolean) -> Unit,
-    onNavigateToDatabaseDebug: () -> Unit
+    onNavigateToDatabaseDebug: () -> Unit,
+    onNavigateToDataRepairment: () -> Unit
 ) {
     var showTargetSheet by remember { mutableStateOf(false) }
     var showEmergencyRechargeSheet by remember { mutableStateOf(false) }
@@ -615,6 +619,17 @@ fun SettingsScreenContent(
                         summary = "View and manage all recorded usage data",
                         onClick = onNavigateToDatabaseDebug,
                         icon = Icons.Outlined.SdStorage,
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    SettingsActionItem(
+                        title = "Data Repairment",
+                        summary = "Fix missing or incorrect usage history",
+                        onClick = onNavigateToDataRepairment,
+                        icon = Icons.Outlined.Build,
                         shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
                     )
                 }

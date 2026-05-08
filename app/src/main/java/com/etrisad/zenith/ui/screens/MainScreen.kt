@@ -81,6 +81,7 @@ fun MainScreen(
         currentRoute == Screen.UsageStats.route ||
                 currentRoute == Screen.Bedtime.route ||
                 currentRoute == Screen.DatabaseDebug.route ||
+                currentRoute == Screen.DataRepairment.route ||
                 currentRoute?.startsWith("app_detail") == true
 
     val enterAlwaysScrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
@@ -190,6 +191,7 @@ fun MainScreen(
                 currentRoute != Screen.UsageStats.route &&
                         currentRoute != Screen.Bedtime.route &&
                         currentRoute != Screen.DatabaseDebug.route &&
+                        currentRoute != Screen.DataRepairment.route &&
                         currentRoute?.startsWith("app_detail") == false
 
             AnimatedVisibility(
@@ -447,11 +449,13 @@ fun MainScreen(
                             targetRoute == Screen.UsageStats.route ||
                                     targetRoute == Screen.Bedtime.route ||
                                     targetRoute == Screen.DatabaseDebug.route ||
+                                    targetRoute == Screen.DataRepairment.route ||
                                     targetRoute?.startsWith("app_detail") == true
                         val isInitialDeep =
                             initialRoute == Screen.UsageStats.route ||
                                     initialRoute == Screen.Bedtime.route ||
                                     initialRoute == Screen.DatabaseDebug.route ||
+                                    initialRoute == Screen.DataRepairment.route ||
                                     initialRoute?.startsWith("app_detail") == true
 
                         val animationSpec = spring<IntOffset>(
@@ -489,6 +493,7 @@ fun MainScreen(
                             targetRoute == Screen.UsageStats.route ||
                                     targetRoute == Screen.Bedtime.route ||
                                     targetRoute == Screen.DatabaseDebug.route ||
+                                    targetRoute == Screen.DataRepairment.route ||
                                     targetRoute?.startsWith("app_detail") == true
 
                         val animationSpec = spring<IntOffset>(
@@ -580,6 +585,12 @@ fun MainScreen(
                             onBack = { navController.popBackStack() }
                         )
                     }
+                    composable(Screen.DataRepairment.route) {
+                        com.etrisad.zenith.ui.screens.settings.DataRepairmentScreen(
+                            viewModel = homeViewModel,
+                            innerPadding = innerPadding
+                        )
+                    }
                     composable(
                         route = Screen.AppDetail.route,
                         arguments = listOf(androidx.navigation.navArgument("packageName") {
@@ -601,6 +612,7 @@ fun MainScreen(
                         currentRoute != Screen.UsageStats.route &&
                                 currentRoute != Screen.Bedtime.route &&
                                 currentRoute != Screen.DatabaseDebug.route &&
+                                currentRoute != Screen.DataRepairment.route &&
                                 currentRoute?.startsWith("app_detail") == false
 
                     androidx.compose.animation.AnimatedVisibility(
