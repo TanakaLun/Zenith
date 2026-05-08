@@ -10,14 +10,16 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.etrisad.zenith.data.local.dao.ScheduleDao
 import com.etrisad.zenith.data.local.dao.ShieldDao
 import com.etrisad.zenith.data.local.dao.DailyUsageDao
+import com.etrisad.zenith.data.local.dao.HourlyUsageDao
 import com.etrisad.zenith.data.local.entity.ShieldEntity
 import com.etrisad.zenith.data.local.entity.ScheduleEntity
 import com.etrisad.zenith.data.local.entity.DailyUsageEntity
+import com.etrisad.zenith.data.local.entity.HourlyUsageEntity
 import com.etrisad.zenith.data.local.Converters
 
 @Database(
-    entities = [ShieldEntity::class, ScheduleEntity::class, DailyUsageEntity::class],
-    version = 18,
+    entities = [ShieldEntity::class, ScheduleEntity::class, DailyUsageEntity::class, HourlyUsageEntity::class],
+    version = 20,
     exportSchema = true,
     autoMigrations = [
         androidx.room.AutoMigration(from = 12, to = 13),
@@ -32,6 +34,7 @@ abstract class ZenithDatabase : RoomDatabase() {
     abstract fun shieldDao(): ShieldDao
     abstract fun scheduleDao(): ScheduleDao
     abstract fun dailyUsageDao(): DailyUsageDao
+    abstract fun hourlyUsageDao(): HourlyUsageDao
 
     companion object {
         @Volatile
@@ -39,7 +42,6 @@ abstract class ZenithDatabase : RoomDatabase() {
 
         private val MIGRATION_10_11 = object : Migration(10, 11) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // Handle possible missing columns if previous migrations were skipped or partial
                 try {
                     db.execSQL("ALTER TABLE schedules ADD COLUMN emergencyUseCount INTEGER NOT NULL DEFAULT 0")
                 } catch (_: Exception) {}
@@ -51,7 +53,6 @@ abstract class ZenithDatabase : RoomDatabase() {
 
         private val MIGRATION_8_9 = object : Migration(8, 9) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // Placeholder if version 9 was an empty migration or handled elsewhere
             }
         }
 
@@ -98,7 +99,6 @@ abstract class ZenithDatabase : RoomDatabase() {
 
         private val MIGRATION_11_12 = object : Migration(11, 12) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // Ensure all ShieldEntity fields are present
                 try {
                     db.execSQL("ALTER TABLE shields ADD COLUMN maxUsesPerPeriod INTEGER NOT NULL DEFAULT 5")
                 } catch (_: Exception) {}
@@ -142,7 +142,6 @@ abstract class ZenithDatabase : RoomDatabase() {
 
         private val MIGRATION_16_17 = object : Migration(16, 17) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // Fixing possible inconsistent state from failed migrations
                 try {
                     db.execSQL("ALTER TABLE shields ADD COLUMN lastGoalReminderTimestamp INTEGER NOT NULL DEFAULT 0")
                 } catch (_: Exception) {}
@@ -160,6 +159,31 @@ abstract class ZenithDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_18_19 = object : Migration(18, 19) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `daily_usage` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `date` TEXT NOT NULL, `packageName` TEXT NOT NULL, `usageTimeMillis` INTEGER NOT NULL, `lastUpdated` INTEGER NOT NULL)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_daily_usage_date_packageName` ON `daily_usage` (`date`, `packageName`)")
+
+                db.execSQL("CREATE TABLE IF NOT EXISTS `hourly_usage` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `date` TEXT NOT NULL, `hour` INTEGER NOT NULL, `packageName` TEXT NOT NULL, `usageTimeMillis` INTEGER NOT NULL, `lastUpdated` INTEGER NOT NULL)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_hourly_usage_date_hour_packageName` ON `hourly_usage` (`date`, `hour`, `packageName`)")
+
+                try { db.execSQL("ALTER TABLE shields ADD COLUMN isPaused INTEGER NOT NULL DEFAULT 0") } catch (_: Exception) {}
+                try { db.execSQL("ALTER TABLE shields ADD COLUMN pauseEndTimestamp INTEGER NOT NULL DEFAULT 0") } catch (_: Exception) {}
+            }
+        }
+
+        private val MIGRATION_19_20 = object : Migration(19, 20) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `daily_usage` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `date` TEXT NOT NULL, `packageName` TEXT NOT NULL, `usageTimeMillis` INTEGER NOT NULL, `lastUpdated` INTEGER NOT NULL)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_daily_usage_date_packageName` ON `daily_usage` (`date`, `packageName`)")
+                db.execSQL("CREATE TABLE IF NOT EXISTS `hourly_usage` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `date` TEXT NOT NULL, `hour` INTEGER NOT NULL, `packageName` TEXT NOT NULL, `usageTimeMillis` INTEGER NOT NULL, `lastUpdated` INTEGER NOT NULL)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_hourly_usage_date_hour_packageName` ON `hourly_usage` (`date`, `hour`, `packageName`)")
+
+                try { db.execSQL("ALTER TABLE shields ADD COLUMN isPaused INTEGER NOT NULL DEFAULT 0") } catch (_: Exception) {}
+                try { db.execSQL("ALTER TABLE shields ADD COLUMN pauseEndTimestamp INTEGER NOT NULL DEFAULT 0") } catch (_: Exception) {}
+            }
+        }
+
         fun getDatabase(context: Context): ZenithDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -171,9 +195,10 @@ abstract class ZenithDatabase : RoomDatabase() {
                         MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, 
                         MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, 
                         MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
-                        MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18
+                        MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18,
+                        MIGRATION_18_19, MIGRATION_19_20
                     )
-                    .setJournalMode(RoomDatabase.JournalMode.TRUNCATE) // Mengurangi file jurnal untuk hemat RAM/Storage
+                    .setJournalMode(RoomDatabase.JournalMode.TRUNCATE)
                     .fallbackToDestructiveMigrationOnDowngrade()
                     .build()
                 INSTANCE = instance

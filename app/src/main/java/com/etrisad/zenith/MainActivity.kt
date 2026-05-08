@@ -36,7 +36,12 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         val database = ZenithDatabase.getDatabase(this)
-        val shieldRepository = ShieldRepository(database.shieldDao(), database.scheduleDao(), database.dailyUsageDao())
+        val shieldRepository = ShieldRepository(
+            database.shieldDao(),
+            database.scheduleDao(),
+            database.dailyUsageDao(),
+            database.hourlyUsageDao()
+        )
         val userPreferencesRepository = UserPreferencesRepository(this)
 
         DailyUsageWorker.schedule(applicationContext)

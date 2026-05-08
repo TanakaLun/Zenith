@@ -11,6 +11,7 @@ import androidx.core.app.NotificationCompat
 import androidx.work.*
 import com.etrisad.zenith.data.local.database.ZenithDatabase
 import com.etrisad.zenith.data.local.entity.DailyUsageEntity
+import com.etrisad.zenith.data.local.entity.HourlyUsageEntity
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -31,6 +32,7 @@ class DailyUsageWorker(context: Context, params: WorkerParameters) : CoroutineWo
 
         val database = ZenithDatabase.getDatabase(applicationContext)
         val dailyUsageDao = database.dailyUsageDao()
+        val hourlyUsageDao = database.hourlyUsageDao()
         val usm = applicationContext.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
         val pm = applicationContext.packageManager
 
@@ -93,12 +95,61 @@ class DailyUsageWorker(context: Context, params: WorkerParameters) : CoroutineWo
         usages.add(DailyUsageEntity(date = dateString, packageName = "TOTAL", usageTimeMillis = finalTotalUsage))
 
         dailyUsageDao.insertAll(usages)
+
+        val hourlyUsages = mutableListOf<HourlyUsageEntity>()
+        val hourlyMap = mutableMapOf<Int, Long>()
+        val hourlyAppUsage = mutableMapOf<Int, MutableMap<String, Long>>()
+        val events = usm.queryEvents(startTime, System.currentTimeMillis().coerceAtMost(endTime))
+        val event = android.app.usage.UsageEvents.Event()
+        val lastEventTime = mutableMapOf<String, Long>()
+        val cal = Calendar.getInstance()
+
+        while (events.hasNextEvent()) {
+            events.getNextEvent(event)
+            val pkg = event.packageName
+            val time = event.timeStamp
+            
+            if (event.eventType == android.app.usage.UsageEvents.Event.ACTIVITY_RESUMED) {
+                lastEventTime[pkg] = time
+            } else if (event.eventType == android.app.usage.UsageEvents.Event.ACTIVITY_PAUSED) {
+                val sTime = lastEventTime.remove(pkg)
+                if (sTime != null) {
+                    val duration = time - sTime
+                    if (duration > 0) {
+                        cal.timeInMillis = sTime
+                        val hour = cal.get(Calendar.HOUR_OF_DAY)
+                        hourlyMap[hour] = (hourlyMap[hour] ?: 0L) + duration
+
+                        if (pkg !in excludePackages && pkg in launcherApps) {
+                            val pkgMap = hourlyAppUsage.getOrPut(hour) { mutableMapOf() }
+                            pkgMap[pkg] = (pkgMap[pkg] ?: 0L) + duration
+                        }
+                    }
+                }
+            }
+        }
+
+        hourlyMap.forEach { (hour, time) ->
+            hourlyUsages.add(HourlyUsageEntity(date = dateString, hour = hour, packageName = "TOTAL", usageTimeMillis = time))
+        }
+
+        hourlyAppUsage.forEach { (hour, appMap) ->
+            appMap.forEach { (pkg, time) ->
+                hourlyUsages.add(HourlyUsageEntity(date = dateString, hour = hour, packageName = pkg, usageTimeMillis = time))
+            }
+        }
+
+        if (hourlyUsages.isNotEmpty()) {
+            hourlyUsageDao.insertAll(hourlyUsages)
+        }
         
         if (!isBackup) {
             sendDataSavedNotification()
             val cleanupCal = Calendar.getInstance()
             cleanupCal.add(Calendar.DAY_OF_YEAR, -21)
-            dailyUsageDao.deleteOldUsage(dateFormat.format(cleanupCal.time))
+            val threshold = dateFormat.format(cleanupCal.time)
+            dailyUsageDao.deleteOldUsage(threshold)
+            hourlyUsageDao.deleteOldUsage(threshold)
         }
 
         return Result.success()

@@ -1,9 +1,11 @@
 package com.etrisad.zenith.data.repository
 
 import com.etrisad.zenith.data.local.dao.DailyUsageDao
+import com.etrisad.zenith.data.local.dao.HourlyUsageDao
 import com.etrisad.zenith.data.local.dao.ScheduleDao
 import com.etrisad.zenith.data.local.dao.ShieldDao
 import com.etrisad.zenith.data.local.entity.DailyUsageEntity
+import com.etrisad.zenith.data.local.entity.HourlyUsageEntity
 import com.etrisad.zenith.data.local.entity.ScheduleEntity
 import com.etrisad.zenith.data.local.entity.ShieldEntity
 import kotlinx.coroutines.CoroutineScope
@@ -17,11 +19,11 @@ import kotlinx.coroutines.launch
 class ShieldRepository(
     private val shieldDao: ShieldDao,
     private val scheduleDao: ScheduleDao,
-    private val dailyUsageDao: DailyUsageDao
+    private val dailyUsageDao: DailyUsageDao,
+    private val hourlyUsageDao: HourlyUsageDao
 ) {
     private val repositoryScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     
-    // Cache memory untuk performa maksimal
     private val _allShieldsCache = MutableStateFlow<List<ShieldEntity>>(emptyList())
     val allShields: Flow<List<ShieldEntity>> = _allShieldsCache.asStateFlow()
     
@@ -35,7 +37,6 @@ class ShieldRepository(
         }
     }
 
-    // Daily Usage Methods
     fun getLastNDaysGlobalUsage(days: Int): Flow<List<DailyUsageEntity>> {
         return dailyUsageDao.getLastNDaysGlobalUsage(days)
     }
@@ -48,17 +49,26 @@ class ShieldRepository(
         return dailyUsageDao.getAllUsage()
     }
 
+    fun getHourlyUsageForDate(date: String): Flow<List<HourlyUsageEntity>> {
+        return hourlyUsageDao.getHourlyUsageForDate(date)
+    }
+
+    suspend fun insertHourlyUsage(usages: List<HourlyUsageEntity>) {
+        hourlyUsageDao.insertAll(usages)
+    }
+
+    suspend fun deleteOldHourlyUsage(thresholdDate: String) {
+        hourlyUsageDao.deleteOldUsage(thresholdDate)
+    }
+
     suspend fun insertDailyUsage(usage: DailyUsageEntity) {
         dailyUsageDao.insertDailyUsage(usage)
     }
 
     suspend fun getShieldByPackageName(packageName: String): ShieldEntity? {
-        // PERBAIKAN: Percaya pada cache memori. Jika tidak ada di cache, berarti aplikasi tidak di-shield.
-        // Ini mencegah hit database (disk I/O) yang terjadi setiap 1-2 detik pada monitoring.
         val cached = _allShieldsCache.value.find { it.packageName == packageName }
         if (cached != null) return cached
-        
-        // Hanya query DB jika cache masih kosong (saat startup)
+
         if (_allShieldsCache.value.isEmpty()) {
             return shieldDao.getShieldByPackageName(packageName)
         }
@@ -71,8 +81,6 @@ class ShieldRepository(
 
     suspend fun updateShield(shield: ShieldEntity) {
         shieldDao.updateShield(shield)
-        // Update cache segera agar perubahan (seperti delay timestamp) bisa langsung dibaca 
-        // oleh AppUsageMonitorService tanpa menunggu emisi Flow dari Room (async).
         val currentList = _allShieldsCache.value.toMutableList()
         val index = currentList.indexOfFirst { it.packageName == shield.packageName }
         if (index != -1) {
@@ -93,7 +101,6 @@ class ShieldRepository(
         return shieldDao.isAppShielded(packageName)
     }
 
-    // Schedule methods
     suspend fun insertSchedule(schedule: ScheduleEntity) {
         scheduleDao.insertSchedule(schedule)
     }
