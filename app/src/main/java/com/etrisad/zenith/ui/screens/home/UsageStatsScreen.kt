@@ -13,6 +13,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Android
+import androidx.compose.material.icons.outlined.ExpandLess
+import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Stars
@@ -26,6 +28,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
 import com.etrisad.zenith.ui.components.UsageHistoryCard
@@ -45,12 +48,23 @@ fun UsageStatsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var selectedHour by rememberSaveable { mutableStateOf<Int?>(null) }
+    var isOtherAppsExpanded by rememberSaveable { mutableStateOf(false) }
+    var isOtherHourAppsExpanded by rememberSaveable(selectedHour) { mutableStateOf(false) }
 
     val (regularApps, lowUsageApps) = remember(uiState.allAppsUsage) {
         uiState.allAppsUsage.partition { it.totalTimeVisible >= 60000L }
     }
     
     val totalLowUsageTime = lowUsageApps.sumOf { it.totalTimeVisible }
+
+    val hourlyAppsData = remember(uiState.hourlyUsage, selectedHour) {
+        val hourData = uiState.hourlyUsage.find { it.hour == selectedHour }
+        if (hourData != null && hourData.apps.isNotEmpty()) {
+            val (regular, low) = hourData.apps.partition { it.totalTimeVisible >= 60000L }
+            val totalLowTime = low.sumOf { it.totalTimeVisible }
+            Triple(hourData, regular, Triple(low, totalLowTime, hourData.hour))
+        } else null
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -61,8 +75,8 @@ fun UsageStatsScreen(
             bottom = innerPadding.calculateBottomPadding() + 24.dp
         )
     ) {
-        item {
-            Column {
+        item(key = "hourly_usage_group") {
+            Column(modifier = Modifier.animateItem()) {
                 GroupedCard(index = 0, total = 2) {
                     HourlyStatsContent(
                         hourlyUsage = uiState.hourlyUsage,
@@ -87,132 +101,250 @@ fun UsageStatsScreen(
             }
         }
 
-        item {
-            AnimatedVisibility(
-                visible = selectedHour != null,
-                enter = expandVertically(animationSpec = spring(stiffness = Spring.StiffnessLow)) + fadeIn(),
-                exit = shrinkVertically(animationSpec = spring(stiffness = Spring.StiffnessLow)) + fadeOut()
-            ) {
-                val hourData = uiState.hourlyUsage.find { it.hour == selectedHour }
-                if (hourData != null && hourData.apps.isNotEmpty()) {
-                    Column(modifier = Modifier.padding(top = 16.dp)) {
-                        Text(
-                            text = "Apps at ${hourData.hour}:00",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        hourData.apps.forEachIndexed { index, app ->
-                            val shape = when {
-                                hourData.apps.size == 1 -> RoundedCornerShape(24.dp)
-                                index == 0 -> RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
-                                index == hourData.apps.size - 1 -> RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
-                                else -> RoundedCornerShape(8.dp)
-                            }
+        if (hourlyAppsData != null) {
+            val (_, regularHourApps, lowData) = hourlyAppsData
+            val (lowUsageHourApps, totalLowUsageHourTime, currentTargetHour) = lowData
+            
+            val totalItems = regularHourApps.size + (if (totalLowUsageHourTime > 0) {
+                if (isOtherHourAppsExpanded) 1 + lowUsageHourApps.size else 1
+            } else 0)
+
+            item(key = "hourly_title_$currentTargetHour") {
+                Text(
+                    text = "Apps at $currentTargetHour:00",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .animateItem()
+                        .padding(horizontal = 8.dp, vertical = 8.dp)
+                        .padding(top = 16.dp),
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            itemsIndexed(
+                items = regularHourApps,
+                key = { _, app -> "hourly-$currentTargetHour-${app.packageName}" }
+            ) { index, app ->
+                Column(modifier = Modifier.animateItem()) {
+                    UsageItem(
+                        app = app,
+                        formatDuration = viewModel::formatDuration,
+                        index = index,
+                        total = totalItems,
+                        onClick = { onAppClick(app.packageName) }
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
+            }
+
+            if (totalLowUsageHourTime > 0) {
+                val otherIndex = regularHourApps.size
+                item(key = "hourly_other_header_$currentTargetHour") {
+                    Column(modifier = Modifier.animateItem()) {
+                        GroupedCard(
+                            index = otherIndex,
+                            total = totalItems,
+                            onClick = { isOtherHourAppsExpanded = !isOtherHourAppsExpanded }
+                        ) {
+                            ListItem(
+                                headlineContent = {
+                                    Text(
+                                        text = "Other Apps",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                },
+                                supportingContent = {
+                                    Text(
+                                        text = "${lowUsageHourApps.size} apps with minimal usage",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                },
+                                trailingContent = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = viewModel.formatDuration(totalLowUsageHourTime),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.secondary
+                                        )
+                                        Icon(
+                                            imageVector = if (isOtherHourAppsExpanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(20.dp).padding(start = 4.dp),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                },
+                                leadingContent = {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Android,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(24.dp),
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                },
+                                colors = ListItemDefaults.colors(
+                                    containerColor = Color.Transparent
+                                )
+                            )
+                        }
+                        if (isOtherHourAppsExpanded) Spacer(modifier = Modifier.height(4.dp))
+                    }
+                }
+
+                if (isOtherHourAppsExpanded) {
+                    itemsIndexed(
+                        items = lowUsageHourApps,
+                        key = { _, app -> "hourly-low-$currentTargetHour-${app.packageName}" }
+                    ) { index, app ->
+                        Column(modifier = Modifier.animateItem()) {
                             UsageItem(
                                 app = app,
                                 formatDuration = viewModel::formatDuration,
-                                shape = shape,
+                                index = otherIndex + 1 + index,
+                                total = totalItems,
                                 onClick = { onAppClick(app.packageName) }
                             )
-                            Spacer(modifier = Modifier.height(4.dp))
+                            if (index < lowUsageHourApps.size - 1) Spacer(modifier = Modifier.height(4.dp))
                         }
                     }
                 }
             }
         }
 
-        item {
-            Spacer(modifier = Modifier.height(16.dp))
-            SevenDayStampsCard(stamps = uiState.sevenDayStamps)
-        }
-
-        item {
-            Spacer(modifier = Modifier.height(24.dp))
-            Text(
-                text = "App Usage",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
-            )
-        }
-
-        itemsIndexed(regularApps) { index, app ->
-            val shape = when {
-                regularApps.size == 1 && totalLowUsageTime == 0L -> RoundedCornerShape(24.dp)
-                index == 0 -> RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
-                index == regularApps.size - 1 && totalLowUsageTime == 0L -> RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
-                else -> RoundedCornerShape(8.dp)
+        item(key = "seven_day_stamps") {
+            Column(modifier = Modifier.animateItem()) {
+                Spacer(modifier = Modifier.height(16.dp))
+                SevenDayStampsCard(stamps = uiState.sevenDayStamps)
             }
+        }
 
-            UsageItem(
-                app = app,
-                formatDuration = viewModel::formatDuration,
-                shape = shape,
-                onClick = { onAppClick(app.packageName) }
-            )
-            Spacer(modifier = Modifier.height(4.dp))
+        item(key = "app_usage_header") {
+            Column(modifier = Modifier.animateItem()) {
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    text = "App Usage",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
+                )
+            }
+        }
+
+        itemsIndexed(
+            items = regularApps,
+            key = { _, app -> "regular-${app.packageName}" }
+        ) { index, app ->
+            val total = regularApps.size + (if (totalLowUsageTime > 0) (if (isOtherAppsExpanded) 1 + lowUsageApps.size else 1) else 0)
+            Column(modifier = Modifier.animateItem()) {
+                UsageItem(
+                    app = app,
+                    formatDuration = viewModel::formatDuration,
+                    index = index,
+                    total = total,
+                    onClick = { onAppClick(app.packageName) }
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+            }
         }
 
         if (totalLowUsageTime > 0) {
-            item {
-                val shape = if (regularApps.isEmpty()) {
-                    RoundedCornerShape(24.dp)
-                } else {
-                    RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
-                }
-                
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = shape,
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                    )
-                ) {
-                    ListItem(
-                        headlineContent = {
-                            Text(
-                                text = "Other Apps",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                        },
-                        supportingContent = {
-                            Text(
-                                text = "${lowUsageApps.size} apps with minimal usage",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        },
-                        trailingContent = {
-                            Text(
-                                text = viewModel.formatDuration(totalLowUsageTime),
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.secondary
-                            )
-                        },
-                        leadingContent = {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Android,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(24.dp),
-                                    tint = MaterialTheme.colorScheme.primary
+            val otherIndex = regularApps.size
+            val total = regularApps.size + (if (isOtherAppsExpanded) 1 + lowUsageApps.size else 1)
+            
+            item(key = "other_apps_header") {
+                Column(modifier = Modifier.animateItem()) {
+                    GroupedCard(
+                        index = otherIndex,
+                        total = total,
+                        onClick = { isOtherAppsExpanded = !isOtherAppsExpanded }
+                    ) {
+                        ListItem(
+                            headlineContent = {
+                                Text(
+                                    text = "Other Apps",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
                                 )
-                            }
-                        },
-                        colors = ListItemDefaults.colors(
-                            containerColor = Color.Transparent
+                            },
+                            supportingContent = {
+                                Text(
+                                    text = "${lowUsageApps.size} apps with minimal usage",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            },
+                            trailingContent = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = viewModel.formatDuration(totalLowUsageTime),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.secondary
+                                    )
+                                    Icon(
+                                        imageVector = if (isOtherAppsExpanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(20.dp).padding(start = 4.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            },
+                            leadingContent = {
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Android,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(24.dp),
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            },
+                            colors = ListItemDefaults.colors(
+                                containerColor = Color.Transparent
+                            )
                         )
-                    )
+                    }
+                    if (isOtherAppsExpanded) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+                }
+            }
+
+            if (isOtherAppsExpanded) {
+                itemsIndexed(
+                    items = lowUsageApps,
+                    key = { _, app -> "low-${app.packageName}" }
+                ) { index, app ->
+                    Column(modifier = Modifier.animateItem()) {
+                        UsageItem(
+                            app = app,
+                            formatDuration = viewModel::formatDuration,
+                            index = otherIndex + 1 + index,
+                            total = total,
+                            onClick = { onAppClick(app.packageName) }
+                        )
+                        if (index < lowUsageApps.size - 1) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                        }
+                    }
                 }
             }
         }
@@ -224,6 +356,7 @@ fun GroupedCard(
     index: Int,
     total: Int,
     onClick: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
     val shape = when {
@@ -233,7 +366,7 @@ fun GroupedCard(
         else -> RoundedCornerShape(12.dp)
     }
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clip(shape)
             .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
@@ -306,7 +439,7 @@ fun HourlyStatsContent(
                 val barHeight = (hourInfo.usageTimeMillis.toFloat() / maxUsage).coerceIn(0.05f, 1f)
                 val animatedHeight by animateFloatAsState(
                     targetValue = barHeight,
-                    animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessLow),
+                    animationSpec = tween(500, easing = FastOutSlowInEasing),
                     label = "HourlyBarHeight"
                 )
                 
@@ -418,19 +551,12 @@ fun SevenDayStampsCard(
 fun UsageItem(
     app: AppUsageInfo,
     formatDuration: (Long) -> String,
-    shape: androidx.compose.ui.graphics.Shape,
-    onClick: () -> Unit
+    index: Int,
+    total: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .clickable { onClick() },
-        shape = shape,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-        )
-    ) {
+    GroupedCard(index = index, total = total, onClick = onClick, modifier = modifier) {
         ListItem(
             headlineContent = {
                 Text(
