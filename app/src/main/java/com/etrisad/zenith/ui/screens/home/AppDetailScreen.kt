@@ -41,6 +41,7 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import com.etrisad.zenith.ui.components.ConfirmBottomSheet
+import com.etrisad.zenith.ui.components.UsageHistoryCard
 import com.etrisad.zenith.ui.viewmodel.HomeViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -154,6 +155,7 @@ fun AppDetailScreen(
                         showDatabaseIndicator = preferences.showDatabaseIndicator,
                         formatDuration = { viewModel.formatDuration(it) },
                         onDaySelected = { },
+                        title = "History (21 Days)",
                         shape = RoundedCornerShape(
                             topStart = 8.dp,
                             topEnd = 8.dp,
@@ -631,78 +633,6 @@ fun UsageTrendsRow(
                     )
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun UsageHistoryCard(
-    history: List<com.etrisad.zenith.ui.viewmodel.DailyUsage>,
-    targetMillis: Long,
-    focusType: FocusType?,
-    showDatabaseIndicator: Boolean = false,
-    formatDuration: (Long) -> String,
-    onDaySelected: (com.etrisad.zenith.ui.viewmodel.DailyUsage?) -> Unit,
-    shape: androidx.compose.ui.graphics.Shape
-) {
-    var selectedUsage by remember { mutableStateOf<com.etrisad.zenith.ui.viewmodel.DailyUsage?>(null) }
-    val dateFormat = remember { SimpleDateFormat("dd", Locale.getDefault()) }
-    val todayDate = remember { dateFormat.format(System.currentTimeMillis()) }
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = shape,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-        )
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "History (21 Days)",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                AnimatedContent(
-                    targetState = selectedUsage,
-                    transitionSpec = {
-                        (fadeIn(animationSpec = spring(stiffness = Spring.StiffnessLow)) +
-                                slideInVertically { it / 2 })
-                            .togetherWith(fadeOut(animationSpec = spring(stiffness = Spring.StiffnessLow)) +
-                                    slideOutVertically { -it / 2 })
-                    },
-                    label = "SelectedUsageAnim"
-                ) { usage ->
-                    if (usage != null && dateFormat.format(usage.date) != todayDate) {
-                        Text(
-                            text = formatDuration(usage.totalTime),
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    } else {
-                        Spacer(modifier = Modifier.height(20.dp))
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            UsageGraph(
-                history = history,
-                targetMillis = targetMillis,
-                focusType = focusType,
-                showDatabaseIndicator = showDatabaseIndicator,
-                onDaySelected = { 
-                    selectedUsage = it
-                    onDaySelected(it)
-                }
-            )
         }
     }
 }
