@@ -80,6 +80,7 @@ fun MainScreen(
     val isDeepScreen =
         currentRoute == Screen.UsageStats.route ||
                 currentRoute == Screen.Bedtime.route ||
+                currentRoute == Screen.DatabaseDebug.route ||
                 currentRoute?.startsWith("app_detail") == true
 
     val enterAlwaysScrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
@@ -188,6 +189,7 @@ fun MainScreen(
             val showNavRail =
                 currentRoute != Screen.UsageStats.route &&
                         currentRoute != Screen.Bedtime.route &&
+                        currentRoute != Screen.DatabaseDebug.route &&
                         currentRoute?.startsWith("app_detail") == false
 
             AnimatedVisibility(
@@ -554,7 +556,7 @@ fun MainScreen(
                         )
                     }
                     composable(Screen.Settings.route) {
-                        SettingsScreen(userPreferencesRepository, innerPadding)
+                        SettingsScreen(userPreferencesRepository, innerPadding, navController)
                     }
                     composable(Screen.Bedtime.route) {
                         BedtimeScreen(bedtimeViewModel, innerPadding)
@@ -566,6 +568,13 @@ fun MainScreen(
                             onAppClick = { packageName ->
                                 navController.navigate(Screen.AppDetail.createRoute(packageName))
                             }
+                        )
+                    }
+                    composable(Screen.DatabaseDebug.route) {
+                        com.etrisad.zenith.ui.screens.settings.DatabaseDebugScreen(
+                            viewModel = homeViewModel,
+                            innerPadding = innerPadding,
+                            onBack = { navController.popBackStack() }
                         )
                     }
                     composable(
@@ -588,6 +597,7 @@ fun MainScreen(
                     val showBottomBar =
                         currentRoute != Screen.UsageStats.route &&
                                 currentRoute != Screen.Bedtime.route &&
+                                currentRoute != Screen.DatabaseDebug.route &&
                                 currentRoute?.startsWith("app_detail") == false
 
                     androidx.compose.animation.AnimatedVisibility(

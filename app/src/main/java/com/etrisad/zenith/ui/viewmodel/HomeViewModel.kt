@@ -61,6 +61,20 @@ data class HomeUiState(
     val globalBestStreak: Int = 0
 )
 
+sealed class UsageRecord {
+    data class Database(val entity: DailyUsageEntity) : UsageRecord()
+    data class Live(val packageName: String, val usageTimeMillis: Long) : UsageRecord()
+}
+
+data class UsageHistoryGroup(
+    val date: String,
+    val records: List<UsageRecord>,
+    val totalTimeMillis: Long,
+    val hasDatabaseRecord: Boolean = false,
+    val isMissing: Boolean = false,
+    val isLive: Boolean = false
+)
+
 class HomeViewModel(
     private val context: Context,
     private val shieldRepository: ShieldRepository,
@@ -69,6 +83,67 @@ class HomeViewModel(
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+
+    val allDatabaseUsage: Flow<List<DailyUsageEntity>> = shieldRepository.getAllUsage()
+
+    val fullUsageHistory: Flow<List<UsageHistoryGroup>> = allDatabaseUsage.map { dbList ->
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val today = Calendar.getInstance()
+        val todayStr = dateFormat.format(today.time)
+        
+        // Find earliest date in DB or default to 7 days ago if empty
+        val earliestDateStr = dbList.lastOrNull()?.date ?: dateFormat.format(Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -7) }.time)
+        val earliestCal = Calendar.getInstance().apply {
+            time = dateFormat.parse(earliestDateStr) ?: time
+        }
+        
+        val groups = mutableListOf<UsageHistoryGroup>()
+        val cal = Calendar.getInstance() // Start from today and go backwards
+        
+        while (!cal.before(earliestCal)) {
+            val dateStr = dateFormat.format(cal.time)
+            val isToday = dateStr == todayStr
+            
+            val dbRecords = dbList.filter { it.date == dateStr }
+            val dbTotal = dbRecords.find { it.packageName == "TOTAL" }?.usageTimeMillis ?: 0L
+            
+            if (isToday) {
+                val liveRecords = mutableListOf<UsageRecord>()
+                dbRecords.forEach { liveRecords.add(UsageRecord.Database(it)) }
+                
+                val liveTotal = uiState.value.totalScreenTime
+                if (dbRecords.none { it.packageName == "TOTAL" } || 
+                    (dbRecords.find { it.packageName == "TOTAL" }?.usageTimeMillis ?: 0L) < liveTotal - 60000) {
+                    liveRecords.add(UsageRecord.Live("TOTAL", liveTotal))
+                }
+                
+                groups.add(UsageHistoryGroup(
+                    date = dateStr, 
+                    records = liveRecords, 
+                    totalTimeMillis = maxOf(dbTotal, liveTotal),
+                    hasDatabaseRecord = dbRecords.isNotEmpty(),
+                    isLive = true
+                ))
+            } else if (dbRecords.isEmpty()) {
+                groups.add(UsageHistoryGroup(
+                    date = dateStr, 
+                    records = emptyList(), 
+                    totalTimeMillis = 0L,
+                    isMissing = true
+                ))
+            } else {
+                groups.add(UsageHistoryGroup(
+                    date = dateStr, 
+                    records = dbRecords.map { UsageRecord.Database(it) },
+                    totalTimeMillis = dbTotal,
+                    hasDatabaseRecord = true
+                ))
+            }
+            
+            cal.add(Calendar.DAY_OF_YEAR, -1)
+        }
+        groups
+    }
 
     private var allShields: List<ShieldEntity> = emptyList()
 

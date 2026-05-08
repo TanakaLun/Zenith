@@ -41,6 +41,7 @@ fun ZenithHeader(
     val isDeepScreen =
         currentRoute == Screen.UsageStats.route || 
         currentRoute == Screen.Bedtime.route ||
+        currentRoute == Screen.DatabaseDebug.route ||
         currentRoute?.startsWith("app_detail") == true
 
     val sideSlotWidth = 68.dp
@@ -117,6 +118,7 @@ fun ZenithHeader(
                 currentRoute == Screen.Settings.route -> "Settings"
                 currentRoute == Screen.UsageStats.route -> "Usage Stats"
                 currentRoute == Screen.Bedtime.route -> "Bedtime"
+                currentRoute == Screen.DatabaseDebug.route -> "Database"
                 currentRoute?.startsWith("app_detail") == true -> "App Detail"
                 else -> "Zenith"
             }

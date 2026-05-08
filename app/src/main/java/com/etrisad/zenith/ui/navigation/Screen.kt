@@ -30,6 +30,8 @@ sealed class Screen(
     object AppDetail : Screen("app_detail/{packageName}", "App Detail", Icons.Filled.Home, Icons.Outlined.Home) {
         fun createRoute(packageName: String) = "app_detail/$packageName"
     }
+
+    object DatabaseDebug : Screen("database_debug", "Database Records", Icons.Filled.Settings, Icons.Outlined.Settings)
 }
 
 val navItems = listOf(

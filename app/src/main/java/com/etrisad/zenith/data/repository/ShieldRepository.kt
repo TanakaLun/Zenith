@@ -44,6 +44,10 @@ class ShieldRepository(
         return dailyUsageDao.getLastNDaysUsageForPackage(packageName, days)
     }
 
+    fun getAllUsage(): Flow<List<DailyUsageEntity>> {
+        return dailyUsageDao.getAllUsage()
+    }
+
     suspend fun insertDailyUsage(usage: DailyUsageEntity) {
         dailyUsageDao.insertDailyUsage(usage)
     }

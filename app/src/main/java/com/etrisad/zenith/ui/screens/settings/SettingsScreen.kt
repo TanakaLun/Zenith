@@ -41,14 +41,17 @@ import com.etrisad.zenith.data.preferences.FontOption
 import com.etrisad.zenith.data.preferences.ThemeConfig
 import com.etrisad.zenith.data.preferences.UserPreferences
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
+import com.etrisad.zenith.ui.navigation.Screen
 import com.etrisad.zenith.util.BackupUtils
 import com.etrisad.zenith.worker.BackupManager
 import kotlinx.coroutines.launch
+import androidx.navigation.NavController
 
 @Composable
 fun SettingsScreen(
     preferencesRepository: UserPreferencesRepository,
-    innerPadding: PaddingValues
+    innerPadding: PaddingValues,
+    navController: NavController
 ) {
     val preferences by preferencesRepository.userPreferencesFlow.collectAsState(
         initial = UserPreferences(
@@ -243,6 +246,9 @@ fun SettingsScreen(
             coroutineScope.launch {
                 preferencesRepository.setDeveloperModeEnabled(enabled)
             }
+        },
+        onNavigateToDatabaseDebug = {
+            navController.navigate(Screen.DatabaseDebug.route)
         }
     )
 
@@ -298,7 +304,8 @@ fun SettingsScreenContent(
     onEarlyKickEnabledChange: (Boolean) -> Unit,
     onInterceptAudioFocusEnabledChange: (Boolean) -> Unit,
     onShowDatabaseIndicatorChange: (Boolean) -> Unit,
-    onDeveloperModeEnabledChange: (Boolean) -> Unit
+    onDeveloperModeEnabledChange: (Boolean) -> Unit,
+    onNavigateToDatabaseDebug: () -> Unit
 ) {
     var showTargetSheet by remember { mutableStateOf(false) }
     var showEmergencyRechargeSheet by remember { mutableStateOf(false) }
@@ -597,7 +604,18 @@ fun SettingsScreenContent(
                         checked = preferences.showDatabaseIndicator,
                         onCheckedChange = onShowDatabaseIndicatorChange,
                         icon = Icons.Outlined.Storage,
-                        shape = RoundedCornerShape(24.dp)
+                        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
+                    )
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    SettingsActionItem(
+                        title = "Database Records",
+                        summary = "View and manage all recorded usage data",
+                        onClick = onNavigateToDatabaseDebug,
+                        icon = Icons.Outlined.SdStorage,
+                        shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
                     )
                 }
             }
