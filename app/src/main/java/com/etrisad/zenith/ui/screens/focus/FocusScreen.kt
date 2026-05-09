@@ -1539,7 +1539,7 @@ fun ScheduleSettingsBottomSheet(
                 Text(
                     text = "Schedule Mode",
                     style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
@@ -1937,7 +1937,7 @@ fun FocusSettingsBottomSheet(
     var isDropdownExpanded by remember { mutableStateOf(false) }
     var isGoalDropdownExpanded by remember { mutableStateOf(false) }
 
-    val isPreventEdit = remember(existingShield, usageToday) {
+    val isPreventEdit = remember(existingShield, usageToday, focusType) {
         if (focusType == FocusType.SHIELD && existingShield != null) {
             val limitMillis = existingShield.timeLimitMinutes * 60 * 1000L
             limitMillis > 0 && usageToday >= (limitMillis * 0.5)
@@ -2020,7 +2020,7 @@ fun FocusSettingsBottomSheet(
                 Text(
                     text = if (focusType == FocusType.GOAL) "Daily Goal Target (HH:MM)" else "Daily Time Limit (HH:MM)",
                     style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
@@ -2228,31 +2228,84 @@ fun FocusSettingsBottomSheet(
                 if (isPreventEdit) {
                     Card(
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f)
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(bottom = 16.dp),
-                        shape = RoundedCornerShape(16.dp)
+                        shape = RoundedCornerShape(24.dp)
                     ) {
                         Row(
-                            modifier = Modifier.padding(16.dp),
+                            modifier = Modifier.padding(20.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
                                 imageVector = Icons.Outlined.Lock,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(20.dp)
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
                             )
-                            Spacer(modifier = Modifier.width(12.dp))
+                            Spacer(modifier = Modifier.width(16.dp))
                             Text(
-                                text = "Shield settings are locked because you have used more than 50% of your daily limit. This prevents bypassing the shield.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                text = "Shield settings are locked because your remaining limit is less than 50%. You can only save changes that make the shield more restrictive (e.g., lower limit) to prevent bypassing.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 fontWeight = FontWeight.Medium
                             )
                         }
+                    }
+                }
+            }
+
+            val currentLimit = timePickerState.hour * 60 + timePickerState.minute
+            val currentMaxUses = maxUses.toIntOrNull() ?: 5
+            val currentMaxEmergency = maxEmergencyUses.toIntOrNull() ?: 3
+
+            val canSave = remember(
+                existingShield, isPreventEdit, currentLimit, currentMaxUses, currentMaxEmergency,
+                remindersEnabled, strictModeEnabled, autoQuitEnabled, isDelayAppEnabled,
+                refreshPeriodMinutes, goalReminderPeriodMinutes, focusType
+            ) {
+                if (focusType == FocusType.GOAL) {
+                    true
+                } else if (existingShield == null) {
+                    currentLimit > 0
+                } else {
+                    val limitDecreased = currentLimit < existingShield.timeLimitMinutes
+                    val limitIncreased = currentLimit > existingShield.timeLimitMinutes
+
+                    val usesDecreased = currentMaxUses < existingShield.maxUsesPerPeriod
+                    val usesIncreased = currentMaxUses > existingShield.maxUsesPerPeriod
+
+                    val emergencyDecreased = currentMaxEmergency < existingShield.maxEmergencyUses
+                    val emergencyIncreased = currentMaxEmergency > existingShield.maxEmergencyUses
+
+                    val remindersEnabledNew = !existingShield.isRemindersEnabled && remindersEnabled
+                    val strictEnabled = !existingShield.isStrictModeEnabled && strictModeEnabled
+                    val strictDisabled = existingShield.isStrictModeEnabled && !strictModeEnabled
+
+                    val autoQuitEnabledNew = !existingShield.isAutoQuitEnabled && autoQuitEnabled
+                    val autoQuitDisabled = existingShield.isAutoQuitEnabled && !autoQuitEnabled
+
+                    val delayEnabledNew = !existingShield.isDelayAppEnabled && isDelayAppEnabled
+                    val delayDisabled = existingShield.isDelayAppEnabled && !isDelayAppEnabled
+
+                    val remindersChanged = remindersEnabled != existingShield.isRemindersEnabled
+                    val refreshChanged = refreshPeriodMinutes != existingShield.refreshPeriodMinutes
+                    val goalReminderChanged = goalReminderPeriodMinutes != existingShield.goalReminderPeriodMinutes
+
+                    val hasPositiveChange = limitDecreased || usesDecreased || emergencyDecreased ||
+                            strictEnabled || autoQuitEnabledNew || delayEnabledNew || remindersEnabledNew
+
+                    val hasNegativeChange = limitIncreased || usesIncreased || emergencyIncreased ||
+                            strictDisabled || autoQuitDisabled || delayDisabled || (!remindersEnabledNew && remindersChanged)
+
+                    val hasAnyChange = hasPositiveChange || hasNegativeChange || remindersChanged || refreshChanged || goalReminderChanged
+
+                    if (isPreventEdit) {
+                        hasPositiveChange && !hasNegativeChange
+                    } else {
+                        hasAnyChange
                     }
                 }
             }
@@ -2279,7 +2332,7 @@ fun FocusSettingsBottomSheet(
                     },
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.large,
-                    enabled = !isPreventEdit
+                    enabled = canSave
                 ) {
                     Text(
                         text = if (focusType == FocusType.GOAL) "Set Goal" else "Save Shield",
@@ -2400,7 +2453,7 @@ fun PreferenceCategory(title: String) {
     Text(
         text = title,
         style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
+        color = MaterialTheme.colorScheme.onSurface,
         modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
     )
 }

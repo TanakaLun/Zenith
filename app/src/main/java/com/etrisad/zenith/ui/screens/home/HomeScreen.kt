@@ -294,7 +294,7 @@ fun UsageDashboard(
                 Text(
                     text = "Daily Screen Time",
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 IconButton(
                     onClick = { showTargetSheet = true },
@@ -1169,7 +1169,7 @@ fun NumberPicker(
         Text(
             text = label,
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
+            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(bottom = 8.dp)
         )
         IconButton(
