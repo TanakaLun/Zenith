@@ -24,6 +24,7 @@ import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.PauseCircle
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -292,7 +293,12 @@ fun MainScreen(
                             val hasSelection = focusUiState.selectedShields.isNotEmpty() || focusUiState.selectedSchedules.isNotEmpty()
 
                             AnimatedContent(
-                                targetState = if (isSelectionMode) "selection" else if (!isDeepScreen) "user" else "none",
+                                targetState = when {
+                                    isSelectionMode -> "selection"
+                                    currentRoute?.startsWith("app_detail") == true -> "app_detail"
+                                    !isDeepScreen -> "user"
+                                    else -> "none"
+                                },
                                 transitionSpec = {
                                     (fadeIn(animationSpec = spring(stiffness = Spring.StiffnessLow)) +
                                             scaleIn(initialScale = 0.92f, animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)) +
@@ -333,6 +339,18 @@ fun MainScreen(
                                                     tint = if (hasSelection) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline
                                                 )
                                             }
+                                        }
+                                    }
+                                    "app_detail" -> {
+                                        IconButton(
+                                            onClick = { homeViewModel.openSettingsSheet() },
+                                            modifier = Modifier.padding(end = 12.dp).clip(CircleShape)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Outlined.Edit,
+                                                contentDescription = "Edit App Settings",
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
                                         }
                                     }
                                     "user" -> {

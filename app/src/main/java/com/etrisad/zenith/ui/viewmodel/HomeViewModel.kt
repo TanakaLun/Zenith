@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.etrisad.zenith.data.local.entity.ShieldEntity
+import com.etrisad.zenith.data.local.entity.FocusType
 import com.etrisad.zenith.data.local.entity.DailyUsageEntity
 import com.etrisad.zenith.data.local.entity.HourlyUsageEntity
 import com.etrisad.zenith.data.repository.ShieldRepository
@@ -50,7 +51,8 @@ data class AppDetailUiState(
     val bestStreak: Int = 0,
     val shieldEntity: ShieldEntity? = null,
     val isPaused: Boolean = false,
-    val pauseEndTimestamp: Long = 0L
+    val pauseEndTimestamp: Long = 0L,
+    val isSettingsSheetOpen: Boolean = false
 )
 
 data class HourlyUsageInfo(
@@ -1015,6 +1017,61 @@ class HomeViewModel(
     fun clearAppDetail(packageName: String) {
         if (_appDetailUiState.value.packageName == packageName) {
             appDetailJob?.cancel()
+        }
+    }
+
+    fun openSettingsSheet() {
+        _appDetailUiState.update { it.copy(isSettingsSheetOpen = true) }
+    }
+
+    fun closeSettingsSheet() {
+        _appDetailUiState.update { it.copy(isSettingsSheetOpen = false) }
+    }
+
+    fun saveFocus(
+        timeLimitMinutes: Int,
+        maxEmergencyUses: Int,
+        isRemindersEnabled: Boolean,
+        isStrictModeEnabled: Boolean,
+        isAutoQuitEnabled: Boolean,
+        maxUsesPerPeriod: Int,
+        refreshPeriodMinutes: Int,
+        goalReminderPeriodMinutes: Int,
+        isDelayAppEnabled: Boolean
+    ) {
+        val state = _appDetailUiState.value
+        val packageName = state.packageName
+        val appName = state.appName
+        val type = state.type ?: com.etrisad.zenith.data.local.entity.FocusType.SHIELD
+
+        viewModelScope.launch {
+            val existingShield = shieldRepository.getShieldByPackageName(packageName)
+            val shield = existingShield?.copy(
+                timeLimitMinutes = timeLimitMinutes,
+                maxEmergencyUses = maxEmergencyUses,
+                isRemindersEnabled = isRemindersEnabled,
+                isStrictModeEnabled = isStrictModeEnabled,
+                isAutoQuitEnabled = isAutoQuitEnabled,
+                maxUsesPerPeriod = maxUsesPerPeriod,
+                refreshPeriodMinutes = refreshPeriodMinutes,
+                goalReminderPeriodMinutes = goalReminderPeriodMinutes,
+                isDelayAppEnabled = isDelayAppEnabled
+            ) ?: ShieldEntity(
+                packageName = packageName,
+                appName = appName,
+                type = type,
+                timeLimitMinutes = timeLimitMinutes,
+                maxEmergencyUses = maxEmergencyUses,
+                isRemindersEnabled = isRemindersEnabled,
+                isStrictModeEnabled = isStrictModeEnabled,
+                isAutoQuitEnabled = isAutoQuitEnabled,
+                maxUsesPerPeriod = maxUsesPerPeriod,
+                refreshPeriodMinutes = refreshPeriodMinutes,
+                goalReminderPeriodMinutes = goalReminderPeriodMinutes,
+                isDelayAppEnabled = isDelayAppEnabled
+            )
+            shieldRepository.insertShield(shield)
+            closeSettingsSheet()
         }
     }
 

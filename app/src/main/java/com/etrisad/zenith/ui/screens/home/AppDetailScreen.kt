@@ -42,6 +42,9 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import com.etrisad.zenith.ui.components.ConfirmBottomSheet
 import com.etrisad.zenith.ui.components.UsageHistoryCard
+import com.etrisad.zenith.ui.components.focus.GoalSettingsBottomSheet
+import com.etrisad.zenith.ui.components.focus.ShieldSettingsBottomSheet
+import com.etrisad.zenith.ui.viewmodel.AppInfo
 import com.etrisad.zenith.ui.viewmodel.HomeViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -69,10 +72,6 @@ fun AppDetailScreen(
     LaunchedEffect(packageName) {
         viewModel.loadAppDetail(packageName)
     }
-
-    // DisposableEffect dihapus karena clearAppDetail(packageName) di ViewModel 
-    // sekarang tidak lagi mengosongkan UI secara paksa, dan pembersihan state 
-    // sudah ditangani oleh loadAppDetail saat berpindah package.
 
 
     val shield = uiState.shieldEntity
@@ -244,6 +243,54 @@ fun AppDetailScreen(
                     }
                 }
             }
+     }
+
+    if (uiState.isSettingsSheetOpen) {
+        val appInfo = AppInfo(uiState.packageName, uiState.appName, uiState.icon)
+        val existingShield = uiState.shieldEntity
+        val focusType = uiState.type ?: FocusType.SHIELD
+
+        if (focusType == FocusType.GOAL) {
+            GoalSettingsBottomSheet(
+                appInfo = appInfo,
+                usageToday = uiState.todayUsage,
+                existingShield = existingShield,
+                onDismiss = { viewModel.closeSettingsSheet() },
+                onSave = { limit, reminders, goalReminder ->
+                    viewModel.saveFocus(
+                        timeLimitMinutes = limit,
+                        maxEmergencyUses = 3,
+                        isRemindersEnabled = reminders,
+                        isStrictModeEnabled = false,
+                        isAutoQuitEnabled = false,
+                        maxUsesPerPeriod = 5,
+                        refreshPeriodMinutes = 60,
+                        goalReminderPeriodMinutes = goalReminder,
+                        isDelayAppEnabled = false
+                    )
+                }
+            )
+        } else {
+            ShieldSettingsBottomSheet(
+                appInfo = appInfo,
+                usageToday = uiState.todayUsage,
+                existingShield = existingShield,
+                onDismiss = { viewModel.closeSettingsSheet() },
+                onSave = { limit, emergency, reminders, strict, autoQuit, maxUses, refresh, delayApp ->
+                    viewModel.saveFocus(
+                        timeLimitMinutes = limit,
+                        maxEmergencyUses = emergency,
+                        isRemindersEnabled = reminders,
+                        isStrictModeEnabled = strict,
+                        isAutoQuitEnabled = autoQuit,
+                        maxUsesPerPeriod = maxUses,
+                        refreshPeriodMinutes = refresh,
+                        goalReminderPeriodMinutes = 120,
+                        isDelayAppEnabled = delayApp
+                    )
+                }
+            )
+        }
     }
 }
 
