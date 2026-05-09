@@ -17,21 +17,30 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Android
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.MonitorWeight
 import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Stars
+import androidx.compose.material.icons.outlined.TrackChanges
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
 import com.etrisad.zenith.data.local.entity.FocusType
 import com.etrisad.zenith.ui.components.SnapshotSection
@@ -41,6 +50,9 @@ import com.etrisad.zenith.ui.viewmodel.HomeViewModel
 import com.etrisad.zenith.ui.viewmodel.HourlyUsageInfo
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.math.cos
+import kotlin.math.roundToInt
+import kotlin.math.sin
 
 import androidx.compose.runtime.saveable.rememberSaveable
 
@@ -53,6 +65,8 @@ fun UsageStatsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var selectedHour by rememberSaveable { mutableStateOf<Int?>(null) }
+    var highlightedCategory by remember { mutableStateOf<String?>(null) } 
+    
     var isOtherAppsExpanded by rememberSaveable { mutableStateOf(false) }
     var isOtherHourAppsExpanded by rememberSaveable(selectedHour) { mutableStateOf(false) }
 
@@ -90,6 +104,24 @@ fun UsageStatsScreen(
         }
     }
 
+    val (shieldUsage, goalUsage, otherUsage) = remember(uiState.allAppsUsage, uiState.activeShields, uiState.activeGoals) {
+        val shieldPkgs = uiState.activeShields.map { it.packageName }.toSet()
+        val goalPkgs = uiState.activeGoals.map { it.packageName }.toSet()
+        
+        var s = 0L
+        var g = 0L
+        var o = 0L
+        
+        uiState.allAppsUsage.forEach { app ->
+            when {
+                app.packageName in shieldPkgs -> s += app.totalTimeVisible
+                app.packageName in goalPkgs -> g += app.totalTimeVisible
+                else -> o += app.totalTimeVisible
+            }
+        }
+        Triple(s, g, o)
+    }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -99,6 +131,27 @@ fun UsageStatsScreen(
             bottom = innerPadding.calculateBottomPadding() + 24.dp
         )
     ) {
+        item(key = "zenith_dashboard") {
+            Column(modifier = Modifier.animateItem()) {
+                val dashboardTotalTime = shieldUsage + goalUsage + otherUsage
+                ZenithDashboard(
+                    totalTime = dashboardTotalTime,
+                    targetTime = uiState.targetMillis,
+                    yesterdayTime = uiState.yesterdayScreenTime,
+                    shieldUsage = shieldUsage,
+                    goalUsage = goalUsage,
+                    otherUsage = otherUsage,
+                    topApp = uiState.topApps.firstOrNull(),
+                    activeGoalsCount = uiState.activeGoals.size,
+                    activeShieldsCount = uiState.activeShields.size,
+                    formatDuration = viewModel::formatDuration,
+                    highlightedCategory = highlightedCategory,
+                    onCategoryClick = { highlightedCategory = if (highlightedCategory == it) null else it }
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+        }
+
         item(key = "hourly_stats_header") {
             Column(modifier = Modifier.animateItem()) {
                 GroupedCard(
@@ -417,6 +470,318 @@ fun UsageStatsScreen(
 }
 
 @Composable
+fun ZenithDashboard(
+    totalTime: Long,
+    targetTime: Long,
+    yesterdayTime: Long,
+    shieldUsage: Long,
+    goalUsage: Long,
+    otherUsage: Long,
+    topApp: AppUsageInfo?,
+    activeGoalsCount: Int,
+    activeShieldsCount: Int,
+    formatDuration: (Long) -> String,
+    highlightedCategory: String?,
+    onCategoryClick: (String) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(200.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .weight(1.1f)
+                .fillMaxHeight()
+        ) {
+            val totalDistributionTime = (shieldUsage + goalUsage + otherUsage).toFloat().coerceAtLeast(1f)
+            
+            val animShieldAngle by animateFloatAsState(
+                targetValue = (shieldUsage.toFloat() / totalDistributionTime) * 360f,
+                animationSpec = spring(stiffness = Spring.StiffnessLow),
+                label = "ShieldAngle"
+            )
+            val animGoalAngle by animateFloatAsState(
+                targetValue = (goalUsage.toFloat() / totalDistributionTime) * 360f,
+                animationSpec = spring(stiffness = Spring.StiffnessLow),
+                label = "GoalAngle"
+            )
+            val animOtherAngle by animateFloatAsState(
+                targetValue = (otherUsage.toFloat() / totalDistributionTime) * 360f,
+                animationSpec = spring(stiffness = Spring.StiffnessLow),
+                label = "OtherAngle"
+            )
+
+            val baseStroke = 26.dp
+            val highlightStroke = 38.dp
+
+            val animShieldStroke by animateDpAsState(
+                targetValue = if (highlightedCategory == "SHIELD") highlightStroke else baseStroke,
+                animationSpec = spring(stiffness = Spring.StiffnessLow),
+                label = "ShieldStroke"
+            )
+            val animGoalStroke by animateDpAsState(
+                targetValue = if (highlightedCategory == "GOAL") highlightStroke else baseStroke,
+                animationSpec = spring(stiffness = Spring.StiffnessLow),
+                label = "GoalStroke"
+            )
+            val animOtherStroke by animateDpAsState(
+                targetValue = if (highlightedCategory == "OTHER") highlightStroke else baseStroke,
+                animationSpec = spring(stiffness = Spring.StiffnessLow),
+                label = "OtherStroke"
+            )
+
+            val animShieldAlpha by animateFloatAsState(
+                targetValue = if (highlightedCategory == null || highlightedCategory == "SHIELD") 1f else 0.3f,
+                animationSpec = spring(stiffness = Spring.StiffnessLow),
+                label = "ShieldAlpha"
+            )
+            val animGoalAlpha by animateFloatAsState(
+                targetValue = if (highlightedCategory == null || highlightedCategory == "GOAL") 1f else 0.3f,
+                animationSpec = spring(stiffness = Spring.StiffnessLow),
+                label = "GoalAlpha"
+            )
+            val animOtherAlpha by animateFloatAsState(
+                targetValue = if (highlightedCategory == null || highlightedCategory == "OTHER") 1f else 0.3f,
+                animationSpec = spring(stiffness = Spring.StiffnessLow),
+                label = "OtherAlpha"
+            )
+
+            val shieldColor = MaterialTheme.colorScheme.primary
+            val goalColor = MaterialTheme.colorScheme.tertiary
+            val otherColor = MaterialTheme.colorScheme.secondary
+
+            androidx.compose.foundation.Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(2.dp)
+            ) {
+                val baseStrokeWidth = baseStroke.toPx()
+                val radius = (size.minDimension - highlightStroke.toPx()) / 2
+                val center = androidx.compose.ui.geometry.Offset(size.width / 2, size.height / 2)
+                val arcSize = androidx.compose.ui.geometry.Size(radius * 2, radius * 2)
+                val topLeft = androidx.compose.ui.geometry.Offset(center.x - radius, center.y - radius)
+
+                var startAngle = -90f
+                val gap = if (totalTime > 0) 22f else 0f
+
+                if (animShieldAngle > gap) {
+                    drawArc(
+                        color = shieldColor.copy(alpha = animShieldAlpha),
+                        startAngle = startAngle + gap / 2,
+                        sweepAngle = (animShieldAngle - gap).coerceAtLeast(0.1f),
+                        useCenter = false,
+                        topLeft = topLeft,
+                        size = arcSize,
+                        style = Stroke(width = animShieldStroke.toPx(), cap = StrokeCap.Round)
+                    )
+                }
+                startAngle += animShieldAngle
+
+                if (animGoalAngle > gap) {
+                    drawArc(
+                        color = goalColor.copy(alpha = animGoalAlpha),
+                        startAngle = startAngle + gap / 2,
+                        sweepAngle = (animGoalAngle - gap).coerceAtLeast(0.1f),
+                        useCenter = false,
+                        topLeft = topLeft,
+                        size = arcSize,
+                        style = Stroke(width = animGoalStroke.toPx(), cap = StrokeCap.Round)
+                    )
+                }
+                startAngle += animGoalAngle
+
+                if (animOtherAngle > gap) {
+                    drawArc(
+                        color = otherColor.copy(alpha = animOtherAlpha),
+                        startAngle = startAngle + gap / 2,
+                        sweepAngle = (animOtherAngle - gap).coerceAtLeast(0.1f),
+                        useCenter = false,
+                        topLeft = topLeft,
+                        size = arcSize,
+                        style = Stroke(width = animOtherStroke.toPx(), cap = StrokeCap.Round)
+                    )
+                }
+            }
+
+            Column(
+                modifier = Modifier.align(Alignment.Center),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                AnimatedContent(
+                    targetState = totalTime,
+                    transitionSpec = {
+                        (slideInVertically { height -> height / 2 } + fadeIn(animationSpec = spring(stiffness = Spring.StiffnessLow)))
+                            .togetherWith(slideOutVertically { height -> -height / 2 } + fadeOut(animationSpec = spring(stiffness = Spring.StiffnessLow)))
+                    },
+                    label = "TotalTimeAnimation"
+                ) { targetTime ->
+                    Text(
+                        text = formatDuration(targetTime),
+                        style = MaterialTheme.typography.displaySmall.copy(fontSize = 24.sp),
+                        fontWeight = FontWeight.Black,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+        }
+
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            val anyHighlighted = highlightedCategory != null
+            DashboardSmallCard(
+                icon = Icons.Outlined.Android,
+                label = "Other Apps",
+                value = formatDuration(otherUsage),
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                iconSectionColor = MaterialTheme.colorScheme.secondary,
+                iconColor = MaterialTheme.colorScheme.onSecondary,
+                textColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(20.dp))
+                    .clickable { onCategoryClick("OTHER") },
+                isHighlighted = highlightedCategory == "OTHER",
+                anyHighlighted = anyHighlighted
+            )
+            DashboardSmallCard(
+                icon = Icons.Outlined.TrackChanges,
+                label = "Goal Apps",
+                value = formatDuration(goalUsage),
+                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                iconSectionColor = MaterialTheme.colorScheme.tertiary,
+                iconColor = MaterialTheme.colorScheme.onTertiary,
+                textColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(20.dp))
+                    .clickable { onCategoryClick("GOAL") },
+                isHighlighted = highlightedCategory == "GOAL",
+                anyHighlighted = anyHighlighted
+            )
+            DashboardSmallCard(
+                icon = Icons.Outlined.Shield,
+                label = "Shield Apps",
+                value = formatDuration(shieldUsage),
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                iconSectionColor = MaterialTheme.colorScheme.primary,
+                iconColor = MaterialTheme.colorScheme.onPrimary,
+                textColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(20.dp))
+                    .clickable { onCategoryClick("SHIELD") },
+                isHighlighted = highlightedCategory == "SHIELD",
+                anyHighlighted = anyHighlighted
+            )
+        }
+    }
+}
+
+@Composable
+fun DashboardSmallCard(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    value: String,
+    containerColor: Color,
+    iconSectionColor: Color,
+    iconColor: Color,
+    textColor: Color,
+    modifier: Modifier = Modifier,
+    isHighlighted: Boolean = false,
+    anyHighlighted: Boolean = false
+) {
+    val animAlpha by animateFloatAsState(
+        targetValue = if (!anyHighlighted || isHighlighted) 1f else 0.4f,
+        animationSpec = spring(stiffness = Spring.StiffnessLow),
+        label = "CardAlpha"
+    )
+    
+    val animScale by animateFloatAsState(
+        targetValue = if (isHighlighted) 1.05f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow),
+        label = "CardScale"
+    )
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                alpha = animAlpha
+                scaleX = animScale
+                scaleY = animScale
+            },
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = containerColor)
+    ) {
+        Row(modifier = Modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(42.dp)
+                    .padding(4.dp)
+                    .clip(RoundedCornerShape(48.dp))
+                    .background(iconSectionColor),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = iconColor
+                )
+            }
+            
+            Box(modifier = Modifier.fillMaxSize()) {
+                val animatedHighlightAlpha by animateFloatAsState(
+                    targetValue = if (isHighlighted) 0f else 0f,
+                    animationSpec = spring(stiffness = Spring.StiffnessLow),
+                    label = "HighlightAlpha"
+                )
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(iconSectionColor.copy(alpha = animatedHighlightAlpha))
+                )
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .padding(start = 4.dp, end = 12.dp),
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = textColor.copy(alpha = 0.7f),
+                        fontWeight = FontWeight.Bold
+                    )
+                    AnimatedContent(
+                        targetState = value,
+                        transitionSpec = {
+                            (slideInVertically { height -> height / 2 } + fadeIn(animationSpec = spring(stiffness = Spring.StiffnessLow)))
+                                .togetherWith(slideOutVertically { height -> -height / 2 } + fadeOut(animationSpec = spring(stiffness = Spring.StiffnessLow)))
+                        },
+                        label = "ValueAnimation"
+                    ) { targetValue ->
+                        Text(
+                            text = targetValue,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Black,
+                            color = textColor
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun GroupedCard(
     index: Int,
     total: Int,
@@ -474,9 +839,6 @@ fun HourlyStatsContent(
             if (startH <= endH) {
                 todayActive && hour in startH until endH
             } else {
-                // Spans midnight: 
-                // Late night today (e.g. 22-23) if today is active
-                // Early morning today (e.g. 0-6) if yesterday was active
                 (todayActive && hour >= startH) || (yesterdayActive && hour < endH)
             }
         }
