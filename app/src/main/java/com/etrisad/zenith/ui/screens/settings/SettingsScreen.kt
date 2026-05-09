@@ -454,11 +454,11 @@ fun SettingsScreenContent(
             item {
                 Spacer(modifier = Modifier.height(4.dp))
                 SettingsToggle(
-                    title = "Pause Media",
-                    description = "Automatically pause media when an overlay appears",
-                    checked = preferences.interceptAudioFocusEnabled,
-                    onCheckedChange = onInterceptAudioFocusEnabledChange,
-                    icon = Icons.Outlined.MusicNote,
+                    title = "Early Kick",
+                    description = "Optionally eject from apps 5 minutes before your time limit expires",
+                    checked = preferences.earlyKickEnabled,
+                    onCheckedChange = onEarlyKickEnabledChange,
+                    icon = Icons.Outlined.ExitToApp,
                     shape = RoundedCornerShape(8.dp)
                 )
             }
@@ -466,11 +466,11 @@ fun SettingsScreenContent(
             item {
                 Spacer(modifier = Modifier.height(4.dp))
                 SettingsToggle(
-                    title = "Early Kick",
-                    description = "Optionally eject from apps 5 minutes before your time limit expires",
-                    checked = preferences.earlyKickEnabled,
-                    onCheckedChange = onEarlyKickEnabledChange,
-                    icon = Icons.Outlined.ExitToApp,
+                    title = "Pause Media",
+                    description = "Automatically pause media when an overlay appears",
+                    checked = preferences.interceptAudioFocusEnabled,
+                    onCheckedChange = onInterceptAudioFocusEnabledChange,
+                    icon = Icons.Outlined.MusicNote,
                     shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
                 )
             }
@@ -1141,7 +1141,7 @@ fun PreferenceCategory(title: String) {
     Text(
         text = title,
         style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
+        color = MaterialTheme.colorScheme.onSurface,
         modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
     )
 }
