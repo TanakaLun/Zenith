@@ -14,6 +14,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.TrendingUp
+import androidx.compose.material.icons.outlined.Android
 import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Security
@@ -23,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.layout.ContentScale
@@ -32,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
 import androidx.graphics.shapes.toPath
+import com.etrisad.zenith.ui.viewmodel.AppInfo
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -249,5 +253,101 @@ fun EmptyFocusMessage(message: String) {
                 )
             }
         }
+    }
+}
+
+@Composable
+fun PickerSectionHeader(title: String, modifier: Modifier = Modifier) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = modifier.fillMaxWidth()
+    )
+}
+
+@Composable
+fun AppPickerItem(
+    app: AppInfo,
+    shape: RoundedCornerShape,
+    onClick: () -> Unit,
+    isSelected: Boolean = false,
+    itemScale: Float = 1f,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    showCheckbox: Boolean = false,
+    isTopApp: Boolean = false
+) {
+    Card(
+        onClick = { onClick() },
+        modifier = Modifier
+            .fillMaxWidth()
+            .scale(itemScale),
+        shape = shape,
+        colors = CardDefaults.cardColors(
+            containerColor = containerColor
+        )
+    ) {
+        ListItem(
+            headlineContent = {
+                Text(
+                    text = app.appName,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            supportingContent = {
+                Text(
+                    text = app.packageName,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            leadingContent = {
+                val iconSize = 44.dp
+                if (app.icon != null) {
+                    Image(
+                        painter = BitmapPainter(app.icon.toBitmap().asImageBitmap()),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(iconSize)
+                            .clip(RoundedCornerShape(12.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(iconSize)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Outlined.Android, contentDescription = null)
+                    }
+                }
+            },
+            trailingContent = {
+                if (showCheckbox) {
+                    Checkbox(
+                        checked = isSelected,
+                        onCheckedChange = { onClick() },
+                        colors = CheckboxDefaults.colors(
+                            checkedColor = MaterialTheme.colorScheme.primary,
+                            uncheckedColor = MaterialTheme.colorScheme.outline
+                        )
+                    )
+                } else if (isTopApp) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Outlined.TrendingUp,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            },
+            colors = ListItemDefaults.colors(
+                containerColor = Color.Transparent
+            )
+        )
     }
 }
