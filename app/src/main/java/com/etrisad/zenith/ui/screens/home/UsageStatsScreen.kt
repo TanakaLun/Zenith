@@ -46,6 +46,7 @@ import com.etrisad.zenith.data.local.entity.FocusType
 import com.etrisad.zenith.ui.components.SnapshotSection
 import com.etrisad.zenith.ui.components.UsageHistoryCard
 import com.etrisad.zenith.ui.viewmodel.AppUsageInfo
+import com.etrisad.zenith.ui.viewmodel.DailyUsage
 import com.etrisad.zenith.ui.viewmodel.HomeViewModel
 import com.etrisad.zenith.ui.viewmodel.HourlyUsageInfo
 import java.text.SimpleDateFormat
@@ -384,9 +385,20 @@ fun UsageStatsScreen(
             }
         }
 
+        item(key = "highlight_header") {
+            Column(modifier = Modifier.animateItem()) {
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    text = "Highlight",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
+                )
+            }
+        }
+
         item(key = "snapshot_stamps") {
             Column(modifier = Modifier.animateItem()) {
-                Spacer(modifier = Modifier.height(12.dp))
                 SnapshotSection(
                     stamps = uiState.snapshotStamps,
                     selectedDateMillis = uiState.selectedDateMillis,
@@ -396,7 +408,111 @@ fun UsageStatsScreen(
                     },
                     onDaySelected = { viewModel.selectDate(it) },
                     formatDuration = viewModel::formatDuration,
-                    showDatabaseIndicator = showDatabaseIndicator
+                    showDatabaseIndicator = showDatabaseIndicator,
+                    startIndex = 0,
+                    totalCount = 4
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+        }
+
+        item(key = "insight_efficiency") {
+            val efficiency = remember(shieldUsage, goalUsage) {
+                val total = (shieldUsage + goalUsage).toFloat()
+                if (total > 0) (goalUsage.toFloat() / total) * 100 else 0f
+            }
+            Column(modifier = Modifier.animateItem()) {
+                EfficiencyScoreItem(
+                    efficiency = efficiency,
+                    goalUsage = goalUsage,
+                    shieldUsage = shieldUsage,
+                    formatDuration = viewModel::formatDuration,
+                    index = 2,
+                    total = 4,
+                    onClick = {
+                        highlightedCategory = if (highlightedCategory == "GOAL") "SHIELD" else "GOAL"
+                    }
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+        }
+
+        item(key = "insight_heatmap") {
+            Column(modifier = Modifier.animateItem()) {
+                GoalHeatmapItem(
+                    history = uiState.dailyUsageHistory,
+                    targetMillis = uiState.targetMillis,
+                    index = 3,
+                    total = 4,
+                    selectedDateMillis = uiState.selectedDateMillis,
+                    onDayClick = { viewModel.selectDate(it) }
+                )
+            }
+        }
+
+        item(key = "about_you_header") {
+            Column(modifier = Modifier.animateItem()) {
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    text = "About You",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
+                )
+            }
+        }
+
+        item(key = "insight_time_profile") {
+            val profile = remember(uiState.hourlyUsage) {
+                val morningUsage = uiState.hourlyUsage.filter { it.hour in 5..11 }.sumOf { it.usageTimeMillis }
+                val afternoonUsage = uiState.hourlyUsage.filter { it.hour in 12..17 }.sumOf { it.usageTimeMillis }
+                val eveningUsage = uiState.hourlyUsage.filter { it.hour in 18..22 }.sumOf { it.usageTimeMillis }
+                val nightUsage = uiState.hourlyUsage.filter { it.hour >= 23 || it.hour <= 4 }.sumOf { it.usageTimeMillis }
+
+                val max = listOf(morningUsage, afternoonUsage, eveningUsage, nightUsage).maxOrNull() ?: 0L
+                when {
+                    max == 0L -> "No usage yet"
+                    max == morningUsage -> "Early Bird"
+                    max == afternoonUsage -> "Day Runner"
+                    max == eveningUsage -> "Evening Active"
+                    else -> "Night Owl"
+                }
+            }
+            Column(modifier = Modifier.animateItem()) {
+                TimeProfileItem(
+                    profile = profile, 
+                    index = 0, 
+                    total = 2,
+                    onClick = {
+                        val peakHour = when(profile) {
+                            "Early Bird" -> 8
+                            "Day Runner" -> 14
+                            "Evening Active" -> 20
+                            "Night Owl" -> 0
+                            else -> null
+                        }
+                        if (peakHour != null) selectedHour = peakHour
+                    }
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+        }
+
+        item(key = "insight_usage_pattern") {
+            val totalSessions = remember(uiState.allAppsUsage) { uiState.allAppsUsage.sumOf { it.sessionCount } }
+            val avgSessionMillis = remember(uiState.totalScreenTime, totalSessions) {
+                if (totalSessions > 0) uiState.totalScreenTime / totalSessions else 0L
+            }
+            Column(modifier = Modifier.animateItem()) {
+                UsagePatternItem(
+                    totalSessions = totalSessions,
+                    avgSessionMillis = avgSessionMillis,
+                    formatDuration = viewModel::formatDuration,
+                    index = 1,
+                    total = 2,
+                    onClick = {
+                        isOtherAppsExpanded = !isOtherAppsExpanded
+                    }
                 )
             }
         }
@@ -964,9 +1080,17 @@ fun HourlyStatsContent(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.Bottom
         ) {
+            val isToday = remember(dateMillis) {
+                val cal = Calendar.getInstance()
+                cal.set(Calendar.HOUR_OF_DAY, 0)
+                cal.set(Calendar.MINUTE, 0)
+                cal.set(Calendar.SECOND, 0)
+                cal.set(Calendar.MILLISECOND, 0)
+                dateMillis == cal.timeInMillis
+            }
             hourlyUsage.forEach { hourInfo ->
                 val isSelected = selectedHour == hourInfo.hour
-                val isCurrentHour = hourInfo.hour == Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+                val isCurrentHour = isToday && hourInfo.hour == Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
                 
                 val barHeight = (hourInfo.usageTimeMillis.toFloat() / maxUsage).coerceIn(0.05f, 1f)
                 val animatedHeight by animateFloatAsState(
@@ -1006,6 +1130,296 @@ fun HourlyStatsContent(
             Text("00:00", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("12:00", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("23:59", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+fun EfficiencyScoreItem(
+    efficiency: Float,
+    goalUsage: Long,
+    shieldUsage: Long,
+    formatDuration: (Long) -> String,
+    index: Int,
+    total: Int,
+    onClick: () -> Unit
+) {
+    val animatedProgress by animateFloatAsState(
+        targetValue = efficiency / 100f,
+        animationSpec = spring(stiffness = Spring.StiffnessLow),
+        label = "EfficiencyProgress"
+    )
+    GroupedCard(index = index, total = total, onClick = onClick) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Stars,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = "Focus Efficiency",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = if (efficiency >= 50) "Productive Day!" else "Distraction Heavy",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(modifier = Modifier.weight(1f))
+                Text(
+                    text = "${efficiency.roundToInt()}%",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Black,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            LinearProgressIndicator(
+                progress = { animatedProgress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(CircleShape),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                strokeCap = StrokeCap.Round
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    text = "Goal: ${formatDuration(goalUsage)}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.tertiary,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Shield: ${formatDuration(shieldUsage)}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun TimeProfileItem(
+    profile: String,
+    index: Int,
+    total: Int,
+    onClick: () -> Unit
+) {
+    var isExpanded by remember { mutableStateOf(false) }
+    val profileDetails = when (profile) {
+        "Early Bird" -> "Your productivity peaks in the morning. Use this time for tasks that require high concentration."
+        "Day Runner" -> "You are most active during core working hours. Maintain your momentum throughout the day."
+        "Evening Active" -> "Your energy increases as the day gets darker. Perfect for reflection or creative projects."
+        "Night Owl" -> "You prefer to be active late at night. Be careful with blue light exposure before bed."
+        else -> "Continue using the device to determine your chronotype profile."
+    }
+
+    GroupedCard(index = index, total = total, onClick = { 
+        isExpanded = !isExpanded
+        onClick()
+    }) {
+        Column {
+            ListItem(
+                headlineContent = {
+                    Text(
+                        text = "Daily Chronotype",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                supportingContent = {
+                    Text(
+                        text = "Your peak activity period",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                },
+                leadingContent = {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Schedule,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.secondary
+                        )
+                    }
+                },
+                trailingContent = {
+                    SuggestionChip(
+                        onClick = { },
+                        label = { Text(profile) },
+                        colors = SuggestionChipDefaults.suggestionChipColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            labelColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        ),
+                        border = null,
+                        shape = CircleShape
+                    )
+                },
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+            )
+            AnimatedVisibility(
+                visible = isExpanded,
+                enter = expandVertically(animationSpec = spring(stiffness = Spring.StiffnessLow)) + fadeIn(),
+                exit = shrinkVertically(animationSpec = spring(stiffness = Spring.StiffnessLow)) + fadeOut()
+            ) {
+                Text(
+                    text = profileDetails,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp)
+                        .padding(bottom = 16.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun UsagePatternItem(
+    totalSessions: Int,
+    avgSessionMillis: Long,
+    formatDuration: (Long) -> String,
+    index: Int,
+    total: Int,
+    onClick: () -> Unit
+) {
+    GroupedCard(index = index, total = total, onClick = onClick) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.1f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.MonitorWeight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.tertiary
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Usage Pattern",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Total $totalSessions unlocks",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = formatDuration(avgSessionMillis),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Black,
+                    color = MaterialTheme.colorScheme.tertiary
+                )
+                Text(
+                    text = "avg / session",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun GoalHeatmapItem(
+    history: List<DailyUsage>,
+    targetMillis: Long,
+    index: Int,
+    total: Int,
+    selectedDateMillis: Long,
+    onDayClick: (Long) -> Unit
+) {
+    GroupedCard(index = index, total = total) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Goal Consistency",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                val last14Days = history.takeLast(14)
+                last14Days.forEach { day ->
+                    val isMet = day.totalTime > 0 && day.totalTime <= targetMillis
+                    val isSelected = day.date == selectedDateMillis
+                    
+                    val color = when {
+                        day.totalTime == 0L -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                        isMet -> MaterialTheme.colorScheme.primary
+                        else -> MaterialTheme.colorScheme.error.copy(alpha = 0.4f)
+                    }
+                    
+                    val animatedScale by animateFloatAsState(
+                        targetValue = if (isSelected) 1.2f else 1f,
+                        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy),
+                        label = "HeatmapScale"
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(24.dp)
+                            .graphicsLayer {
+                                scaleX = animatedScale
+                                scaleY = animatedScale
+                            }
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(color)
+                            .clickable { onDayClick(day.date) }
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Last 14 Days", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Target Met", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
         }
     }
 }

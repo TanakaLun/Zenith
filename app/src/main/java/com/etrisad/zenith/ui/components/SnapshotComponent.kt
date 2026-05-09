@@ -107,11 +107,22 @@ fun SnapshotSection(
     getAppType: (String) -> FocusType?,
     onDaySelected: (Long) -> Unit,
     formatDuration: (Long) -> String,
-    showDatabaseIndicator: Boolean = false
+    showDatabaseIndicator: Boolean = false,
+    startIndex: Int = 0,
+    totalCount: Int = 2
 ) {
     val pages = remember(stamps) { stamps.chunked(7) }
     val pageCount = pages.size.coerceAtLeast(1)
     val pagerState = rememberPagerState(pageCount = { pageCount }, initialPage = (pageCount - 1).coerceAtLeast(0))
+
+    fun getLocalGroupShape(index: Int): RoundedCornerShape {
+        return when {
+            totalCount == 1 -> RoundedCornerShape(28.dp)
+            index == 0 -> RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp, bottomStart = 12.dp, bottomEnd = 12.dp)
+            index == totalCount - 1 -> RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp, bottomStart = 28.dp, bottomEnd = 28.dp)
+            else -> RoundedCornerShape(12.dp)
+        }
+    }
 
     Column {
         SnapshotCard(
@@ -122,14 +133,14 @@ fun SnapshotSection(
             formatDuration = formatDuration,
             showDatabaseIndicator = showDatabaseIndicator,
             pagerState = pagerState,
-            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp, bottomStart = 12.dp, bottomEnd = 12.dp)
+            shape = getLocalGroupShape(startIndex)
         )
         Spacer(modifier = Modifier.height(4.dp))
         SnapshotInsightCard(
             stamps = stamps,
             currentPage = pagerState.currentPage,
             getAppType = getAppType,
-            shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp, bottomStart = 28.dp, bottomEnd = 28.dp)
+            shape = getLocalGroupShape(startIndex + 1)
         )
     }
 }

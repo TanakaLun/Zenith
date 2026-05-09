@@ -24,7 +24,8 @@ data class AppUsageInfo(
     val icon: android.graphics.drawable.Drawable? = null,
     val hasDatabaseRecord: Boolean = false,
     val hasSystemData: Boolean = false,
-    val isLive: Boolean = false
+    val isLive: Boolean = false,
+    val sessionCount: Int = 0
 )
 
 data class DailyUsage(
@@ -434,6 +435,7 @@ class HomeViewModel(
 
             // 2. Calculate App Totals for Selected Day (The Source of Truth)
             val appTotals = mutableMapOf<String, Long>()
+            val appSessionCounts = mutableMapOf<String, Int>()
             val dayStats = if (isSelectedToday) trueTodayStats else usm.queryAndAggregateUsageStats(dayStart, dayEnd)
             
             dayStats.forEach { (pkg, stat) ->
@@ -442,29 +444,7 @@ class HomeViewModel(
                 if (time > 0) appTotals[pkg] = time
             }
 
-            if (isSelectedToday) {
-                totalToday = appTotals.values.sum()
-            }
-
-            val appList = appTotals.mapNotNull { (pkg, time) ->
-                val cached = appInfoCache[pkg]
-                if (cached != null) {
-                    AppUsageInfo(pkg, cached.first, time, cached.second)
-                } else {
-                    try {
-                        val appInfo = pm.getApplicationInfo(pkg, 0)
-                        val label = pm.getApplicationLabel(appInfo).toString()
-                        val icon = pm.getApplicationIcon(appInfo)
-                        appInfoCache[pkg] = label to icon
-                        AppUsageInfo(pkg, label, time, icon)
-                    } catch (_: Exception) { null }
-                }
-            }
-
-            val topApps = appList.sortedByDescending { it.totalTimeVisible }.take(5)
-            val allAppsUsage = appList.sortedByDescending { it.totalTimeVisible }
-
-            // 3. Calculate Hourly Distribution using Events
+            // 3. Calculate Hourly Distribution and Session Counts using Events
             val hourlyAppUsage = mutableMapOf<Int, MutableMap<String, Long>>()
             val eventBuffer = 24 * 60 * 60 * 1000L // Look back to catch sessions crossing midnight
             val events = usm.queryEvents(dayStart - eventBuffer, dayEnd)
@@ -481,6 +461,9 @@ class HomeViewModel(
                 if (event.eventType == android.app.usage.UsageEvents.Event.MOVE_TO_FOREGROUND || 
                     event.eventType == android.app.usage.UsageEvents.Event.ACTIVITY_RESUMED) {
                     lastEventTime[pkg] = time
+                    if (time in dayStart..dayEnd) {
+                        appSessionCounts[pkg] = (appSessionCounts[pkg] ?: 0) + 1
+                    }
                 } else if (event.eventType == android.app.usage.UsageEvents.Event.MOVE_TO_BACKGROUND || 
                            event.eventType == android.app.usage.UsageEvents.Event.ACTIVITY_PAUSED) {
                     val startTime = lastEventTime.remove(pkg) ?: continue
@@ -517,6 +500,9 @@ class HomeViewModel(
                 val segmentStart = maxOf(startTime, dayStart)
                 val segmentEnd = dayEnd
                 if (segmentStart < segmentEnd) {
+                    if (startTime in dayStart..dayEnd) {
+                        appSessionCounts[pkg] = (appSessionCounts[pkg] ?: 0) + 1
+                    }
                     var current = segmentStart
                     while (current < segmentEnd) {
                         cal.timeInMillis = current
@@ -538,6 +524,29 @@ class HomeViewModel(
                     }
                 }
             }
+
+            if (isSelectedToday) {
+                totalToday = appTotals.values.sum()
+            }
+
+            val appList = appTotals.mapNotNull { (pkg, time) ->
+                val sessions = if (isSelectedToday) (appSessionCounts[pkg] ?: 0) else 1
+                val cached = appInfoCache[pkg]
+                if (cached != null) {
+                    AppUsageInfo(pkg, cached.first, time, cached.second, sessionCount = sessions)
+                } else {
+                    try {
+                        val appInfo = pm.getApplicationInfo(pkg, 0)
+                        val label = pm.getApplicationLabel(appInfo).toString()
+                        val icon = pm.getApplicationIcon(appInfo)
+                        appInfoCache[pkg] = label to icon
+                        AppUsageInfo(pkg, label, time, icon, sessionCount = sessions)
+                    } catch (_: Exception) { null }
+                }
+            }
+
+            val topApps = appList.sortedByDescending { it.totalTimeVisible }.take(5)
+            val allAppsUsage = appList.sortedByDescending { it.totalTimeVisible }
 
             val rawTotals = appTotals.keys.associateWith { pkg ->
                 (0..23).sumOf { h -> hourlyAppUsage[h]?.get(pkg) ?: 0L }
