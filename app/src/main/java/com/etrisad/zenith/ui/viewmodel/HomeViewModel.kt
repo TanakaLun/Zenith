@@ -126,16 +126,15 @@ class HomeViewModel(
         val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
         val today = Calendar.getInstance()
         val todayStr = dateFormat.format(today.time)
-        
-        // Find earliest date in DB or default to 7 days ago if empty
+
         val earliestDateStr = dbList.lastOrNull()?.date ?: dateFormat.format(Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -7) }.time)
         val earliestCal = Calendar.getInstance().apply {
             time = dateFormat.parse(earliestDateStr) ?: time
         }
         
         val groups = mutableListOf<UsageHistoryGroup>()
-        val cal = Calendar.getInstance() // Start from today and go backwards
-        
+        val cal = Calendar.getInstance()
+
         while (!cal.before(earliestCal)) {
             val dateStr = dateFormat.format(cal.time)
             val isToday = dateStr == todayStr
@@ -229,7 +228,6 @@ class HomeViewModel(
                     )
                 }
             } finally {
-                // Short delay to ensure Room finishes its disk writes and Flow emits
                 delay(500)
                 _isRepairing.value = false
             }
@@ -426,7 +424,6 @@ class HomeViewModel(
             
             val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
-            // 1. Calculate Summary (Only if needed or periodically)
             val trueTodayStats = usm.queryAndAggregateUsageStats(todayStart, now)
             var totalToday = 0L
             trueTodayStats.forEach { (pkg, stat) ->
@@ -435,7 +432,6 @@ class HomeViewModel(
                 if (time > 0) totalToday += time
             }
 
-            // 2. Calculate Top Apps for Selected Day
             val appList = mutableListOf<AppUsageInfo>()
             val dayStats = if (isSelectedToday) trueTodayStats else usm.queryAndAggregateUsageStats(dayStart, dayEnd)
             
@@ -461,7 +457,6 @@ class HomeViewModel(
             val topApps = appList.sortedByDescending { it.totalTimeVisible }.take(5)
             val allAppsUsage = appList.sortedByDescending { it.totalTimeVisible }
 
-            // 3. Calculate Hourly for Selected Day
             val hourlyMap = mutableMapOf<Int, Long>()
             val hourlyAppUsage = mutableMapOf<Int, MutableMap<String, Long>>()
             val events = usm.queryEvents(dayStart, dayEnd)
@@ -514,8 +509,6 @@ class HomeViewModel(
                 HourlyUsageInfo(hour, hourlyMap[hour] ?: 0L, appsInHour)
             }
 
-            // 4. Calculate Trends/History (Periodically or on init)
-            // To be even lighter, we only recalculate these if they are empty or "today" changed
             val yesterdayCal = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }
             val yesterdayDateStr = dateFormat.format(yesterdayCal.time)
 
@@ -551,7 +544,6 @@ class HomeViewModel(
                 else               -> 0f
             }
 
-            // 5. Calculate Snapshot Stamps (Only if not already set for today)
             val currentSnapshotStamps = _uiState.value.snapshotStamps
             val snapshotStamps = if (currentSnapshotStamps.isEmpty() || isSelectedToday) {
                 (0..20).map { i ->
@@ -842,8 +834,7 @@ class HomeViewModel(
     private fun refreshCurrentAppDetailUsage() {
         val currentState = _appDetailUiState.value
         val packageName = currentState.packageName
-        
-        // Jangan update jika packageName kosong atau data dasar (appName) belum dimuat
+
         if (packageName.isEmpty() || currentState.appName == packageName) return
 
         viewModelScope.launch {
@@ -868,7 +859,6 @@ class HomeViewModel(
     }
 
     fun clearAppDetail(packageName: String) {
-        // Hanya hentikan job, jangan reset state ke kosong agar tidak menyebabkan data hilang tiba-tiba di UI
         if (_appDetailUiState.value.packageName == packageName) {
             appDetailJob?.cancel()
         }

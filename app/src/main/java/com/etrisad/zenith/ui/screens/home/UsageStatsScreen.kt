@@ -123,6 +123,49 @@ fun UsageStatsScreen(
         Triple(s, g, o)
     }
 
+    val isBedtimeHour = remember(uiState.selectedDateMillis, uiState.bedtimeEnabled, uiState.bedtimeStartTime, uiState.bedtimeEndTime, uiState.bedtimeDays) {
+        val cal = Calendar.getInstance()
+        cal.timeInMillis = uiState.selectedDateMillis
+        val todayDay = cal.get(Calendar.DAY_OF_WEEK)
+        
+        cal.add(Calendar.DAY_OF_YEAR, -1)
+        val yesterdayDay = cal.get(Calendar.DAY_OF_WEEK)
+        
+        val startH = uiState.bedtimeStartTime.split(":").firstOrNull()?.toIntOrNull() ?: 22
+        val endH = uiState.bedtimeEndTime.split(":").firstOrNull()?.toIntOrNull() ?: 7
+        
+        val todayActive = uiState.bedtimeEnabled && todayDay in uiState.bedtimeDays
+        val yesterdayActive = uiState.bedtimeEnabled && yesterdayDay in uiState.bedtimeDays
+        
+        { hour: Int ->
+            if (startH <= endH) {
+                todayActive && hour in startH until endH
+            } else {
+                (todayActive && hour >= startH) || (yesterdayActive && hour < endH)
+            }
+        }
+    }
+
+    val hourlyAccentColor by animateColorAsState(
+        targetValue = if (selectedHour != null && isBedtimeHour(selectedHour!!)) {
+            MaterialTheme.colorScheme.tertiary
+        } else {
+            MaterialTheme.colorScheme.primary
+        },
+        animationSpec = spring(stiffness = Spring.StiffnessLow),
+        label = "HourlyAccentColor"
+    )
+    
+    val hourlyAccentContainerColor by animateColorAsState(
+        targetValue = if (selectedHour != null && isBedtimeHour(selectedHour!!)) {
+            MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f)
+        } else {
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+        },
+        animationSpec = spring(stiffness = Spring.StiffnessLow),
+        label = "HourlyAccentContainerColor"
+    )
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -160,7 +203,7 @@ fun UsageStatsScreen(
                 GroupedCard(
                     index = 0, 
                     total = hourlyGroupTotal,
-                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                    containerColor = hourlyAccentContainerColor
                 ) {
                     HourlyStatsContent(
                         hourlyUsage = uiState.hourlyUsage,
@@ -171,7 +214,8 @@ fun UsageStatsScreen(
                         bedtimeStartTime = uiState.bedtimeStartTime,
                         bedtimeEndTime = uiState.bedtimeEndTime,
                         bedtimeDays = uiState.bedtimeDays,
-                        dateMillis = uiState.selectedDateMillis
+                        dateMillis = uiState.selectedDateMillis,
+                        accentColor = hourlyAccentColor
                     )
                 }
             }
@@ -186,7 +230,8 @@ fun UsageStatsScreen(
                     Spacer(modifier = Modifier.height(4.dp))
                     GroupedCard(
                         index = 1,
-                        total = hourlyGroupTotal
+                        total = hourlyGroupTotal,
+                        containerColor = hourlyAccentContainerColor
                     ) {
                         Row(
                             modifier = Modifier
@@ -198,14 +243,14 @@ fun UsageStatsScreen(
                                 imageVector = Icons.Outlined.History,
                                 contentDescription = null,
                                 modifier = Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.primary
+                                tint = hourlyAccentColor
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = "Apps used at ${String.format("%02d:00", currentTargetHour)}",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
+                                color = hourlyAccentColor
                             )
                         }
                     }
@@ -224,7 +269,9 @@ fun UsageStatsScreen(
                         formatDuration = viewModel::formatDuration,
                         index = groupIndex,
                         total = hourlyGroupTotal,
-                        onClick = { onAppClick(app.packageName) }
+                        onClick = { onAppClick(app.packageName) },
+                        containerColor = hourlyAccentContainerColor,
+                        accentColor = hourlyAccentColor
                     )
                 }
             }
@@ -237,7 +284,8 @@ fun UsageStatsScreen(
                         GroupedCard(
                             index = otherIndexInGroup,
                             total = hourlyGroupTotal,
-                            onClick = { isOtherHourAppsExpanded = !isOtherHourAppsExpanded }
+                            onClick = { isOtherHourAppsExpanded = !isOtherHourAppsExpanded },
+                            containerColor = hourlyAccentContainerColor
                         ) {
                             ListItem(
                                 headlineContent = {
@@ -251,7 +299,7 @@ fun UsageStatsScreen(
                                     Text(
                                         text = "${lowUsageHourApps.size} apps with minimal usage",
                                         style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        color = hourlyAccentColor
                                     )
                                 },
                                 trailingContent = {
@@ -260,13 +308,13 @@ fun UsageStatsScreen(
                                             text = viewModel.formatDuration(totalLowUsageHourTime),
                                             style = MaterialTheme.typography.bodyMedium,
                                             fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.secondary
+                                            color = hourlyAccentColor
                                         )
                                         Icon(
                                             imageVector = if (isOtherHourAppsExpanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
                                             contentDescription = null,
                                             modifier = Modifier.size(20.dp).padding(start = 4.dp),
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                            tint = hourlyAccentColor
                                         )
                                     }
                                 },
@@ -275,14 +323,14 @@ fun UsageStatsScreen(
                                         modifier = Modifier
                                             .size(40.dp)
                                             .clip(CircleShape)
-                                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                                            .background(hourlyAccentColor.copy(alpha = 0.1f)),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
                                             imageVector = Icons.Outlined.Android,
                                             contentDescription = null,
                                             modifier = Modifier.size(24.dp),
-                                            tint = MaterialTheme.colorScheme.primary
+                                            tint = hourlyAccentColor
                                         )
                                     }
                                 },
@@ -307,7 +355,9 @@ fun UsageStatsScreen(
                                 formatDuration = viewModel::formatDuration,
                                 index = groupIndex,
                                 total = hourlyGroupTotal,
-                                onClick = { onAppClick(app.packageName) }
+                                onClick = { onAppClick(app.packageName) },
+                                containerColor = hourlyAccentContainerColor,
+                                accentColor = hourlyAccentColor
                             )
                         }
                     }
@@ -820,7 +870,8 @@ fun HourlyStatsContent(
     bedtimeStartTime: String,
     bedtimeEndTime: String,
     bedtimeDays: Set<Int>,
-    dateMillis: Long
+    dateMillis: Long,
+    accentColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.primary
 ) {
     val maxUsage = hourlyUsage.maxOfOrNull { it.usageTimeMillis }?.coerceAtLeast(1L) ?: 1L
     
@@ -859,7 +910,7 @@ fun HourlyStatsContent(
                 Icon(
                     imageVector = Icons.Outlined.Schedule,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = accentColor,
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
@@ -893,7 +944,7 @@ fun HourlyStatsContent(
                             text = formatDuration(usage),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.ExtraBold,
-                            color = MaterialTheme.colorScheme.primary
+                            color = accentColor
                         )
                     }
                 } else {
@@ -966,9 +1017,11 @@ fun UsageItem(
     index: Int,
     total: Int,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceContainerLow,
+    accentColor: Color = MaterialTheme.colorScheme.secondary
 ) {
-    GroupedCard(index = index, total = total, onClick = onClick, modifier = modifier) {
+    GroupedCard(index = index, total = total, onClick = onClick, modifier = modifier, containerColor = containerColor) {
         ListItem(
             headlineContent = {
                 Text(
@@ -982,7 +1035,7 @@ fun UsageItem(
                     text = formatDuration(app.totalTimeVisible),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.secondary
+                    color = accentColor
                 )
             },
             leadingContent = {
