@@ -23,6 +23,7 @@ import com.etrisad.zenith.data.local.database.ZenithDatabase
 import com.etrisad.zenith.data.preferences.UserPreferences
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
 import com.etrisad.zenith.data.repository.ShieldRepository
+import com.etrisad.zenith.service.ZenithNotificationListener
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -79,6 +80,8 @@ class AppUsageMonitorService : Service() {
     private var lastCheckedDayTimestamp = 0L
     private var isScreenOn = true
     private var isPowerSaveMode = false
+
+    private var previouslyActiveScheduleIds = setOf<Long>()
 
     private var baseGlobalUsageAtSessionStart = 0L
     private var cachedTotalGlobalUsage = 0L
@@ -304,6 +307,11 @@ class AppUsageMonitorService : Service() {
                         currentPreferences?.let { updateBedtimeStatus(it) }
 
                         val currentDay = java.util.Calendar.getInstance().apply { timeInMillis = currentTime }.get(Calendar.DAY_OF_YEAR)
+                        val currentMinutes = java.util.Calendar.getInstance().apply { timeInMillis = currentTime }.get(Calendar.HOUR_OF_DAY) * 60 + 
+                                            java.util.Calendar.getInstance().apply { timeInMillis = currentTime }.get(Calendar.MINUTE)
+                        
+                        checkSchedulesTransition(currentMinutes)
+
                         if (lastCheckedDay != -1 && currentDay != lastCheckedDay) {
                             updateStreaks()
                             shieldRepository.resetAllRemainingTimes()
@@ -1156,6 +1164,26 @@ class AppUsageMonitorService : Service() {
                 e.printStackTrace()
             }
         }
+    }
+
+    private fun checkSchedulesTransition(currentTotalMinutes: Int) {
+        val currentlyActiveIds = mutableSetOf<Long>()
+        for (ps in parsedSchedulesCache) {
+            val isInInterval = if (ps.startMinutes <= ps.endMinutes) {
+                currentTotalMinutes in ps.startMinutes..ps.endMinutes
+            } else {
+                currentTotalMinutes >= ps.startMinutes || currentTotalMinutes <= ps.endMinutes
+            }
+            if (isInInterval) {
+                currentlyActiveIds.add(ps.id)
+            }
+        }
+
+        val endedSchedules = previouslyActiveScheduleIds - currentlyActiveIds
+        endedSchedules.forEach { id ->
+            ZenithNotificationListener.restoreNotifications(this, id)
+        }
+        previouslyActiveScheduleIds = currentlyActiveIds
     }
 
     private fun checkSchedules(packageName: String): Boolean {

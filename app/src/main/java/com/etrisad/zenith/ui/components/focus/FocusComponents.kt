@@ -164,8 +164,10 @@ fun SettingsToggle(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
-    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(24.dp)
+    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(24.dp),
+    enabled: Boolean = true
 ) {
+    val alpha = if (enabled) 1f else 0.38f
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = shape,
@@ -183,7 +185,8 @@ fun SettingsToggle(
                 modifier = Modifier
                     .size(40.dp)
                     .background(
-                        MaterialTheme.colorScheme.primaryContainer,
+                        if (enabled) MaterialTheme.colorScheme.primaryContainer 
+                        else MaterialTheme.colorScheme.surfaceContainerHigh,
                         CircleShape
                     ),
                 contentAlignment = Alignment.Center
@@ -191,7 +194,8 @@ fun SettingsToggle(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    tint = if (enabled) MaterialTheme.colorScheme.onPrimaryContainer 
+                           else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -203,12 +207,12 @@ fun SettingsToggle(
                     text = title,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha)
                 )
                 Text(
                     text = description,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha)
                 )
             }
 
@@ -217,9 +221,12 @@ fun SettingsToggle(
             Switch(
                 checked = checked,
                 onCheckedChange = onCheckedChange,
+                enabled = enabled,
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
-                    checkedTrackColor = MaterialTheme.colorScheme.primary
+                    checkedTrackColor = MaterialTheme.colorScheme.primary,
+                    disabledUncheckedThumbColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                    disabledUncheckedTrackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)
                 )
             )
         }

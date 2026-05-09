@@ -44,3 +44,18 @@ fun hasNotificationPermission(context: Context): Boolean {
         androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled()
     }
 }
+
+fun isNotificationListenerEnabled(context: Context): Boolean {
+    val pkgName = context.packageName
+    val flat = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
+    if (!flat.isNullOrEmpty()) {
+        val names = flat.split(":")
+        for (name in names) {
+            val cn = android.content.ComponentName.unflattenFromString(name)
+            if (cn != null && cn.packageName == pkgName) {
+                return true
+            }
+        }
+    }
+    return false
+}

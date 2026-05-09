@@ -11,15 +11,23 @@ import com.etrisad.zenith.data.local.dao.ScheduleDao
 import com.etrisad.zenith.data.local.dao.ShieldDao
 import com.etrisad.zenith.data.local.dao.DailyUsageDao
 import com.etrisad.zenith.data.local.dao.HourlyUsageDao
+import com.etrisad.zenith.data.local.dao.InterceptedNotificationDao
 import com.etrisad.zenith.data.local.entity.ShieldEntity
 import com.etrisad.zenith.data.local.entity.ScheduleEntity
 import com.etrisad.zenith.data.local.entity.DailyUsageEntity
 import com.etrisad.zenith.data.local.entity.HourlyUsageEntity
+import com.etrisad.zenith.data.local.entity.InterceptedNotificationEntity
 import com.etrisad.zenith.data.local.Converters
 
 @Database(
-    entities = [ShieldEntity::class, ScheduleEntity::class, DailyUsageEntity::class, HourlyUsageEntity::class],
-    version = 20,
+    entities = [
+        ShieldEntity::class, 
+        ScheduleEntity::class, 
+        DailyUsageEntity::class, 
+        HourlyUsageEntity::class,
+        InterceptedNotificationEntity::class
+    ],
+    version = 21,
     exportSchema = true,
     autoMigrations = [
         androidx.room.AutoMigration(from = 12, to = 13),
@@ -35,6 +43,7 @@ abstract class ZenithDatabase : RoomDatabase() {
     abstract fun scheduleDao(): ScheduleDao
     abstract fun dailyUsageDao(): DailyUsageDao
     abstract fun hourlyUsageDao(): HourlyUsageDao
+    abstract fun interceptedNotificationDao(): InterceptedNotificationDao
 
     companion object {
         @Volatile
@@ -184,6 +193,15 @@ abstract class ZenithDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_20_21 = object : Migration(20, 21) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                try {
+                    db.execSQL("ALTER TABLE schedules ADD COLUMN interceptNotifications INTEGER NOT NULL DEFAULT 0")
+                } catch (_: Exception) {}
+                db.execSQL("CREATE TABLE IF NOT EXISTS `intercepted_notifications` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `packageName` TEXT NOT NULL, `title` TEXT, `text` TEXT, `timestamp` INTEGER NOT NULL, `scheduleId` INTEGER NOT NULL)")
+            }
+        }
+
         fun getDatabase(context: Context): ZenithDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -196,7 +214,7 @@ abstract class ZenithDatabase : RoomDatabase() {
                         MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, 
                         MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
                         MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18,
-                        MIGRATION_18_19, MIGRATION_19_20
+                        MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21
                     )
                     .setJournalMode(RoomDatabase.JournalMode.TRUNCATE)
                     .fallbackToDestructiveMigrationOnDowngrade()

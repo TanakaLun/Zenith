@@ -198,6 +198,20 @@ fun FocusScreen(
             )
         }
 
+        if (uiState.isScheduleSettingsOpen) {
+            ScheduleSettingsBottomSheet(
+                uiState = uiState,
+                editingSchedule = uiState.editingSchedule,
+                onDismiss = { viewModel.closeScheduleSettings() },
+                onSave = { name, start, end, mode, maxEmergency, intercept ->
+                    viewModel.saveSchedule(name, start, end, mode, maxEmergency, intercept)
+                },
+                onEditApps = {
+                    viewModel.openSchedulePicker(resetSelection = false)
+                }
+            )
+        }
+
         if (uiState.isSchedulePickerOpen) {
             MultiAppPickerBottomSheet(
                 uiState = uiState,
@@ -205,21 +219,6 @@ fun FocusScreen(
                 onAppToggled = { viewModel.toggleAppSelectionForSchedule(it) },
                 onConfirm = { viewModel.proceedToScheduleSettings() },
                 onSearchQueryChange = { viewModel.onSearchQueryChange(it) }
-            )
-        }
-
-        if (uiState.isScheduleSettingsOpen) {
-            ScheduleSettingsBottomSheet(
-                uiState = uiState,
-                editingSchedule = uiState.editingSchedule,
-                onDismiss = { viewModel.closeScheduleSettings() },
-                onSave = { name, start, end, mode, maxEmergency ->
-                    viewModel.saveSchedule(name, start, end, mode, maxEmergency)
-                },
-                onEditApps = {
-                    viewModel.closeScheduleSettings()
-                    viewModel.openSchedulePicker(resetSelection = false)
-                }
             )
         }
 

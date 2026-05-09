@@ -232,7 +232,6 @@ class FocusViewModel(
             isSchedulePickerOpen = true,
             selectedAppsForSchedule = if (resetSelection) emptySet() else _uiState.value.selectedAppsForSchedule,
             isSettingsSheetOpen = false,
-            isScheduleSettingsOpen = false,
             editingSchedule = if (resetSelection) null else _uiState.value.editingSchedule
         )
     }
@@ -251,8 +250,7 @@ class FocusViewModel(
         if (_uiState.value.selectedAppsForSchedule.isEmpty()) return
         _uiState.value = _uiState.value.copy(
             isSchedulePickerOpen = false,
-            isScheduleSettingsOpen = true,
-            editingSchedule = null
+            isScheduleSettingsOpen = true
         )
     }
 
@@ -279,7 +277,8 @@ class FocusViewModel(
         startTime: String,
         endTime: String,
         mode: ScheduleMode,
-        maxEmergencyUses: Int = 3
+        maxEmergencyUses: Int = 3,
+        interceptNotifications: Boolean = false
     ) {
         val packageNames = _uiState.value.selectedAppsForSchedule.toList()
         if (packageNames.isEmpty()) return
@@ -293,6 +292,7 @@ class FocusViewModel(
                     startTime = startTime,
                     endTime = endTime,
                     mode = mode,
+                    interceptNotifications = interceptNotifications,
                     emergencyUseCount = editing.emergencyUseCount,
                     maxEmergencyUses = maxEmergencyUses
                 )
@@ -303,6 +303,7 @@ class FocusViewModel(
                     startTime = startTime,
                     endTime = endTime,
                     mode = mode,
+                    interceptNotifications = interceptNotifications,
                     emergencyUseCount = maxEmergencyUses,
                     maxEmergencyUses = maxEmergencyUses
                 )

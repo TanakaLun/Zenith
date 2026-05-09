@@ -39,14 +39,14 @@ fun ScheduleSettingsBottomSheet(
     uiState: FocusUiState,
     editingSchedule: ScheduleEntity? = null,
     onDismiss: () -> Unit,
-    onSave: (String, String, String, ScheduleMode, Int) -> Unit,
+    onSave: (String, String, String, ScheduleMode, Int, Boolean) -> Unit,
     onEditApps: () -> Unit
 ) {
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
     val context = LocalContext.current
-    val appIcons = remember(editingSchedule, uiState.selectedAppsForSchedule) {
-        val packages = editingSchedule?.packageNames ?: uiState.selectedAppsForSchedule.toList()
+    val appIcons = remember(uiState.selectedAppsForSchedule) {
+        val packages = uiState.selectedAppsForSchedule.toList()
         packages.take(4).mapNotNull { pkg ->
             try {
                 context.packageManager.getApplicationIcon(pkg)
@@ -59,6 +59,7 @@ fun ScheduleSettingsBottomSheet(
     var name by remember { mutableStateOf(editingSchedule?.name ?: "My Schedule") }
     var mode by remember { mutableStateOf(editingSchedule?.mode ?: ScheduleMode.BLOCK) }
     var maxEmergencyUses by remember { mutableStateOf(editingSchedule?.maxEmergencyUses?.toString() ?: "3") }
+    var interceptNotifications by remember { mutableStateOf(editingSchedule?.interceptNotifications ?: false) }
     var isEditingName by remember { mutableStateOf(false) }
 
     val initialStart = editingSchedule?.startTime?.split(":")?.map { it.toInt() } ?: listOf(9, 0)
@@ -106,8 +107,7 @@ fun ScheduleSettingsBottomSheet(
                     .padding(horizontal = 16.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    val packageNames =
-                        editingSchedule?.packageNames ?: uiState.selectedAppsForSchedule.toList()
+                    val packageNames = uiState.selectedAppsForSchedule.toList()
                     MultiAppIconGroup(
                         appIcons = appIcons,
                         totalCount = packageNames.size,
@@ -278,6 +278,29 @@ fun ScheduleSettingsBottomSheet(
                     }
                 )
 
+                Spacer(modifier = Modifier.height(24.dp))
+
+                PreferenceCategory(title = "Settings")
+
+                SettingsToggle(
+                    title = "Intercept Notifications",
+                    description = "Hold notifications until schedule ends",
+                    checked = if (mode == ScheduleMode.BLOCK) interceptNotifications else false,
+                    onCheckedChange = { 
+                        if (it && !com.etrisad.zenith.util.isNotificationListenerEnabled(context)) {
+                            android.widget.Toast.makeText(context, "Please grant Notification Access in settings", android.widget.Toast.LENGTH_LONG).show()
+                            context.startActivity(android.content.Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).apply {
+                                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                            })
+                        } else {
+                            interceptNotifications = it 
+                        }
+                    },
+                    icon = Icons.Outlined.NotificationsPaused,
+                    enabled = mode == ScheduleMode.BLOCK,
+                    shape = RoundedCornerShape(24.dp)
+                )
+
                 Spacer(modifier = Modifier.height(32.dp))
             }
 
@@ -301,7 +324,7 @@ fun ScheduleSettingsBottomSheet(
                             endTimeState.hour,
                             endTimeState.minute
                         )
-                        onSave(name, startStr, endStr, mode, maxEmergencyUses.toIntOrNull() ?: 3)
+                        onSave(name, startStr, endStr, mode, maxEmergencyUses.toIntOrNull() ?: 3, interceptNotifications)
                     },
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.large
