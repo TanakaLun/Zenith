@@ -5,6 +5,8 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.GenericShape
@@ -18,6 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asComposePath
@@ -49,6 +52,26 @@ fun AppGoalOverlayContent(
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     
     var showSelectionSheet by remember { mutableStateOf(false) }
+
+    val timeoutDuration = 45_000L
+    val progressState = remember { Animatable(0f) }
+
+    LaunchedEffect(showSelectionSheet) {
+        if (!showSelectionSheet) {
+            val result = progressState.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(
+                    durationMillis = ((1f - progressState.value) * timeoutDuration).toInt(),
+                    easing = LinearEasing
+                )
+            )
+            if (result.endReason == AnimationEndReason.Finished) {
+                onSnooze()
+            }
+        } else {
+            progressState.stop()
+        }
+    }
 
     val appInfos = remember(packageNames) {
         packageNames.map { pkg ->
@@ -206,7 +229,10 @@ fun AppGoalOverlayContent(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
-                    AppGoalSnoozeButton(onSnooze = onSnooze)
+                    AppGoalSnoozeButton(
+                        progress = progressState.value,
+                        onSnooze = onSnooze
+                    )
                     Spacer(modifier = Modifier.height(32.dp))
                     AppGoalActionGroup(
                         hintPhase = hintPhase,
@@ -226,7 +252,6 @@ fun AppGoalOverlayContent(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .statusBarsPadding()
                     .navigationBarsPadding()
                     .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -263,7 +288,10 @@ fun AppGoalOverlayContent(
 
                 Spacer(modifier = Modifier.weight(1.3f))
 
-                AppGoalSnoozeButton(onSnooze = onSnooze)
+                AppGoalSnoozeButton(
+                    progress = progressState.value,
+                    onSnooze = onSnooze
+                )
                 
                 Spacer(modifier = Modifier.height(32.dp))
 
@@ -365,28 +393,59 @@ private fun AppGoalMultiIconBox(
 }
 
 @Composable
-private fun AppGoalSnoozeButton(onSnooze: () -> Unit) {
+private fun AppGoalSnoozeButton(
+    progress: Float,
+    onSnooze: () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.96f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+        label = "snoozeScale"
+    )
+    val fillingColor = MaterialTheme.colorScheme.surfaceContainerHighest
+
     Surface(
         onClick = onSnooze,
         shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 1.dp,
+        shadowElevation = 1.dp,
+        interactionSource = interactionSource,
+        modifier = Modifier
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clip(CircleShape)
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 28.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Box(
+            modifier = Modifier
+                .drawBehind {
+                    drawRect(
+                        color = fillingColor,
+                        size = size.copy(width = size.width * progress)
+                    )
+                }
+                .padding(horizontal = 32.dp, vertical = 16.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = Icons.Default.Snooze, 
-                contentDescription = null, 
-                modifier = Modifier.size(20.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
-            Spacer(modifier = Modifier.width(10.dp))
-            Text(
-                text = "Snooze for 5 minutes", 
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Medium
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.Snooze,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = "Snooze for 5 minutes",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
         }
     }
 }
