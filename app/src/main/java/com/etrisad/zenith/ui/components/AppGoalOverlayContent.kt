@@ -17,10 +17,12 @@ import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.Snooze
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asComposePath
@@ -51,10 +53,15 @@ fun AppGoalOverlayContent(
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     
-    var showSelectionSheet by remember { mutableStateOf(false) }
+    var showSelectionSheet by rememberSaveable { mutableStateOf(false) }
 
     val timeoutDuration = 45_000L
-    val progressState = remember { Animatable(0f) }
+    var savedProgress by rememberSaveable { mutableFloatStateOf(0f) }
+    val progressState = remember { Animatable(savedProgress) }
+
+    LaunchedEffect(progressState.value) {
+        savedProgress = progressState.value
+    }
 
     LaunchedEffect(showSelectionSheet) {
         if (!showSelectionSheet) {
@@ -159,6 +166,19 @@ fun AppGoalOverlayContent(
         label = "bgAlpha"
     )
 
+    val pulseProgress by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(4000, easing = LinearOutSlowInEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "pulseProgress"
+    )
+
+    val pulseColor = MaterialTheme.colorScheme.primary
+    val pulseSecondaryColor = MaterialTheme.colorScheme.secondary
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -218,7 +238,10 @@ fun AppGoalOverlayContent(
                         iconSize = 130.dp,
                         rotationAngle = rotationAngle,
                         decorativeShape = decorativeShape,
-                        sunnyShape = sunnyShape
+                        sunnyShape = sunnyShape,
+                        pulseProgress = pulseProgress,
+                        pulseColor = pulseColor,
+                        pulseSecondaryColor = pulseSecondaryColor
                     )
                 }
 
@@ -283,7 +306,10 @@ fun AppGoalOverlayContent(
                     iconSize = 180.dp,
                     rotationAngle = rotationAngle,
                     decorativeShape = decorativeShape,
-                    sunnyShape = sunnyShape
+                    sunnyShape = sunnyShape,
+                    pulseProgress = pulseProgress,
+                    pulseColor = pulseColor,
+                    pulseSecondaryColor = pulseSecondaryColor
                 )
 
                 Spacer(modifier = Modifier.weight(1.3f))
@@ -333,9 +359,30 @@ private fun AppGoalMultiIconBox(
     iconSize: androidx.compose.ui.unit.Dp,
     rotationAngle: Float,
     decorativeShape: androidx.compose.ui.graphics.Shape,
-    sunnyShape: androidx.compose.ui.graphics.Shape
+    sunnyShape: androidx.compose.ui.graphics.Shape,
+    pulseProgress: Float,
+    pulseColor: Color,
+    pulseSecondaryColor: Color
 ) {
-    Box(contentAlignment = Alignment.Center) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier.drawBehind {
+            val radius = size.toPx() * (1f + pulseProgress * 0.4f)
+            val alpha = 0.15f * (1f - pulseProgress)
+            
+            drawCircle(
+                color = pulseColor.copy(alpha = alpha),
+                radius = radius,
+                center = center
+            )
+            
+            drawCircle(
+                color = pulseSecondaryColor.copy(alpha = alpha * 0.6f),
+                radius = radius * 0.85f,
+                center = center
+            )
+        }
+    ) {
         Box(
             modifier = Modifier
                 .size(size)
