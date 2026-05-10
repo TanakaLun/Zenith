@@ -50,6 +50,7 @@ class AppUsageMonitorService : Service() {
     private val reusableCalendar = Calendar.getInstance()
     private var lastForegroundApp: String? = null
     private var currentShieldCache: ShieldEntity? = null
+    private var currentSessionPackage: String? = null
     private var lastUsageFetchTime = 0L
     private var cachedTotalUsage = 0L
     private var sessionStartTime = 0L
@@ -104,6 +105,7 @@ class AppUsageMonitorService : Service() {
                 Intent.ACTION_SCREEN_OFF -> {
                     isScreenOn = false
                     currentShieldCache = null
+                    currentSessionPackage = null
                     usageStatsCache = null
                 }
                 android.os.PowerManager.ACTION_POWER_SAVE_MODE_CHANGED -> {
@@ -412,6 +414,7 @@ class AppUsageMonitorService : Service() {
                                 lastUsageFetchTime = 0L 
                                 lastHUDUpdateTime = 0L
                                 sessionStartTime = currentTime
+                                currentSessionPackage = currentApp
                                 
                                 val systemUsage = getSystemUsageToday(currentApp)
                                 val systemGlobal = getSystemGlobalUsageToday()
@@ -556,6 +559,8 @@ class AppUsageMonitorService : Service() {
                     } else if (currentApp != null && (currentApp == packageName || launcherPackages.contains(currentApp))) {
                         sessionUsageOverlayManager.updateForegroundApp(currentApp)
                         currentShieldCache = null
+                        currentSessionPackage = currentApp
+                        cachedTotalUsage = 0L
                     }
                     
                     lastForegroundApp = currentApp
@@ -594,6 +599,8 @@ class AppUsageMonitorService : Service() {
     }
 
     private suspend fun updateUsageTime(packageName: String) {
+        if (packageName != currentSessionPackage) return
+
         val currentTime = System.currentTimeMillis()
         val sessionElapsed = currentTime - sessionStartTime
         
@@ -672,7 +679,7 @@ class AppUsageMonitorService : Service() {
                 lastGoalReminderTimestamp = if (shield.type == FocusType.GOAL) currentTime else shield.lastGoalReminderTimestamp
             )
             shieldRepository.updateShield(finalShield)
-            if (shield.packageName == lastForegroundApp) {
+            if (shield.packageName == currentSessionPackage) {
                 currentShieldCache = finalShield
             }
 
@@ -1045,7 +1052,7 @@ class AppUsageMonitorService : Service() {
     }
 
     private fun getTotalUsageToday(packageName: String): Long {
-        if (packageName == lastForegroundApp && cachedTotalUsage > 0) {
+        if (packageName == currentSessionPackage && cachedTotalUsage > 0) {
             return cachedTotalUsage
         }
         return getSystemUsageToday(packageName)
