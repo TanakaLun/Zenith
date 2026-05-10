@@ -19,6 +19,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -59,24 +60,23 @@ fun AppGoalOverlayContent(
     var savedProgress by rememberSaveable { mutableFloatStateOf(0f) }
     val progressState = remember { Animatable(savedProgress) }
 
-    LaunchedEffect(progressState.value) {
-        savedProgress = progressState.value
-    }
-
     LaunchedEffect(showSelectionSheet) {
         if (!showSelectionSheet) {
-            val result = progressState.animateTo(
-                targetValue = 1f,
-                animationSpec = tween(
-                    durationMillis = ((1f - progressState.value) * timeoutDuration).toInt(),
-                    easing = LinearEasing
-                )
-            )
-            if (result.endReason == AnimationEndReason.Finished) {
-                onSnooze()
+            val remainingTime = ((1f - savedProgress) * timeoutDuration).toLong()
+            val endTime = System.currentTimeMillis() + remainingTime
+
+            while (System.currentTimeMillis() < endTime) {
+                val now = System.currentTimeMillis()
+                val currentProgress = (1f - (endTime - now).toFloat() / timeoutDuration).coerceIn(0f, 1f)
+                
+                progressState.snapTo(currentProgress)
+                savedProgress = currentProgress
+                delay(50)
             }
-        } else {
-            progressState.stop()
+            
+            progressState.snapTo(1f)
+            savedProgress = 1f
+            onSnooze()
         }
     }
 
