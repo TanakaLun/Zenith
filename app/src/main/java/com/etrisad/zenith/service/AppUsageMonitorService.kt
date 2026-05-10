@@ -240,6 +240,16 @@ class AppUsageMonitorService : Service() {
                         val isNightTime = hour >= 22 || hour < 6 // 10 PM to 6 AM
 
                         if (!isBedtimeActive && !isNightTime) {
+                            try {
+                                val wakeLock = powerManager.newWakeLock(
+                                    android.os.PowerManager.FULL_WAKE_LOCK or
+                                            android.os.PowerManager.ACQUIRE_CAUSES_WAKEUP or
+                                            android.os.PowerManager.ON_AFTER_RELEASE,
+                                    "Zenith:GoalWakeLock"
+                                )
+                                wakeLock.acquire(3000)
+                            } catch (_: Exception) {}
+
                             AppGoalOverlayActivity.start(this@AppUsageMonitorService, overlayGoals.map { it.packageName })
                         }
                     }
