@@ -11,7 +11,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Matrix
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asComposePath
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -31,6 +34,7 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 
 import androidx.compose.runtime.saveable.rememberSaveable
+import kotlinx.coroutines.launch
 
 @Composable
 fun UsageHistoryCard(
@@ -124,6 +128,7 @@ fun UsageGraph(
     selectedDateMillis: Long? = null,
     onDaySelected: (DailyUsage?) -> Unit
 ) {
+    val scope = rememberCoroutineScope()
     val sunnyShape = remember {
         GenericShape { size, _ ->
             val path = MaterialShapes.Sunny.toPath().asComposePath()
@@ -366,6 +371,71 @@ fun UsageGraph(
                                         .background(if (showDatabaseIndicator) animatedIndicatorColor else Color.Transparent)
                                 )
                             }
+                        }
+                    }
+                }
+            }
+
+            val showTodayButton by remember {
+                derivedStateOf { pagerState.currentPage < pagerState.pageCount - 1 }
+            }
+
+            val buttonAlpha by animateFloatAsState(
+                targetValue = if (showTodayButton) 1f else 0f,
+                animationSpec = spring(stiffness = Spring.StiffnessLow),
+                label = "TodayButtonAlpha"
+            )
+            val buttonScale by animateFloatAsState(
+                targetValue = if (showTodayButton) 1f else 0.8f,
+                animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessLow),
+                label = "TodayButtonScale"
+            )
+
+            if (buttonAlpha > 0.01f) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = 12.dp)
+                        .graphicsLayer {
+                            alpha = buttonAlpha
+                            scaleX = buttonScale
+                            scaleY = buttonScale
+                        }
+                ) {
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                pagerState.animateScrollToPage(pageCount - 1)
+                            }
+                        },
+                        modifier = Modifier
+                            .height(32.dp)
+                            .widthIn(min = 48.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp),
+                        shape = CircleShape,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        ),
+                        elevation = ButtonDefaults.buttonElevation(
+                            defaultElevation = 4.dp,
+                            pressedElevation = 2.dp
+                        )
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Today,
+                                contentDescription = "Today",
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp)
+                            )
                         }
                     }
                 }
