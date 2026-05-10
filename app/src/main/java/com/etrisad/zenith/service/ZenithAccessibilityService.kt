@@ -202,13 +202,21 @@ class ZenithAccessibilityService : AccessibilityService() {
 
     private suspend fun handlePackageChange(currentApp: String) {
         Log.d("ZenithAS", "handlePackageChange: $currentApp")
+        
+        var localSessionStartTime = sessionStartTime
+        var localBaseUsage = baseUsageAtSessionStart
+        var localShield = allShieldsCache.find { it.packageName == currentApp }
+        
         if (currentApp != lastForegroundApp || currentShieldCache == null) {
-            currentShieldCache = allShieldsCache.find { it.packageName == currentApp }
+            currentShieldCache = localShield
             if (currentApp != lastForegroundApp) {
                 lastUsageFetchTime = 0L
-                sessionStartTime = System.currentTimeMillis()
-                baseUsageAtSessionStart = getTotalUsageToday(currentApp)
-                cachedTotalUsage = baseUsageAtSessionStart
+                localSessionStartTime = System.currentTimeMillis()
+                localBaseUsage = getTotalUsageToday(currentApp)
+                
+                sessionStartTime = localSessionStartTime
+                baseUsageAtSessionStart = localBaseUsage
+                cachedTotalUsage = localBaseUsage
                 lastForegroundApp = currentApp
             }
         }
@@ -217,8 +225,9 @@ class ZenithAccessibilityService : AccessibilityService() {
             lastEventTime = System.currentTimeMillis()
             val currentTime = System.currentTimeMillis()
             
-            if (currentShieldCache == null) {
-                currentShieldCache = allShieldsCache.find { it.packageName == currentApp }
+            if (localShield == null) {
+                localShield = allShieldsCache.find { it.packageName == currentApp }
+                currentShieldCache = localShield
             }
 
             if (currentTime - lastCheckedDayTimestamp > 60000) {
@@ -236,6 +245,9 @@ class ZenithAccessibilityService : AccessibilityService() {
                     notifiedGoals.clear()
                     earlyKickManager.reset()
 
+                    localBaseUsage = 0L
+                    localSessionStartTime = currentTime
+                    
                     baseUsageAtSessionStart = 0L
                     sessionStartTime = currentTime
                     
@@ -254,7 +266,12 @@ class ZenithAccessibilityService : AccessibilityService() {
                 continue
             }
 
-            updateUsageTime(currentApp)
+            updateUsageTime(currentApp, localSessionStartTime, localBaseUsage, localShield)
+            
+            // Re-fetch shield in case it was updated in DB and we need fresh state
+            // But we can just use the updated one from updateUsageTime if we make it return it.
+            // For now, let's just make sure updateUsageTime updates the localShield if it's the same app.
+            localShield = currentShieldCache?.takeIf { it.packageName == currentApp } ?: localShield
 
             val shield = currentShieldCache
             val isAppPaused = shield != null && isPaused(shield)
@@ -334,12 +351,12 @@ class ZenithAccessibilityService : AccessibilityService() {
         }
     }
 
-    private fun updateUsageTime(packageName: String) {
-        val shield = currentShieldCache ?: return
+    private fun updateUsageTime(packageName: String, startTime: Long, baseUsage: Long, shield: ShieldEntity?) {
+        if (shield == null) return
         val currentTime = System.currentTimeMillis()
 
-        val sessionElapsed = currentTime - sessionStartTime
-        val currentTotalUsage = baseUsageAtSessionStart + sessionElapsed
+        val sessionElapsed = currentTime - startTime
+        val currentTotalUsage = baseUsage + sessionElapsed
         cachedTotalUsage = currentTotalUsage
 
         if (shield.type == FocusType.GOAL) {
@@ -354,8 +371,9 @@ class ZenithAccessibilityService : AccessibilityService() {
             }
 
             if (currentTime - lastUsageFetchTime >= uiUpdateInterval) {
+                val usageToReport = currentTotalUsage
                 serviceScope.launch(Dispatchers.Main) {
-                    sessionUsageOverlayManager.updateHUDUsage(packageName, currentTotalUsage)
+                    sessionUsageOverlayManager.updateHUDUsage(packageName, usageToReport)
                 }
                 lastUsageFetchTime = currentTime
             }
@@ -382,7 +400,9 @@ class ZenithAccessibilityService : AccessibilityService() {
             serviceScope.launch {
                 shieldRepository.updateShield(updatedShield)
             }
-            currentShieldCache = updatedShield
+            if (currentShieldCache?.packageName == packageName) {
+                currentShieldCache = updatedShield
+            }
 
             if (shield.type == FocusType.GOAL && !isPaused(shield)) {
                 if (currentTotalUsage >= limitMillis && !notifiedGoals.contains(packageName)) {

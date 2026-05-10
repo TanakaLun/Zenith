@@ -496,7 +496,10 @@ class AppUsageMonitorService : Service() {
                                         )
                                         if (isGoal && currentTime - lastHUDUpdateTime > HUD_UPDATE_INTERVAL) {
                                             lastHUDUpdateTime = currentTime
-                                            sessionUsageOverlayManager.updateHUDUsage(currentApp, cachedTotalUsage)
+                                            val currentUsageToReport = cachedTotalUsage
+                                            serviceScope.launch(Dispatchers.Main) {
+                                                sessionUsageOverlayManager.updateHUDUsage(currentApp, currentUsageToReport)
+                                            }
                                         }
                                     }
                                 }
@@ -596,8 +599,9 @@ class AppUsageMonitorService : Service() {
 
             if (currentTime - lastHUDUpdateTime > uiUpdateInterval) {
                 lastHUDUpdateTime = currentTime
+                val currentUsageToReport = cachedTotalUsage
                 serviceScope.launch(Dispatchers.Main) {
-                    sessionUsageOverlayManager.updateHUDUsage(packageName, cachedTotalUsage)
+                    sessionUsageOverlayManager.updateHUDUsage(packageName, currentUsageToReport)
                 }
             }
         }

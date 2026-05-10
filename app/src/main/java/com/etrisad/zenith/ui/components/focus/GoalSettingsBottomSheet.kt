@@ -21,6 +21,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
+import androidx.core.net.toUri
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -344,8 +345,7 @@ fun GoalSettingsBottomSheet(
                                                 selected = isDefault,
                                                 onClick = { goalCallerSoundUri = null },
                                                 isFirst = true,
-                                                isLast = false,
-                                                containerColor = containerColor
+                                                isLast = false
                                             )
                                             GroupedOptionButton(
                                                 label = "System",
@@ -354,23 +354,21 @@ fun GoalSettingsBottomSheet(
                                                     val intent = android.content.Intent(android.media.RingtoneManager.ACTION_RINGTONE_PICKER).apply {
                                                         putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_TYPE, android.media.RingtoneManager.TYPE_ALL)
                                                         putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_TITLE, "Select System Sound")
-                                                        putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, goalCallerSoundUri?.let { android.net.Uri.parse(it) })
+                                                        putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, goalCallerSoundUri?.toUri())
                                                         putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
                                                         putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
                                                     }
                                                     ringtonePickerLauncher.launch(intent)
                                                 },
                                                 isFirst = false,
-                                                isLast = false,
-                                                containerColor = containerColor
+                                                isLast = false
                                             )
                                             GroupedOptionButton(
                                                 label = "File",
                                                 selected = isFile,
                                                 onClick = { filePickerLauncher.launch(arrayOf("audio/*")) },
                                                 isFirst = false,
-                                                isLast = true,
-                                                containerColor = containerColor
+                                                isLast = true
                                             )
                                         }
                                         
