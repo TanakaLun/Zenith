@@ -12,6 +12,7 @@ import com.etrisad.zenith.data.local.entity.DailyUsageEntity
 import com.etrisad.zenith.data.local.entity.HourlyUsageEntity
 import com.etrisad.zenith.data.repository.ShieldRepository
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
+import com.etrisad.zenith.service.UsageSyncManager
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
@@ -314,6 +315,15 @@ class HomeViewModel(
 
         refreshUsageStats()
         startRealTimeUpdates()
+        syncDataNow()
+    }
+
+    fun syncDataNow() {
+        viewModelScope.launch {
+            val syncManager = UsageSyncManager(context, shieldRepository, userPreferencesRepository)
+            syncManager.syncUsageData()
+            refreshUsageStats()
+        }
     }
 
     private fun getMidnight(offsetDaysFromToday: Int = 0): Long {

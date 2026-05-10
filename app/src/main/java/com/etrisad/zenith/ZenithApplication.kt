@@ -8,8 +8,13 @@ import coil.memory.MemoryCache
 
 import com.etrisad.zenith.data.local.database.ZenithDatabase
 import com.etrisad.zenith.data.repository.ShieldRepository
+import com.etrisad.zenith.data.preferences.UserPreferencesRepository
 
 class ZenithApplication : Application(), ImageLoaderFactory {
+
+    val userPreferencesRepository: UserPreferencesRepository by lazy {
+        UserPreferencesRepository(this)
+    }
 
     val shieldRepository: ShieldRepository by lazy {
         val database = ZenithDatabase.getDatabase(this)
@@ -19,6 +24,11 @@ class ZenithApplication : Application(), ImageLoaderFactory {
             database.dailyUsageDao(),
             database.hourlyUsageDao()
         )
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        com.etrisad.zenith.service.UsageSyncWorker.enqueue(this)
     }
 
     override fun newImageLoader(): ImageLoader {

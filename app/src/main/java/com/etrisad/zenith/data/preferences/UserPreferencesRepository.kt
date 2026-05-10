@@ -67,6 +67,7 @@ class UserPreferencesRepository(private val context: Context) {
         val INTERCEPT_AUDIO_FOCUS_ENABLED = booleanPreferencesKey("intercept_audio_focus_enabled")
         val SHOW_DATABASE_INDICATOR = booleanPreferencesKey("show_database_indicator")
         val DEVELOPER_MODE_ENABLED = booleanPreferencesKey("developer_mode_enabled")
+        val LAST_SYNC_TIMESTAMP = longPreferencesKey("last_sync_timestamp")
     }
 
     val userPreferencesFlow: Flow<UserPreferences> = context.dataStore.data
@@ -120,6 +121,7 @@ class UserPreferencesRepository(private val context: Context) {
             val interceptAudioFocusEnabled = preferences[PreferencesKeys.INTERCEPT_AUDIO_FOCUS_ENABLED] ?: true
             val showDatabaseIndicator = preferences[PreferencesKeys.SHOW_DATABASE_INDICATOR] ?: false
             val developerModeEnabled = preferences[PreferencesKeys.DEVELOPER_MODE_ENABLED] ?: false
+            val lastSyncTimestamp = preferences[PreferencesKeys.LAST_SYNC_TIMESTAMP] ?: (System.currentTimeMillis() - 24 * 60 * 60 * 1000L)
 
             UserPreferences(
                 themeConfig = themeConfig,
@@ -158,7 +160,8 @@ class UserPreferencesRepository(private val context: Context) {
                 earlyKickEnabled = earlyKickEnabled,
                 interceptAudioFocusEnabled = interceptAudioFocusEnabled,
                 showDatabaseIndicator = showDatabaseIndicator,
-                developerModeEnabled = developerModeEnabled
+                developerModeEnabled = developerModeEnabled,
+                lastSyncTimestamp = lastSyncTimestamp
             )
         }
 
@@ -368,6 +371,12 @@ class UserPreferencesRepository(private val context: Context) {
             preferences[PreferencesKeys.DEVELOPER_MODE_ENABLED] = enabled
         }
     }
+
+    suspend fun setLastSyncTimestamp(timestamp: Long) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.LAST_SYNC_TIMESTAMP] = timestamp
+        }
+    }
 }
 
 data class UserPreferences(
@@ -407,5 +416,6 @@ data class UserPreferences(
     val earlyKickEnabled: Boolean = false,
     val interceptAudioFocusEnabled: Boolean = true,
     val showDatabaseIndicator: Boolean = false,
-    val developerModeEnabled: Boolean = false
+    val developerModeEnabled: Boolean = false,
+    val lastSyncTimestamp: Long = 0L
 )
