@@ -367,18 +367,18 @@ private fun AppGoalMultiIconBox(
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier.drawBehind {
-            val radius = size.toPx() * (1f + pulseProgress * 0.4f)
-            val alpha = 0.15f * (1f - pulseProgress)
+            val maxRadius = size.toPx() * 1.35f
+            val alpha = (1f - pulseProgress).coerceIn(0f, 1f) * 0.25f
             
             drawCircle(
                 color = pulseColor.copy(alpha = alpha),
-                radius = radius,
+                radius = maxRadius * pulseProgress,
                 center = center
             )
             
             drawCircle(
-                color = pulseSecondaryColor.copy(alpha = alpha * 0.6f),
-                radius = radius * 0.85f,
+                color = pulseSecondaryColor.copy(alpha = alpha * 0.5f),
+                radius = maxRadius * 0.8f * pulseProgress,
                 center = center
             )
         }
