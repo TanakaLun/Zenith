@@ -209,11 +209,11 @@ class AppUsageMonitorService : Service() {
             while (true) {
                 val currentTime = System.currentTimeMillis()
                 val goals = goalShieldsCache
+                val triggeredGoals = mutableListOf<ShieldEntity>()
 
                 if (goals.isNotEmpty()) {
                     goals.forEach { goal ->
                         if (goal.packageName == lastForegroundApp) return@forEach
-
                         if (isPaused(goal)) return@forEach
 
                         val usageToday = dailyUsageCache[goal.packageName] ?: getTotalUsageToday(goal.packageName)
@@ -222,9 +222,19 @@ class AppUsageMonitorService : Service() {
 
                         val periodMillis = goal.goalReminderPeriodMinutes * 60 * 1000L
                         if (periodMillis > 0 && currentTime - goal.lastGoalReminderTimestamp >= periodMillis) {
-                            sendGoalSuggestionNotification(goal)
-                            shieldRepository.updateShield(goal.copy(lastGoalReminderTimestamp = currentTime))
+                            triggeredGoals.add(goal)
                         }
+                    }
+                }
+
+                if (triggeredGoals.isNotEmpty()) {
+                    triggeredGoals.forEach { goal ->
+                        sendGoalSuggestionNotification(goal)
+                        shieldRepository.updateShield(goal.copy(lastGoalReminderTimestamp = currentTime))
+                    }
+
+                    if (currentPreferences?.appGoalFullscreenOverlayEnabled == true) {
+                        AppGoalOverlayActivity.start(this@AppUsageMonitorService, triggeredGoals.map { it.packageName })
                     }
                 }
 

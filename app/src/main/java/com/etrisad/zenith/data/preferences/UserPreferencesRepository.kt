@@ -64,6 +64,7 @@ class UserPreferencesRepository(private val context: Context) {
         val BEDTIME_WHITELISTED_PACKAGES = stringPreferencesKey("bedtime_whitelisted_packages")
         val USER_NAME = stringPreferencesKey("user_name")
         val EARLY_KICK_ENABLED = booleanPreferencesKey("early_kick_enabled")
+        val APP_GOAL_FULLSCREEN_OVERLAY_ENABLED = booleanPreferencesKey("app_goal_fullscreen_overlay_enabled")
         val INTERCEPT_AUDIO_FOCUS_ENABLED = booleanPreferencesKey("intercept_audio_focus_enabled")
         val SHOW_DATABASE_INDICATOR = booleanPreferencesKey("show_database_indicator")
         val DEVELOPER_MODE_ENABLED = booleanPreferencesKey("developer_mode_enabled")
@@ -117,6 +118,7 @@ class UserPreferencesRepository(private val context: Context) {
             val bedtimeWhitelistedPackages = preferences[PreferencesKeys.BEDTIME_WHITELISTED_PACKAGES]?.split(",")?.filter { it.isNotEmpty() }?.toSet() ?: emptySet()
             val userName = preferences[PreferencesKeys.USER_NAME] ?: "User"
             val earlyKickEnabled = preferences[PreferencesKeys.EARLY_KICK_ENABLED] ?: false
+            val appGoalFullscreenOverlayEnabled = preferences[PreferencesKeys.APP_GOAL_FULLSCREEN_OVERLAY_ENABLED] ?: false
             val interceptAudioFocusEnabled = preferences[PreferencesKeys.INTERCEPT_AUDIO_FOCUS_ENABLED] ?: true
             val showDatabaseIndicator = preferences[PreferencesKeys.SHOW_DATABASE_INDICATOR] ?: false
             val developerModeEnabled = preferences[PreferencesKeys.DEVELOPER_MODE_ENABLED] ?: false
@@ -156,6 +158,7 @@ class UserPreferencesRepository(private val context: Context) {
                 bedtimeWhitelistedPackages = bedtimeWhitelistedPackages,
                 userName = userName,
                 earlyKickEnabled = earlyKickEnabled,
+                appGoalFullscreenOverlayEnabled = appGoalFullscreenOverlayEnabled,
                 interceptAudioFocusEnabled = interceptAudioFocusEnabled,
                 showDatabaseIndicator = showDatabaseIndicator,
                 developerModeEnabled = developerModeEnabled
@@ -351,6 +354,12 @@ class UserPreferencesRepository(private val context: Context) {
         }
     }
 
+    suspend fun setAppGoalFullscreenOverlayEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.APP_GOAL_FULLSCREEN_OVERLAY_ENABLED] = enabled
+        }
+    }
+
     suspend fun setInterceptAudioFocusEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.INTERCEPT_AUDIO_FOCUS_ENABLED] = enabled
@@ -405,6 +414,7 @@ data class UserPreferences(
     val bedtimeWhitelistedPackages: Set<String> = emptySet(),
     val userName: String = "User",
     val earlyKickEnabled: Boolean = false,
+    val appGoalFullscreenOverlayEnabled: Boolean = false,
     val interceptAudioFocusEnabled: Boolean = true,
     val showDatabaseIndicator: Boolean = false,
     val developerModeEnabled: Boolean = false

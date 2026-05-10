@@ -37,11 +37,16 @@ import androidx.compose.ui.unit.dp
 import androidx.graphics.shapes.toPath
 import com.etrisad.zenith.R
 import com.etrisad.zenith.BuildConfig
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.etrisad.zenith.ZenithApplication
 import com.etrisad.zenith.data.preferences.FontOption
 import com.etrisad.zenith.data.preferences.ThemeConfig
 import com.etrisad.zenith.data.preferences.UserPreferences
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
+import com.etrisad.zenith.service.AppGoalOverlayActivity
 import com.etrisad.zenith.ui.navigation.Screen
+import com.etrisad.zenith.ui.viewmodel.FocusViewModel
+import com.etrisad.zenith.ui.viewmodel.FocusViewModelFactory
 import com.etrisad.zenith.util.BackupUtils
 import com.etrisad.zenith.worker.BackupManager
 import kotlinx.coroutines.launch
@@ -70,10 +75,19 @@ fun SettingsScreen(
     val coroutineScope = rememberCoroutineScope()
     var showWhitelistSheet by remember { mutableStateOf(false) }
     var showRestoreConfirmSheet by remember { mutableStateOf(false) }
+    var showGoalTestSheet by remember { mutableStateOf(false) }
     var restoreMetadata by remember { mutableStateOf<BackupUtils.BackupMetadata?>(null) }
     var pendingRestoreUri by remember { mutableStateOf<android.net.Uri?>(null) }
     
     val context = androidx.compose.ui.platform.LocalContext.current
+    val app = context.applicationContext as ZenithApplication
+    val focusViewModel: FocusViewModel = viewModel(
+        factory = FocusViewModelFactory(
+            context = context,
+            shieldRepository = app.shieldRepository,
+            preferencesRepository = preferencesRepository
+        )
+    )
 
     val backupManager = remember { BackupManager(context) }
 
@@ -232,6 +246,11 @@ fun SettingsScreen(
                 preferencesRepository.setEarlyKickEnabled(enabled)
             }
         },
+        onAppGoalFullscreenOverlayEnabledChange = { enabled ->
+            coroutineScope.launch {
+                preferencesRepository.setAppGoalFullscreenOverlayEnabled(enabled)
+            }
+        },
         onInterceptAudioFocusEnabledChange = { enabled ->
             coroutineScope.launch {
                 preferencesRepository.setInterceptAudioFocusEnabled(enabled)
@@ -252,8 +271,18 @@ fun SettingsScreen(
         },
         onNavigateToDataRepairment = {
             navController.navigate(Screen.DataRepairment.route)
+        },
+        onTestGoalOverlay = {
+            showGoalTestSheet = true
         }
     )
+
+    if (showGoalTestSheet) {
+        com.etrisad.zenith.ui.components.AppGoalTestBottomSheet(
+            focusViewModel = focusViewModel,
+            onDismiss = { showGoalTestSheet = false }
+        )
+    }
 
 
     if (showRestoreConfirmSheet && restoreMetadata != null && pendingRestoreUri != null) {
@@ -305,11 +334,13 @@ fun SettingsScreenContent(
     onExpressiveColorsChange: (Boolean) -> Unit,
     onTotalUsagePillEnabledChange: (Boolean) -> Unit,
     onEarlyKickEnabledChange: (Boolean) -> Unit,
+    onAppGoalFullscreenOverlayEnabledChange: (Boolean) -> Unit,
     onInterceptAudioFocusEnabledChange: (Boolean) -> Unit,
     onShowDatabaseIndicatorChange: (Boolean) -> Unit,
     onDeveloperModeEnabledChange: (Boolean) -> Unit,
     onNavigateToDatabaseDebug: () -> Unit,
-    onNavigateToDataRepairment: () -> Unit
+    onNavigateToDataRepairment: () -> Unit,
+    onTestGoalOverlay: () -> Unit
 ) {
     var showTargetSheet by remember { mutableStateOf(false) }
     var showEmergencyRechargeSheet by remember { mutableStateOf(false) }
@@ -459,6 +490,18 @@ fun SettingsScreenContent(
                     checked = preferences.earlyKickEnabled,
                     onCheckedChange = onEarlyKickEnabledChange,
                     icon = Icons.Outlined.ExitToApp,
+                    shape = RoundedCornerShape(8.dp)
+                )
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(4.dp))
+                SettingsToggle(
+                    title = "Goal Caller Overlay",
+                    description = "Wakes device with dialer-like UI when it's time to open your goal apps",
+                    checked = preferences.appGoalFullscreenOverlayEnabled,
+                    onCheckedChange = onAppGoalFullscreenOverlayEnabledChange,
+                    icon = Icons.Outlined.NotificationsActive,
                     shape = RoundedCornerShape(8.dp)
                 )
             }
@@ -630,6 +673,17 @@ fun SettingsScreenContent(
                         summary = "Fix missing or incorrect usage history",
                         onClick = onNavigateToDataRepairment,
                         icon = Icons.Outlined.Build,
+                        shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
+                    )
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    SettingsActionItem(
+                        title = "Test Goal Overlay",
+                        summary = "Immediately trigger the full screen caller overlay",
+                        onClick = onTestGoalOverlay,
+                        icon = Icons.Outlined.BugReport,
                         shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
                     )
                 }
