@@ -39,12 +39,12 @@ fun AppGoalSelectionBottomSheet(
         packageNames.map { pkg ->
             val label = try {
                 pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 pkg
             }
             val icon = try {
                 pm.getApplicationIcon(pkg)
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 null
             }
             AppSelectionInfo(pkg, label, icon)

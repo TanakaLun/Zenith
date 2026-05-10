@@ -246,11 +246,6 @@ fun SettingsScreen(
                 preferencesRepository.setEarlyKickEnabled(enabled)
             }
         },
-        onAppGoalFullscreenOverlayEnabledChange = { enabled ->
-            coroutineScope.launch {
-                preferencesRepository.setAppGoalFullscreenOverlayEnabled(enabled)
-            }
-        },
         onInterceptAudioFocusEnabledChange = { enabled ->
             coroutineScope.launch {
                 preferencesRepository.setInterceptAudioFocusEnabled(enabled)
@@ -334,7 +329,6 @@ fun SettingsScreenContent(
     onExpressiveColorsChange: (Boolean) -> Unit,
     onTotalUsagePillEnabledChange: (Boolean) -> Unit,
     onEarlyKickEnabledChange: (Boolean) -> Unit,
-    onAppGoalFullscreenOverlayEnabledChange: (Boolean) -> Unit,
     onInterceptAudioFocusEnabledChange: (Boolean) -> Unit,
     onShowDatabaseIndicatorChange: (Boolean) -> Unit,
     onDeveloperModeEnabledChange: (Boolean) -> Unit,
@@ -490,18 +484,6 @@ fun SettingsScreenContent(
                     checked = preferences.earlyKickEnabled,
                     onCheckedChange = onEarlyKickEnabledChange,
                     icon = Icons.Outlined.ExitToApp,
-                    shape = RoundedCornerShape(8.dp)
-                )
-            }
-
-            item {
-                Spacer(modifier = Modifier.height(4.dp))
-                SettingsToggle(
-                    title = "Goal Caller Overlay",
-                    description = "Wakes device with dialer-like UI when it's time to open your goal apps",
-                    checked = preferences.appGoalFullscreenOverlayEnabled,
-                    onCheckedChange = onAppGoalFullscreenOverlayEnabledChange,
-                    icon = Icons.Outlined.NotificationsActive,
                     shape = RoundedCornerShape(8.dp)
                 )
             }

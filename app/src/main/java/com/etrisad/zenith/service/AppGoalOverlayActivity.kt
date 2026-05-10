@@ -3,6 +3,9 @@ package com.etrisad.zenith.service
 import android.app.KeyguardManager
 import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
+import android.media.MediaPlayer
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
@@ -15,10 +18,12 @@ import com.etrisad.zenith.ui.theme.ZenithTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class AppGoalOverlayActivity : ComponentActivity() {
 
     private val activePackageNames = mutableStateListOf<String>()
+    private var mediaPlayer: MediaPlayer? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -31,6 +36,7 @@ class AppGoalOverlayActivity : ComponentActivity() {
         }
         
         activePackageNames.addAll(packageList)
+        playGoalSound(packageList.firstOrNull())
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
@@ -79,6 +85,49 @@ class AppGoalOverlayActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    private fun playGoalSound(packageName: String?) {
+        if (packageName == null) return
+        val shieldRepo = (application as com.etrisad.zenith.ZenithApplication).shieldRepository
+        CoroutineScope(Dispatchers.IO).launch {
+            val shield = shieldRepo.getShieldByPackageName(packageName)
+            // Play sound if shield is null (test scenario) or if explicitly enabled
+            if (shield == null || (shield.isGoalCallerEnabled && shield.isGoalCallerSoundEnabled)) {
+                withContext(Dispatchers.Main) {
+                    try {
+                        mediaPlayer?.release()
+                        val soundUri = if (shield?.goalCallerSoundUri != null) {
+                            Uri.parse(shield.goalCallerSoundUri)
+                        } else {
+                            android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_RINGTONE)
+                        }
+
+                        mediaPlayer = MediaPlayer().apply {
+                            setDataSource(this@AppGoalOverlayActivity, soundUri)
+                            setAudioAttributes(
+                                AudioAttributes.Builder()
+                                    .setUsage(AudioAttributes.USAGE_ALARM)
+                                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                                    .build()
+                            )
+                            isLooping = true
+                            prepare()
+                            start()
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        mediaPlayer?.stop()
+        mediaPlayer?.release()
+        mediaPlayer = null
     }
 
     override fun onNewIntent(intent: Intent) {

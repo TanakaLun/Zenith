@@ -248,7 +248,7 @@ fun FocusScreen(
                     usageToday = uiState.selectedAppUsageToday,
                     existingShield = existingShield,
                     onDismiss = { viewModel.closeSettingsSheet() },
-                    onSave = { limit, reminders, goalReminder ->
+                    onSave = { limit, reminders, goalReminder, isCaller, isSound, soundUri ->
                         viewModel.saveFocus(
                             timeLimitMinutes = limit,
                             maxEmergencyUses = 3,
@@ -258,7 +258,10 @@ fun FocusScreen(
                             maxUsesPerPeriod = 5,
                             refreshPeriodMinutes = 60,
                             goalReminderPeriodMinutes = goalReminder,
-                            isDelayAppEnabled = false
+                            isDelayAppEnabled = false,
+                            isGoalCallerEnabled = isCaller,
+                            isGoalCallerSoundEnabled = isSound,
+                            goalCallerSoundUri = soundUri
                         )
                     }
                 )

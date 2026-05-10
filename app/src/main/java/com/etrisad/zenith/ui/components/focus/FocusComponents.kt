@@ -2,8 +2,7 @@ package com.etrisad.zenith.ui.components.focus
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.*
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -13,15 +12,18 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.TrendingUp
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Android
 import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -158,6 +160,22 @@ fun PreferenceCategory(title: String) {
 }
 
 @Composable
+fun CardGroup(
+    modifier: Modifier = Modifier,
+    shape: Shape = RoundedCornerShape(28.dp),
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = shape,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        ),
+        content = content
+    )
+}
+
+@Composable
 fun SettingsToggle(
     title: String,
     description: String,
@@ -165,20 +183,25 @@ fun SettingsToggle(
     onCheckedChange: (Boolean) -> Unit,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(24.dp),
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    showDivider: Boolean = false
 ) {
     val alpha = if (enabled) 1f else 0.38f
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = shape,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-        )
-    ) {
+    
+    Column {
+        if (showDivider) {
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+            )
+        }
+        
         Row(
             modifier = Modifier
-                .padding(16.dp)
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                .clip(shape)
+                .then(if (enabled) Modifier.clickable { onCheckedChange(!checked) } else Modifier)
+                .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
@@ -272,6 +295,110 @@ fun PickerSectionHeader(title: String, modifier: Modifier = Modifier) {
         color = MaterialTheme.colorScheme.primary,
         modifier = modifier.fillMaxWidth()
     )
+}
+
+@Composable
+fun RowScope.GroupedOptionButton(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    isFirst: Boolean,
+    isLast: Boolean
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+
+    val widthScale by animateFloatAsState(
+        targetValue = when {
+            isPressed -> 1.5f
+            selected -> 1.25f
+            else -> 1.0f
+        },
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "WidthScale"
+    )
+
+    val backgroundColor by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.secondaryContainer
+                      else MaterialTheme.colorScheme.surface,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "BgColor"
+    )
+    
+    val contentColor by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.onSecondaryContainer
+                      else MaterialTheme.colorScheme.onSurfaceVariant,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "ContentColor"
+    )
+
+    val innerRadius by animateDpAsState(
+        targetValue = if (selected) 24.dp else 8.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "InnerRadius"
+    )
+    
+    val outerRadius = 24.dp
+    
+    val shape = when {
+        selected -> CircleShape
+        isFirst -> RoundedCornerShape(
+            topStart = outerRadius, 
+            bottomStart = outerRadius, 
+            topEnd = innerRadius, 
+            bottomEnd = innerRadius
+        )
+        isLast -> RoundedCornerShape(
+            topEnd = outerRadius, 
+            bottomEnd = outerRadius, 
+            topStart = innerRadius, 
+            bottomStart = innerRadius
+        )
+        else -> RoundedCornerShape(innerRadius)
+    }
+
+    Box(
+        modifier = Modifier
+            .weight(widthScale)
+            .height(48.dp)
+            .clip(shape)
+            .background(backgroundColor)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+            modifier = Modifier.padding(horizontal = 8.dp)
+        ) {
+            if (selected) {
+                Icon(
+                    imageVector = Icons.Outlined.Check,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = contentColor
+                )
+                Spacer(Modifier.width(4.dp))
+            }
+            Text(
+                text = label,
+                color = contentColor,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                maxLines = 1
+            )
+        }
+    }
 }
 
 @Composable

@@ -233,8 +233,9 @@ class AppUsageMonitorService : Service() {
                         shieldRepository.updateShield(goal.copy(lastGoalReminderTimestamp = currentTime))
                     }
 
-                    if (currentPreferences?.appGoalFullscreenOverlayEnabled == true) {
-                        AppGoalOverlayActivity.start(this@AppUsageMonitorService, triggeredGoals.map { it.packageName })
+                    val overlayGoals = triggeredGoals.filter { it.isGoalCallerEnabled }
+                    if (overlayGoals.isNotEmpty()) {
+                        AppGoalOverlayActivity.start(this@AppUsageMonitorService, overlayGoals.map { it.packageName })
                     }
                 }
 

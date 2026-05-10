@@ -2,11 +2,11 @@
   "formatVersion": 1,
   "database": {
     "version": 21,
-    "identityHash": "4a13a1c53721330ea37e8ece26101507",
+    "identityHash": "ad6711e4f917048f667a6da5980a630b",
     "entities": [
       {
         "tableName": "shields",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`packageName` TEXT NOT NULL, `appName` TEXT NOT NULL, `type` TEXT NOT NULL, `timeLimitMinutes` INTEGER NOT NULL, `emergencyUseCount` INTEGER NOT NULL, `maxEmergencyUses` INTEGER NOT NULL, `isRemindersEnabled` INTEGER NOT NULL, `isStrictModeEnabled` INTEGER NOT NULL, `isAutoQuitEnabled` INTEGER NOT NULL, `remainingTimeMillis` INTEGER NOT NULL, `lastUsedTimestamp` INTEGER NOT NULL, `maxUsesPerPeriod` INTEGER NOT NULL, `refreshPeriodMinutes` INTEGER NOT NULL, `currentPeriodUses` INTEGER NOT NULL, `lastPeriodResetTimestamp` INTEGER NOT NULL, `lastEmergencyRechargeTimestamp` INTEGER NOT NULL, `goalReminderPeriodMinutes` INTEGER NOT NULL, `lastGoalReminderTimestamp` INTEGER NOT NULL DEFAULT 0, `isDelayAppEnabled` INTEGER NOT NULL, `lastDelayStartTimestamp` INTEGER NOT NULL, `currentStreak` INTEGER NOT NULL, `bestStreak` INTEGER NOT NULL, `lastStreakUpdateTimestamp` INTEGER NOT NULL, `lastSessionEndTimestamp` INTEGER NOT NULL DEFAULT 0, `isPaused` INTEGER NOT NULL DEFAULT 0, `pauseEndTimestamp` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`packageName`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`packageName` TEXT NOT NULL, `appName` TEXT NOT NULL, `type` TEXT NOT NULL, `timeLimitMinutes` INTEGER NOT NULL, `emergencyUseCount` INTEGER NOT NULL, `maxEmergencyUses` INTEGER NOT NULL, `isRemindersEnabled` INTEGER NOT NULL, `isStrictModeEnabled` INTEGER NOT NULL, `isAutoQuitEnabled` INTEGER NOT NULL, `remainingTimeMillis` INTEGER NOT NULL, `lastUsedTimestamp` INTEGER NOT NULL, `maxUsesPerPeriod` INTEGER NOT NULL, `refreshPeriodMinutes` INTEGER NOT NULL, `currentPeriodUses` INTEGER NOT NULL, `lastPeriodResetTimestamp` INTEGER NOT NULL, `lastEmergencyRechargeTimestamp` INTEGER NOT NULL, `goalReminderPeriodMinutes` INTEGER NOT NULL, `lastGoalReminderTimestamp` INTEGER NOT NULL DEFAULT 0, `isDelayAppEnabled` INTEGER NOT NULL, `lastDelayStartTimestamp` INTEGER NOT NULL, `currentStreak` INTEGER NOT NULL, `bestStreak` INTEGER NOT NULL, `lastStreakUpdateTimestamp` INTEGER NOT NULL, `lastSessionEndTimestamp` INTEGER NOT NULL DEFAULT 0, `isPaused` INTEGER NOT NULL DEFAULT 0, `pauseEndTimestamp` INTEGER NOT NULL DEFAULT 0, `isGoalCallerEnabled` INTEGER NOT NULL DEFAULT 0, `isGoalCallerSoundEnabled` INTEGER NOT NULL DEFAULT 1, `goalCallerSoundUri` TEXT, PRIMARY KEY(`packageName`))",
         "fields": [
           {
             "fieldPath": "packageName",
@@ -167,6 +167,25 @@
             "affinity": "INTEGER",
             "notNull": true,
             "defaultValue": "0"
+          },
+          {
+            "fieldPath": "isGoalCallerEnabled",
+            "columnName": "isGoalCallerEnabled",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "isGoalCallerSoundEnabled",
+            "columnName": "isGoalCallerSoundEnabled",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "1"
+          },
+          {
+            "fieldPath": "goalCallerSoundUri",
+            "columnName": "goalCallerSoundUri",
+            "affinity": "TEXT"
           }
         ],
         "primaryKey": {
@@ -412,7 +431,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '4a13a1c53721330ea37e8ece26101507')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'ad6711e4f917048f667a6da5980a630b')"
     ]
   }
 }

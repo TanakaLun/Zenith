@@ -1037,7 +1037,10 @@ class HomeViewModel(
         maxUsesPerPeriod: Int,
         refreshPeriodMinutes: Int,
         goalReminderPeriodMinutes: Int,
-        isDelayAppEnabled: Boolean
+        isDelayAppEnabled: Boolean,
+        isGoalCallerEnabled: Boolean = false,
+        isGoalCallerSoundEnabled: Boolean = true,
+        goalCallerSoundUri: String? = null
     ) {
         val state = _appDetailUiState.value
         val packageName = state.packageName
@@ -1055,7 +1058,10 @@ class HomeViewModel(
                 maxUsesPerPeriod = maxUsesPerPeriod,
                 refreshPeriodMinutes = refreshPeriodMinutes,
                 goalReminderPeriodMinutes = goalReminderPeriodMinutes,
-                isDelayAppEnabled = isDelayAppEnabled
+                isDelayAppEnabled = isDelayAppEnabled,
+                isGoalCallerEnabled = isGoalCallerEnabled,
+                isGoalCallerSoundEnabled = isGoalCallerSoundEnabled,
+                goalCallerSoundUri = goalCallerSoundUri
             ) ?: ShieldEntity(
                 packageName = packageName,
                 appName = appName,
@@ -1068,7 +1074,10 @@ class HomeViewModel(
                 maxUsesPerPeriod = maxUsesPerPeriod,
                 refreshPeriodMinutes = refreshPeriodMinutes,
                 goalReminderPeriodMinutes = goalReminderPeriodMinutes,
-                isDelayAppEnabled = isDelayAppEnabled
+                isDelayAppEnabled = isDelayAppEnabled,
+                isGoalCallerEnabled = isGoalCallerEnabled,
+                isGoalCallerSoundEnabled = isGoalCallerSoundEnabled,
+                goalCallerSoundUri = goalCallerSoundUri
             )
             shieldRepository.insertShield(shield)
             closeSettingsSheet()

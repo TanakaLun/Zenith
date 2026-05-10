@@ -39,5 +39,10 @@ data class ShieldEntity(
     @androidx.room.ColumnInfo(defaultValue = "0")
     val isPaused: Boolean = false,
     @androidx.room.ColumnInfo(defaultValue = "0")
-    val pauseEndTimestamp: Long = 0L // 0 means indefinitely
+    val pauseEndTimestamp: Long = 0L, // 0 means indefinitely
+    @androidx.room.ColumnInfo(defaultValue = "0")
+    val isGoalCallerEnabled: Boolean = false,
+    @androidx.room.ColumnInfo(defaultValue = "1")
+    val isGoalCallerSoundEnabled: Boolean = true,
+    val goalCallerSoundUri: String? = null
 )
