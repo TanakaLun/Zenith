@@ -235,7 +235,13 @@ class AppUsageMonitorService : Service() {
 
                     val overlayGoals = triggeredGoals.filter { it.isGoalCallerEnabled }
                     if (overlayGoals.isNotEmpty()) {
-                        AppGoalOverlayActivity.start(this@AppUsageMonitorService, overlayGoals.map { it.packageName })
+                        val calendar = Calendar.getInstance()
+                        val hour = calendar.get(Calendar.HOUR_OF_DAY)
+                        val isNightTime = hour >= 22 || hour < 6 // 10 PM to 6 AM
+
+                        if (!isBedtimeActive && !isNightTime) {
+                            AppGoalOverlayActivity.start(this@AppUsageMonitorService, overlayGoals.map { it.packageName })
+                        }
                     }
                 }
 
