@@ -92,7 +92,8 @@ data class HomeUiState(
         set(Calendar.MINUTE, 0)
         set(Calendar.SECOND, 0)
         set(Calendar.MILLISECOND, 0)
-    }.timeInMillis
+    }.timeInMillis,
+    val isLoading: Boolean = false
 )
 
 sealed class UsageRecord {
@@ -420,6 +421,7 @@ class HomeViewModel(
     private fun refreshUsageStats() {
         refreshJob?.cancel()
         refreshJob = viewModelScope.launch(kotlinx.coroutines.Dispatchers.Default) {
+            _uiState.update { it.copy(isLoading = true) }
             val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
             val pm = context.packageManager
 
@@ -822,7 +824,8 @@ class HomeViewModel(
                 activeGoals   = sortShields(liveShields.filter { it.type == com.etrisad.zenith.data.local.entity.FocusType.GOAL }, state.goalSortType),
                 globalCurrentStreak = liveStreak,
                 globalBestStreak = maxOf(prefGlobalBestStreak, bestStreakFromHistory),
-                targetMillis = targetMillis
+                targetMillis = targetMillis,
+                isLoading = false
             ) }
 
             viewModelScope.launch {

@@ -106,6 +106,7 @@ fun HomeScreen(
     )
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun HomeScreenContent(
     uiState: HomeUiState,
@@ -121,165 +122,186 @@ fun HomeScreenContent(
     onStatsClick: () -> Unit,
     onDaySelected: (Long?) -> Unit
 ) {
-    val targetMillis = preferences.screenTimeTargetMinutes * 60 * 1000L
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp),
-        contentPadding = PaddingValues(
-            top = innerPadding.calculateTopPadding() + 16.dp,
-            bottom = 150.dp
-        )
-    ) {
-        item {
-            UsageDashboard(
-                uiState = uiState,
-                preferences = preferences,
-                onSetTarget = onSetTarget,
-                formatDuration = formatDuration,
-                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
+    Box(modifier = Modifier.fillMaxSize()) {
+        val targetMillis = preferences.screenTimeTargetMinutes * 60 * 1000L
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            contentPadding = PaddingValues(
+                top = innerPadding.calculateTopPadding() + 16.dp,
+                bottom = 150.dp
             )
-            Spacer(modifier = Modifier.height(4.dp))
-        }
-
-        item {
-            UsageTrendsRow(
-                uiState = uiState,
-                formatDuration = formatDuration
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-        }
-
-        item {
-            val selectedUsage = remember(uiState.dailyUsageHistory, uiState.selectedDateMillis) {
-                uiState.dailyUsageHistory.find { it.date == uiState.selectedDateMillis }
+        ) {
+            item {
+                UsageDashboard(
+                    uiState = uiState,
+                    preferences = preferences,
+                    onSetTarget = onSetTarget,
+                    formatDuration = formatDuration,
+                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
+                )
+                Spacer(modifier = Modifier.height(4.dp))
             }
-            val showWarning = selectedUsage != null && 
-                             !selectedUsage.hasDatabaseRecord && 
-                             selectedUsage.hasSystemData && 
-                             !selectedUsage.isLive
 
-            AnimatedVisibility(
-                visible = showWarning,
-                enter = expandVertically(animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)) + fadeIn(),
-                exit = shrinkVertically(animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)) + fadeOut()
-            ) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 4.dp)
-                        .clip(RoundedCornerShape(8.dp)),
-                    shape = RoundedCornerShape(8.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.8f)
-                    )
+            item {
+                UsageTrendsRow(
+                    uiState = uiState,
+                    formatDuration = formatDuration
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+
+            item {
+                val selectedUsage = remember(uiState.dailyUsageHistory, uiState.selectedDateMillis) {
+                    uiState.dailyUsageHistory.find { it.date == uiState.selectedDateMillis }
+                }
+                val showWarning = selectedUsage != null && 
+                                 !selectedUsage.hasDatabaseRecord && 
+                                 selectedUsage.hasSystemData && 
+                                 !selectedUsage.isLive
+
+                AnimatedVisibility(
+                    visible = showWarning,
+                    enter = expandVertically(animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)) + fadeIn(),
+                    exit = shrinkVertically(animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)) + fadeOut()
                 ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 4.dp)
+                            .clip(RoundedCornerShape(8.dp)),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.8f)
+                        )
                     ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Info,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            text = "The data for the selected day is taken directly from the usage system and may not be entirely accurate. So take it with a grain of salt.",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onTertiaryContainer,
-                            fontWeight = FontWeight.Medium
-                        )
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Info,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = "The data for the selected day is taken directly from the usage system and may not be entirely accurate. So take it with a grain of salt.",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
                     }
                 }
             }
-        }
 
-        item {
-            UsageHistoryCard(
-                history = uiState.dailyUsageHistory,
-                targetMillis = targetMillis,
-                showDatabaseIndicator = preferences.showDatabaseIndicator,
-                selectedDateMillis = uiState.selectedDateMillis,
-                formatDuration = formatDuration,
-                onDaySelected = { usage ->
-                    onDaySelected(usage?.date)
-                },
-                shape = RoundedCornerShape(8.dp)
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-        }
-
-        item {
-            TopAppsSection(
-                topApps = uiState.topApps,
-                formatDuration = formatDuration,
-                expressiveColors = preferences.expressiveColors,
-                shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp),
-                onSeeFullList = onSeeFullList,
-                onAppClick = { packageName -> onAppClick(packageName) }
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-
-        item {
-            QuickActionsSection(
-                onBedtimeClick = onBedtimeClick,
-                onStatsClick = onStatsClick
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-
-        item {
-            ShieldSortHeader(
-                title = "Active Goals",
-                currentSortType = uiState.goalSortType,
-                onSortTypeChange = onGoalSortTypeChange
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-
-        if (uiState.activeGoals.isEmpty()) {
             item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                    )
-                ) {
-                    EmptyShieldsMessage(message = "No active goals. Go to Focus to add one!")
-                }
+                UsageHistoryCard(
+                    history = uiState.dailyUsageHistory,
+                    targetMillis = targetMillis,
+                    showDatabaseIndicator = preferences.showDatabaseIndicator,
+                    selectedDateMillis = uiState.selectedDateMillis,
+                    formatDuration = formatDuration,
+                    onDaySelected = { usage ->
+                        onDaySelected(usage?.date)
+                    },
+                    shape = RoundedCornerShape(8.dp)
+                )
+                Spacer(modifier = Modifier.height(4.dp))
             }
-        } else {
-            shieldList(shields = uiState.activeGoals, formatDuration = formatDuration, onAppClick = onAppClick)
-        }
 
-        item {
-            Spacer(modifier = Modifier.height(24.dp))
-            ShieldSortHeader(
-                title = "Active Shields",
-                currentSortType = uiState.shieldSortType,
-                onSortTypeChange = onShieldSortTypeChange
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-
-        if (uiState.activeShields.isEmpty()) {
             item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                    )
-                ) {
-                    EmptyShieldsMessage(message = "No active shields. Go to Focus to add one!")
-                }
+                TopAppsSection(
+                    topApps = uiState.topApps,
+                    formatDuration = formatDuration,
+                    expressiveColors = preferences.expressiveColors,
+                    shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp),
+                    onSeeFullList = onSeeFullList,
+                    onAppClick = { packageName -> onAppClick(packageName) }
+                )
+                Spacer(modifier = Modifier.height(16.dp))
             }
-        } else {
-            shieldList(shields = uiState.activeShields, formatDuration = formatDuration, onAppClick = onAppClick)
+
+            item {
+                QuickActionsSection(
+                    onBedtimeClick = onBedtimeClick,
+                    onStatsClick = onStatsClick
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            item {
+                ShieldSortHeader(
+                    title = "Active Goals",
+                    currentSortType = uiState.goalSortType,
+                    onSortTypeChange = onGoalSortTypeChange
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            if (uiState.activeGoals.isEmpty()) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                        )
+                    ) {
+                        EmptyShieldsMessage(message = "No active goals. Go to Focus to add one!")
+                    }
+                }
+            } else {
+                shieldList(shields = uiState.activeGoals, formatDuration = formatDuration, onAppClick = onAppClick)
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(24.dp))
+                ShieldSortHeader(
+                    title = "Active Shields",
+                    currentSortType = uiState.shieldSortType,
+                    onSortTypeChange = onShieldSortTypeChange
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            if (uiState.activeShields.isEmpty()) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                        )
+                    ) {
+                        EmptyShieldsMessage(message = "No active shields. Go to Focus to add one!")
+                    }
+                }
+            } else {
+                shieldList(shields = uiState.activeShields, formatDuration = formatDuration, onAppClick = onAppClick)
+            }
+        }
+
+        AnimatedVisibility(
+            visible = uiState.isLoading && uiState.dailyUsageHistory.isEmpty(),
+            enter = fadeIn(animationSpec = spring(stiffness = Spring.StiffnessLow)),
+            exit = fadeOut(animationSpec = spring(stiffness = Spring.StiffnessLow))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.4f))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {},
+                contentAlignment = Alignment.Center
+            ) {
+                ContainedLoadingIndicator()
+            }
         }
     }
 }
@@ -682,7 +704,6 @@ fun TopAppsSection(
                 ) {
                     topApps.forEachIndexed { index, app ->
                         val itemShape = when {
-                            topApps.size == 1 -> RoundedCornerShape(24.dp)
                             index == 0 -> RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
                             else -> RoundedCornerShape(8.dp)
                         }
