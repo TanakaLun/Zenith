@@ -47,7 +47,6 @@ class AppUsageMonitorService : Service() {
     private val usageStatsManager by lazy { getSystemService(USAGE_STATS_SERVICE) as UsageStatsManager }
     private val powerManager by lazy { getSystemService(POWER_SERVICE) as android.os.PowerManager }
     private val reusableEvent = UsageEvents.Event()
-    private val reusableCalendar = Calendar.getInstance()
     private var lastForegroundApp: String? = null
     private var currentShieldCache: ShieldEntity? = null
     private var currentSessionPackage: String? = null
@@ -900,8 +899,7 @@ class AppUsageMonitorService : Service() {
             preferencesRepository.setLastStreakCheckDate(todayStr)
         }
         
-        reusableCalendar.timeInMillis = System.currentTimeMillis()
-        lastCheckedDay = reusableCalendar.get(java.util.Calendar.DAY_OF_YEAR)
+        lastCheckedDay = Calendar.getInstance().get(Calendar.DAY_OF_YEAR)
     }
 
     private suspend fun updateStreaks() {
@@ -911,34 +909,29 @@ class AppUsageMonitorService : Service() {
         if (shields.isEmpty() && prefs.screenTimeTargetMinutes <= 0) return
 
         val currentTime = System.currentTimeMillis()
-        val (startTime, endTime, todayYear, todayDayOfYear) = synchronized(reusableCalendar) {
-            reusableCalendar.timeInMillis = currentTime
-            val tYear = reusableCalendar.get(Calendar.YEAR)
-            val tDay = reusableCalendar.get(Calendar.DAY_OF_YEAR)
-            
-            reusableCalendar.add(Calendar.DAY_OF_YEAR, -1)
-            reusableCalendar.set(Calendar.HOUR_OF_DAY, 0)
-            reusableCalendar.set(Calendar.MINUTE, 0)
-            reusableCalendar.set(Calendar.SECOND, 0)
-            reusableCalendar.set(Calendar.MILLISECOND, 0)
-            val sTime = reusableCalendar.timeInMillis
+        val calendar = Calendar.getInstance()
+        calendar.timeInMillis = currentTime
+        val todayYear = calendar.get(Calendar.YEAR).toLong()
+        val todayDayOfYear = calendar.get(Calendar.DAY_OF_YEAR).toLong()
+        
+        calendar.add(Calendar.DAY_OF_YEAR, -1)
+        calendar.set(Calendar.HOUR_OF_DAY, 0)
+        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.SECOND, 0)
+        calendar.set(Calendar.MILLISECOND, 0)
+        val startTime = calendar.timeInMillis
 
-            reusableCalendar.set(Calendar.HOUR_OF_DAY, 23)
-            reusableCalendar.set(Calendar.MINUTE, 59)
-            reusableCalendar.set(Calendar.SECOND, 59)
-            reusableCalendar.set(Calendar.MILLISECOND, 999)
-            val eTime = reusableCalendar.timeInMillis
-            
-            listOf(sTime, eTime, tYear.toLong(), tDay.toLong())
-        }
+        calendar.set(Calendar.HOUR_OF_DAY, 23)
+        calendar.set(Calendar.MINUTE, 59)
+        calendar.set(Calendar.SECOND, 59)
+        calendar.set(Calendar.MILLISECOND, 999)
+        val endTime = calendar.timeInMillis
 
         val usageMap = usageStatsManager.queryAndAggregateUsageStats(startTime, endTime)
         
-        val isGlobalAlreadyUpdated = synchronized(reusableCalendar) {
-            reusableCalendar.timeInMillis = prefs.globalLastStreakUpdateTimestamp
-            reusableCalendar.get(Calendar.YEAR).toLong() == todayYear &&
-                    reusableCalendar.get(Calendar.DAY_OF_YEAR).toLong() == todayDayOfYear
-        }
+        val lastUpdateCalendar = Calendar.getInstance().apply { timeInMillis = prefs.globalLastStreakUpdateTimestamp }
+        val isGlobalAlreadyUpdated = lastUpdateCalendar.get(Calendar.YEAR).toLong() == todayYear &&
+                                   lastUpdateCalendar.get(Calendar.DAY_OF_YEAR).toLong() == todayDayOfYear
 
         if (!isGlobalAlreadyUpdated && prefs.screenTimeTargetMinutes > 0) {
             var totalUsageYesterday = 0L
@@ -961,11 +954,9 @@ class AppUsageMonitorService : Service() {
         }
 
         shields.forEach { shield ->
-            val isAlreadyUpdatedToday = synchronized(reusableCalendar) {
-                reusableCalendar.timeInMillis = shield.lastStreakUpdateTimestamp
-                reusableCalendar.get(Calendar.YEAR).toLong() == todayYear &&
-                        reusableCalendar.get(Calendar.DAY_OF_YEAR).toLong() == todayDayOfYear
-            }
+            val shieldUpdateCalendar = Calendar.getInstance().apply { timeInMillis = shield.lastStreakUpdateTimestamp }
+            val isAlreadyUpdatedToday = shieldUpdateCalendar.get(Calendar.YEAR).toLong() == todayYear &&
+                                       shieldUpdateCalendar.get(Calendar.DAY_OF_YEAR).toLong() == todayDayOfYear
             
             if (isAlreadyUpdatedToday) return@forEach
 
@@ -1016,10 +1007,10 @@ class AppUsageMonitorService : Service() {
         val currentTime = System.currentTimeMillis()
         val startTime = getStartOfDay()
 
-        val stats = try {
-            usageStatsManager.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, startTime, currentTime)
+        val statsMap = try {
+            usageStatsManager.queryAndAggregateUsageStats(startTime, currentTime)
         } catch (_: Exception) {
-            null
+            emptyMap<String, android.app.usage.UsageStats>()
         }
 
         if (currentTime - lastLauncherAppsRefreshTime > 3600000 || launcherAppsCache.isEmpty()) {
@@ -1039,8 +1030,7 @@ class AppUsageMonitorService : Service() {
         val excludePackages = launcherPackages + packageName
 
         var totalToday = 0L
-        stats?.forEach { stat ->
-            val pkg = stat.packageName
+        statsMap.forEach { (pkg, stat) ->
             if (pkg !in excludePackages && pkg in launcherAppsCache) {
                 val time = stat.totalTimeVisible.coerceAtLeast(stat.totalTimeInForeground)
                 if (time > 0) {
@@ -1072,25 +1062,26 @@ class AppUsageMonitorService : Service() {
         val startTime = getStartOfDay()
 
         try {
-            val stats = usageStatsManager.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, startTime, currentTime)
+            val statsMap = usageStatsManager.queryAndAggregateUsageStats(startTime, currentTime)
             
-            if (stats != null) {
+            if (statsMap != null && statsMap.isNotEmpty()) {
                 val tempUsageMap = mutableMapOf<String, Long>()
+                val statsList = mutableListOf<android.app.usage.UsageStats>()
                 
-                stats.forEach { stat ->
-                    val pkg = stat.packageName
+                statsMap.forEach { (pkg, stat) ->
                     val time = stat.totalTimeVisible.coerceAtLeast(stat.totalTimeInForeground)
-
-                    if (time > (tempUsageMap[pkg] ?: 0L)) {
+                    if (time > 0) {
                         tempUsageMap[pkg] = time
+                        statsList.add(stat)
                     }
                 }
 
-                tempUsageMap.forEach { (pkg, usage) ->
-                    dailyUsageCache[pkg] = usage
-                }
-                
-                usageStatsCache = stats
+                dailyUsageCache.clear()
+                dailyUsageCache.putAll(tempUsageMap)
+                usageStatsCache = statsList
+            } else {
+                dailyUsageCache.clear()
+                usageStatsCache = emptyList()
             }
         } catch (e: Exception) {
             usageStatsCache = null
@@ -1101,15 +1092,14 @@ class AppUsageMonitorService : Service() {
     }
 
     private fun getStartOfDay(): Long {
-        val currentTime = System.currentTimeMillis()
-        reusableCalendar.timeInMillis = currentTime
-        val today = reusableCalendar.get(java.util.Calendar.DAY_OF_YEAR)
+        val calendar = Calendar.getInstance()
+        val today = calendar.get(Calendar.DAY_OF_YEAR)
         if (today != lastStartOfDayDate) {
-            reusableCalendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
-            reusableCalendar.set(java.util.Calendar.MINUTE, 0)
-            reusableCalendar.set(java.util.Calendar.SECOND, 0)
-            reusableCalendar.set(java.util.Calendar.MILLISECOND, 0)
-            cachedStartOfDay = reusableCalendar.timeInMillis
+            calendar.set(Calendar.HOUR_OF_DAY, 0)
+            calendar.set(Calendar.MINUTE, 0)
+            calendar.set(Calendar.SECOND, 0)
+            calendar.set(Calendar.MILLISECOND, 0)
+            cachedStartOfDay = calendar.timeInMillis
             lastStartOfDayDate = today
         }
         return cachedStartOfDay
@@ -1124,20 +1114,15 @@ class AppUsageMonitorService : Service() {
 
     private fun updateBedtimeStatus(prefs: UserPreferences) {
         val currentTime = System.currentTimeMillis()
-        val currentDay: Int
-        val currentMinutes: Int
+        val calendar = Calendar.getInstance().apply { timeInMillis = currentTime }
+        val currentDay = calendar.get(Calendar.DAY_OF_WEEK)
+        val currentMinutes = calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE)
         
         val yesterdayCalendar = Calendar.getInstance().apply {
             timeInMillis = currentTime
             add(Calendar.DAY_OF_YEAR, -1)
         }
         val yesterdayDay = yesterdayCalendar.get(Calendar.DAY_OF_WEEK)
-
-        synchronized(reusableCalendar) {
-            reusableCalendar.timeInMillis = currentTime
-            currentDay = reusableCalendar.get(Calendar.DAY_OF_WEEK)
-            currentMinutes = reusableCalendar.get(Calendar.HOUR_OF_DAY) * 60 + reusableCalendar.get(Calendar.MINUTE)
-        }
 
         val startMinutes = cachedBedtimeStartMinutes
         val endMinutes = cachedBedtimeEndMinutes
@@ -1251,9 +1236,9 @@ class AppUsageMonitorService : Service() {
         }
 
         val now = System.currentTimeMillis()
-        reusableCalendar.timeInMillis = now
-        val currentTotalMinutes = reusableCalendar.get(java.util.Calendar.HOUR_OF_DAY) * 60 + 
-                                 reusableCalendar.get(java.util.Calendar.MINUTE)
+        val calendar = Calendar.getInstance().apply { timeInMillis = now }
+        val currentTotalMinutes = calendar.get(java.util.Calendar.HOUR_OF_DAY) * 60 + 
+                                 calendar.get(java.util.Calendar.MINUTE)
         
         for (ps in parsedSchedulesCache) {
             val isInInterval = if (ps.startMinutes <= ps.endMinutes) {
