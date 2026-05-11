@@ -186,7 +186,7 @@ fun HomeScreenContent(
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
-                            text = "Data untuk hari yang dipilih diambil dari sistem penggunaan dan mungkin tidak sepenuhnya akurat.",
+                            text = "The data for the selected day is taken directly from the usage system and may not be entirely accurate. So take it with a grain of salt.",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onTertiaryContainer,
                             fontWeight = FontWeight.Medium
