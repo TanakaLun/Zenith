@@ -510,8 +510,9 @@ fun UsageStatsScreen(
 
         item(key = "insight_usage_pattern") {
             val totalSessions = remember(uiState.allAppsUsage) { uiState.allAppsUsage.sumOf { it.sessionCount } }
-            val avgSessionMillis = remember(uiState.totalScreenTime, totalSessions) {
-                if (totalSessions > 0) uiState.totalScreenTime / totalSessions else 0L
+            val totalUsageTime = remember(uiState.allAppsUsage) { uiState.allAppsUsage.sumOf { it.totalTimeVisible } }
+            val avgSessionMillis = remember(totalUsageTime, totalSessions) {
+                if (totalSessions > 0) totalUsageTime / totalSessions else 0L
             }
             Column(modifier = Modifier.animateItem()) {
                 UsagePatternItem(

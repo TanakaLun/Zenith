@@ -481,12 +481,13 @@ class HomeViewModel(
                 if (pkg in excludePackages || pkg !in launcherApps) continue
                 
                 val time = event.timeStamp
-                if (event.eventType == android.app.usage.UsageEvents.Event.MOVE_TO_FOREGROUND || 
-                    event.eventType == android.app.usage.UsageEvents.Event.ACTIVITY_RESUMED) {
+                if (event.eventType == android.app.usage.UsageEvents.Event.MOVE_TO_FOREGROUND) {
                     lastEventTime[pkg] = time
                     if (time in dayStart..dayEnd) {
                         appSessionCounts[pkg] = (appSessionCounts[pkg] ?: 0) + 1
                     }
+                } else if (event.eventType == android.app.usage.UsageEvents.Event.ACTIVITY_RESUMED) {
+                    lastEventTime[pkg] = time
                 } else if (event.eventType == android.app.usage.UsageEvents.Event.MOVE_TO_BACKGROUND || 
                            event.eventType == android.app.usage.UsageEvents.Event.ACTIVITY_PAUSED) {
                     val startTime = lastEventTime.remove(pkg) ?: continue
@@ -522,9 +523,6 @@ class HomeViewModel(
                 val segmentStart = maxOf(startTime, dayStart)
                 val segmentEnd = dayEnd
                 if (segmentStart < segmentEnd) {
-                    if (startTime in dayStart..dayEnd) {
-                        appSessionCounts[pkg] = (appSessionCounts[pkg] ?: 0) + 1
-                    }
                     var current = segmentStart
                     while (current < segmentEnd) {
                         cal.timeInMillis = current
@@ -552,7 +550,7 @@ class HomeViewModel(
             }
 
             val appList = appTotals.mapNotNull { (pkg, time) ->
-                val sessions = if (isSelectedToday) (appSessionCounts[pkg] ?: 0) else 1
+                val sessions = appSessionCounts[pkg]?.coerceAtLeast(1) ?: 1
                 val cached = appInfoCache[pkg]
                 if (cached != null) {
                     AppUsageInfo(pkg, cached.first, time, cached.second, sessionCount = sessions)
@@ -1115,8 +1113,13 @@ class HomeViewModel(
     }
 
     fun formatDuration(millis: Long): String {
-        val hours   = millis / (1000 * 60 * 60)
+        val hours = millis / (1000 * 60 * 60)
         val minutes = (millis / (1000 * 60)) % 60
-        return if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
+        val seconds = (millis / 1000) % 60
+        return when {
+            hours > 0 -> "${hours}h ${minutes}m"
+            minutes > 0 -> "${minutes}m"
+            else -> "${seconds}s"
+        }
     }
 }
