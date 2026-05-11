@@ -9,6 +9,7 @@ import androidx.compose.ui.unit.dp
 import com.etrisad.zenith.ui.components.UsageHistoryList
 import com.etrisad.zenith.ui.viewmodel.HomeViewModel
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun DatabaseDebugScreen(
     viewModel: HomeViewModel,
@@ -28,10 +29,8 @@ fun DatabaseDebugScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(48.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                    strokeWidth = 4.dp
+                LoadingIndicator(
+                    modifier = Modifier.size(48.dp)
                 )
                 Spacer(modifier = Modifier.height(24.dp))
                 Text(

@@ -1190,6 +1190,7 @@ fun HourlyStatsContent(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun EfficiencyScoreItem(
     efficiency: Float,
@@ -1243,15 +1244,14 @@ fun EfficiencyScoreItem(
                 )
             }
             Spacer(modifier = Modifier.height(16.dp))
-            LinearProgressIndicator(
+            LinearWavyProgressIndicator(
                 progress = { animatedProgress },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(CircleShape),
+                    .height(8.dp),
                 color = MaterialTheme.colorScheme.primary,
                 trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                strokeCap = StrokeCap.Round
+                stroke = Stroke(width = with(androidx.compose.ui.platform.LocalDensity.current) { 4.dp.toPx() }, cap = StrokeCap.Round)
             )
             Spacer(modifier = Modifier.height(12.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
