@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -22,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.etrisad.zenith.data.preferences.UserPreferences
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,6 +36,8 @@ fun AppGoalSelectionBottomSheet(
     val pm = context.packageManager
     val repository = remember { UserPreferencesRepository(context) }
     val preferences by repository.userPreferencesFlow.collectAsState(initial = UserPreferences())
+    val scope = rememberCoroutineScope()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     
     val apps = remember(packageNames) {
         packageNames.map { pkg ->
@@ -60,7 +64,7 @@ fun AppGoalSelectionBottomSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp
     ) {
@@ -94,7 +98,12 @@ fun AppGoalSelectionBottomSheet(
                     }
 
                     Surface(
-                        onClick = { onAppSelected(app.packageName) },
+                        onClick = {
+                            scope.launch {
+                                sheetState.hide()
+                                onAppSelected(app.packageName)
+                            }
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         shape = shape,
                         color = containerColor

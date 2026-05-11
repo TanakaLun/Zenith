@@ -73,7 +73,6 @@ class ZenithNotificationListener : NotificationListenerService() {
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
-        // No action needed here for interception
     }
 
     override fun onDestroy() {

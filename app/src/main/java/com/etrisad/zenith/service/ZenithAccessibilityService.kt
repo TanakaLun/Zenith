@@ -267,10 +267,7 @@ class ZenithAccessibilityService : AccessibilityService() {
             }
 
             updateUsageTime(currentApp, localSessionStartTime, localBaseUsage, localShield)
-            
-            // Re-fetch shield in case it was updated in DB and we need fresh state
-            // But we can just use the updated one from updateUsageTime if we make it return it.
-            // For now, let's just make sure updateUsageTime updates the localShield if it's the same app.
+
             localShield = currentShieldCache?.takeIf { it.packageName == currentApp } ?: localShield
 
             val shield = currentShieldCache

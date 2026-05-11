@@ -34,6 +34,7 @@ import com.etrisad.zenith.data.local.entity.ScheduleMode
 import com.etrisad.zenith.data.preferences.UserPreferences
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
 import com.etrisad.zenith.ui.viewmodel.FocusUiState
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,6 +50,9 @@ fun ScheduleSettingsBottomSheet(
     val context = LocalContext.current
     val repository = remember { UserPreferencesRepository(context) }
     val preferences by repository.userPreferencesFlow.collectAsState(initial = UserPreferences())
+
+    val scope = rememberCoroutineScope()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val containerColor by animateColorAsState(
         targetValue = if (preferences.expressiveColors) MaterialTheme.colorScheme.surfaceContainerHighest
@@ -104,7 +108,7 @@ fun ScheduleSettingsBottomSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface
     ) {
         Column(
@@ -331,19 +335,22 @@ fun ScheduleSettingsBottomSheet(
             ) {
                 Button(
                     onClick = {
-                        val startStr = String.format(
-                            currentLocale,
-                            "%02d:%02d",
-                            startTimeState.hour,
-                            startTimeState.minute
-                        )
-                        val endStr = String.format(
-                            currentLocale,
-                            "%02d:%02d",
-                            endTimeState.hour,
-                            endTimeState.minute
-                        )
-                        onSave(name, startStr, endStr, mode, maxEmergencyUses.toIntOrNull() ?: 3, interceptNotifications)
+                        scope.launch {
+                            val startStr = String.format(
+                                currentLocale,
+                                "%02d:%02d",
+                                startTimeState.hour,
+                                startTimeState.minute
+                            )
+                            val endStr = String.format(
+                                currentLocale,
+                                "%02d:%02d",
+                                endTimeState.hour,
+                                endTimeState.minute
+                            )
+                            sheetState.hide()
+                            onSave(name, startStr, endStr, mode, maxEmergencyUses.toIntOrNull() ?: 3, interceptNotifications)
+                        }
                     },
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.large

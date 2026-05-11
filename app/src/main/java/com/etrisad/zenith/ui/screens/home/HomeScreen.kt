@@ -53,6 +53,7 @@ import com.etrisad.zenith.ui.viewmodel.AppUsageInfo
 import com.etrisad.zenith.ui.viewmodel.HomeUiState
 import com.etrisad.zenith.ui.viewmodel.HomeViewModel
 import com.etrisad.zenith.ui.viewmodel.ShieldSortType
+import kotlinx.coroutines.launch
 
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.automirrored.outlined.TrendingDown
@@ -424,18 +425,22 @@ fun ScreenTimeTargetBottomSheet(
     onDismiss: () -> Unit,
     onSave: (Int) -> Unit
 ) {
+    val scope = rememberCoroutineScope()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var hours by remember { mutableIntStateOf(initialMinutes / 60) }
     var minutes by remember { mutableIntStateOf(initialMinutes % 60) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetState = sheetState,
         dragHandle = { BottomSheetDefaults.DragHandle() }
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(24.dp)
-                .padding(bottom = 32.dp),
+                .padding(bottom = 32.dp)
+                .navigationBarsPadding(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
@@ -499,7 +504,12 @@ fun ScreenTimeTargetBottomSheet(
             Spacer(modifier = Modifier.height(24.dp))
 
             Button(
-                onClick = { onSave(hours * 60 + minutes) },
+                onClick = {
+                    scope.launch {
+                        sheetState.hide()
+                        onSave(hours * 60 + minutes)
+                    }
+                },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp)
             ) {
@@ -508,7 +518,12 @@ fun ScreenTimeTargetBottomSheet(
 
             if (initialMinutes > 0) {
                 TextButton(
-                    onClick = { onSave(0) },
+                    onClick = {
+                        scope.launch {
+                            sheetState.hide()
+                            onSave(0)
+                        }
+                    },
                     modifier = Modifier.padding(top = 8.dp)
                 ) {
                     Text("Remove Target", color = MaterialTheme.colorScheme.error)

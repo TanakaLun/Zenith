@@ -53,7 +53,6 @@ class UserPreferencesRepository(private val context: Context) {
         val LAST_KNOWN_DAILY_USAGE = longPreferencesKey("last_known_daily_usage")
         val LAST_KNOWN_DAILY_USAGE_DATE = stringPreferencesKey("last_known_daily_usage_date")
         
-        // Bedtime Settings
         val BEDTIME_ENABLED = booleanPreferencesKey("bedtime_enabled")
         val BEDTIME_START_TIME = stringPreferencesKey("bedtime_start_time")
         val BEDTIME_END_TIME = stringPreferencesKey("bedtime_end_time")
@@ -203,6 +202,10 @@ class UserPreferencesRepository(private val context: Context) {
 
     suspend fun setScreenTimeTarget(minutes: Int) {
         context.dataStore.edit { preferences ->
+            val currentTarget = preferences[PreferencesKeys.SCREEN_TIME_TARGET] ?: 0
+            if (minutes > currentTarget && currentTarget > 0) {
+                preferences[PreferencesKeys.GLOBAL_CURRENT_STREAK] = 0
+            }
             preferences[PreferencesKeys.SCREEN_TIME_TARGET] = minutes
         }
     }

@@ -93,7 +93,6 @@ class AppGoalOverlayActivity : ComponentActivity() {
         val shieldRepo = (application as com.etrisad.zenith.ZenithApplication).shieldRepository
         CoroutineScope(Dispatchers.IO).launch {
             val shield = shieldRepo.getShieldByPackageName(packageName)
-            // Play sound if shield is null (test scenario) or if explicitly enabled
             if (shield == null || (shield.isGoalCallerEnabled && shield.isGoalCallerSoundEnabled)) {
                 withContext(Dispatchers.Main) {
                     try {

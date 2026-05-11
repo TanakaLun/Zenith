@@ -8,7 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import com.etrisad.zenith.data.local.entity.FocusType
 import com.etrisad.zenith.ui.viewmodel.AppInfo
 import com.etrisad.zenith.ui.viewmodel.FocusUiState
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -28,9 +29,12 @@ fun AppPickerBottomSheet(
 ) {
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
+    val scope = rememberCoroutineScope()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp,
         dragHandle = null
@@ -115,7 +119,12 @@ fun AppPickerBottomSheet(
                                     AppPickerItem(
                                         app = app,
                                         shape = shape,
-                                        onClick = { onAppSelected(app) },
+                                        onClick = {
+                                            scope.launch {
+                                                sheetState.hide()
+                                                onAppSelected(app)
+                                            }
+                                        },
                                         isTopApp = true
                                     )
                                     if (index < uiState.topApps.size - 1) {
@@ -172,7 +181,12 @@ fun AppPickerBottomSheet(
                                     AppPickerItem(
                                         app = app,
                                         shape = shape,
-                                        onClick = { onAppSelected(app) },
+                                        onClick = {
+                                            scope.launch {
+                                                sheetState.hide()
+                                                onAppSelected(app)
+                                            }
+                                        },
                                         isTopApp = false
                                     )
                                     if (index < uiState.installedApps.size - 1) {

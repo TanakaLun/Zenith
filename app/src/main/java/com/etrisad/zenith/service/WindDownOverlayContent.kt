@@ -67,7 +67,6 @@ fun WindDownOverlayContent(
                 targetValue = 1f,
                 animationSpec = tween(durationMillis = 5000, easing = LinearEasing)
             )
-            // Kick the user
             showContent = false
             delay(400)
             onCloseApp()

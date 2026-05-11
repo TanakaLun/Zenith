@@ -28,6 +28,7 @@ import com.etrisad.zenith.data.local.entity.ShieldEntity
 import com.etrisad.zenith.data.preferences.UserPreferences
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
 import com.etrisad.zenith.ui.viewmodel.AppInfo
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,6 +43,9 @@ fun ShieldSettingsBottomSheet(
     val context = LocalContext.current
     val repository = remember { UserPreferencesRepository(context) }
     val preferences by repository.userPreferencesFlow.collectAsState(initial = UserPreferences())
+
+    val scope = rememberCoroutineScope()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val containerColor by animateColorAsState(
         targetValue = if (preferences.expressiveColors) MaterialTheme.colorScheme.surfaceContainerHighest
@@ -83,7 +87,7 @@ fun ShieldSettingsBottomSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface
     ) {
         Column(
@@ -387,16 +391,19 @@ fun ShieldSettingsBottomSheet(
             ) {
                 Button(
                     onClick = {
-                        onSave(
-                            currentLimit,
-                            currentMaxEmergency,
-                            remindersEnabled,
-                            strictModeEnabled,
-                            autoQuitEnabled,
-                            currentMaxUses,
-                            refreshPeriodMinutes,
-                            isDelayAppEnabled
-                        )
+                        scope.launch {
+                            sheetState.hide()
+                            onSave(
+                                currentLimit,
+                                currentMaxEmergency,
+                                remindersEnabled,
+                                strictModeEnabled,
+                                autoQuitEnabled,
+                                currentMaxUses,
+                                refreshPeriodMinutes,
+                                isDelayAppEnabled
+                            )
+                        }
                     },
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.large,

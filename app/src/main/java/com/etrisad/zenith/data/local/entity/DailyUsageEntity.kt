@@ -11,8 +11,8 @@ import androidx.room.PrimaryKey
 data class DailyUsageEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
-    val date: String, // Format: YYYY-MM-DD
-    val packageName: String, // Use "TOTAL" for global usage
+    val date: String,
+    val packageName: String,
     val usageTimeMillis: Long,
     val lastUpdated: Long = System.currentTimeMillis()
 )

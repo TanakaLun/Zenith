@@ -458,7 +458,6 @@ class HomeViewModel(
                 if (time > 0) totalToday += time
             }
 
-            // 2. Calculate App Totals for Selected Day (The Source of Truth)
             val appTotals = mutableMapOf<String, Long>()
             val appSessionCounts = mutableMapOf<String, Int>()
             val dayStats = if (isSelectedToday) trueTodayStats else usm.queryAndAggregateUsageStats(dayStart, dayEnd)
@@ -469,9 +468,8 @@ class HomeViewModel(
                 if (time > 0) appTotals[pkg] = time
             }
 
-            // 3. Calculate Hourly Distribution and Session Counts using Events
             val hourlyAppUsage = mutableMapOf<Int, MutableMap<String, Long>>()
-            val eventBuffer = 24 * 60 * 60 * 1000L // Look back to catch sessions crossing midnight
+            val eventBuffer = 24 * 60 * 60 * 1000L
             val events = usm.queryEvents(dayStart - eventBuffer, dayEnd)
             val event = android.app.usage.UsageEvents.Event()
             val lastEventTime = mutableMapOf<String, Long>()
@@ -519,8 +517,7 @@ class HomeViewModel(
                     }
                 }
             }
-            
-            // Handle apps still in foreground
+
             lastEventTime.forEach { (pkg, startTime) ->
                 val segmentStart = maxOf(startTime, dayStart)
                 val segmentEnd = dayEnd

@@ -39,6 +39,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
 import com.etrisad.zenith.data.preferences.ThemeConfig
 import com.etrisad.zenith.data.preferences.UserPreferences
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,6 +51,7 @@ fun PermissionBottomSheet(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
     
     val preferences by preferencesRepository.userPreferencesFlow.collectAsState(
         initial = UserPreferences()
@@ -223,7 +225,12 @@ fun PermissionBottomSheet(
             if (allGranted) {
                 Spacer(modifier = Modifier.height(24.dp))
                 Button(
-                    onClick = onAllPermissionsGranted,
+                    onClick = {
+                        scope.launch {
+                            sheetState.hide()
+                            onAllPermissionsGranted()
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp)
                 ) {

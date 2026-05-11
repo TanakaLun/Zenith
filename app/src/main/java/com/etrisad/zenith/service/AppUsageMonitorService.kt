@@ -239,7 +239,7 @@ class AppUsageMonitorService : Service() {
                     if (overlayGoals.isNotEmpty()) {
                         val calendar = Calendar.getInstance()
                         val hour = calendar.get(Calendar.HOUR_OF_DAY)
-                        val isNightTime = hour >= 22 || hour < 6 // 10 PM to 6 AM
+                        val isNightTime = hour >= 22 || hour < 6
 
                         if (!isBedtimeActive && !isNightTime) {
                             try {

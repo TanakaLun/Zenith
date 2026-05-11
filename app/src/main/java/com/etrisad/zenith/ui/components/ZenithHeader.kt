@@ -85,7 +85,6 @@ fun ZenithHeader(
             )
         )
 
-        // Title Overlay (Absolute Center)
         val titleBias by animateFloatAsState(
             targetValue = if (isDeepScreen) -1f else 0f,
             animationSpec = spring(stiffness = Spring.StiffnessLow),
@@ -170,7 +169,6 @@ fun ZenithHeader(
             }
         }
 
-        // Overlay Sisi Kiri (Navigation)
         Box(
             modifier = Modifier
                 .align(Alignment.TopStart)
@@ -218,7 +216,6 @@ fun ZenithHeader(
             }
         }
 
-        // Overlay Sisi Kanan (Actions)
         Box(
             modifier = Modifier
                 .align(Alignment.TopEnd)

@@ -48,6 +48,7 @@ import com.etrisad.zenith.ui.navigation.Screen
 import com.etrisad.zenith.ui.viewmodel.FocusViewModel
 import com.etrisad.zenith.ui.viewmodel.FocusViewModelFactory
 import com.etrisad.zenith.util.BackupUtils
+import kotlinx.coroutines.launch
 import com.etrisad.zenith.worker.BackupManager
 import kotlinx.coroutines.launch
 import androidx.navigation.NavController
@@ -786,9 +787,12 @@ fun RestoreConfirmationBottomSheet(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
+    val scope = rememberCoroutineScope()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        sheetState = sheetState
     ) {
         Column(
             modifier = Modifier
@@ -906,7 +910,12 @@ fun RestoreConfirmationBottomSheet(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 OutlinedButton(
-                    onClick = onDismiss,
+                    onClick = {
+                        scope.launch {
+                            sheetState.hide()
+                            onDismiss()
+                        }
+                    },
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(16.dp)
                 ) {
@@ -914,7 +923,12 @@ fun RestoreConfirmationBottomSheet(
                 }
                 
                 Button(
-                    onClick = onConfirm,
+                    onClick = {
+                        scope.launch {
+                            sheetState.hide()
+                            onConfirm()
+                        }
+                    },
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(
@@ -977,9 +991,14 @@ fun DelayAppBottomSheet(
     onDismiss: () -> Unit,
     onSave: (Int) -> Unit
 ) {
+    val scope = rememberCoroutineScope()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var seconds by remember { mutableIntStateOf(initialSeconds) }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1045,7 +1064,12 @@ fun DelayAppBottomSheet(
             Spacer(modifier = Modifier.height(24.dp))
 
             Button(
-                onClick = { onSave(seconds) },
+                onClick = {
+                    scope.launch {
+                        sheetState.hide()
+                        onSave(seconds)
+                    }
+                },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp)
             ) {
@@ -1062,9 +1086,14 @@ fun EmergencyRechargeBottomSheet(
     onDismiss: () -> Unit,
     onSave: (Int) -> Unit
 ) {
+    val scope = rememberCoroutineScope()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var minutes by remember { mutableIntStateOf(initialMinutes) }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1140,7 +1169,12 @@ fun EmergencyRechargeBottomSheet(
             Spacer(modifier = Modifier.height(24.dp))
 
             Button(
-                onClick = { onSave(minutes) },
+                onClick = {
+                    scope.launch {
+                        sheetState.hide()
+                        onSave(minutes)
+                    }
+                },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp)
             ) {

@@ -26,6 +26,7 @@ import com.etrisad.zenith.data.preferences.UserPreferencesRepository
 import com.etrisad.zenith.service.AppGoalOverlayActivity
 import com.etrisad.zenith.ui.components.focus.AppPickerBottomSheet
 import com.etrisad.zenith.ui.viewmodel.FocusViewModel
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,6 +39,8 @@ fun AppGoalTestBottomSheet(
     val preferences by repository.userPreferencesFlow.collectAsState(initial = UserPreferences())
     val focusUiState by focusViewModel.uiState.collectAsState()
     
+    val scope = rememberCoroutineScope()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var showAppPicker by remember { mutableStateOf(false) }
 
     val containerColor by animateColorAsState(
@@ -49,7 +52,7 @@ fun AppGoalTestBottomSheet(
     
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp
     ) {
@@ -75,23 +78,35 @@ fun AppGoalTestBottomSheet(
 
             val options = listOf(
                 Triple("Test with Zenith", "Single app scenario using the current app", Icons.Outlined.FilterCenterFocus) to {
-                    AppGoalOverlayActivity.start(context, listOf(context.packageName))
-                    onDismiss()
+                    scope.launch {
+                        AppGoalOverlayActivity.start(context, listOf(context.packageName))
+                        sheetState.hide()
+                        onDismiss()
+                    }
+                    Unit
                 },
                 Triple("Test with selected app", "Pick an app to test the overlay", Icons.Outlined.AppRegistration) to {
                     showAppPicker = true
                 },
                 Triple("Test more than 2 Apps", "Multiple apps scenario (Zenith, Settings, and Phone)", Icons.Outlined.Apps) to {
-                    AppGoalOverlayActivity.start(
-                        context, 
-                        listOf(context.packageName, "com.android.settings", "com.android.phone")
-                    )
-                    onDismiss()
+                    scope.launch {
+                        AppGoalOverlayActivity.start(
+                            context, 
+                            listOf(context.packageName, "com.android.settings", "com.android.phone")
+                        )
+                        sheetState.hide()
+                        onDismiss()
+                    }
+                    Unit
                 },
                 Triple("Test with random app", "Picks a random installed launcher app", Icons.Outlined.BugReport) to {
-                    val randomPackage = getRandomInstalledApp(context)
-                    AppGoalOverlayActivity.start(context, listOf(randomPackage))
-                    onDismiss()
+                    scope.launch {
+                        val randomPackage = getRandomInstalledApp(context)
+                        AppGoalOverlayActivity.start(context, listOf(randomPackage))
+                        sheetState.hide()
+                        onDismiss()
+                    }
+                    Unit
                 }
             )
 

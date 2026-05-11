@@ -11,9 +11,9 @@ import androidx.room.PrimaryKey
 data class HourlyUsageEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
-    val date: String, // Format: YYYY-MM-DD
-    val hour: Int, // 0-23
-    val packageName: String, // Use "TOTAL" for global hourly usage
+    val date: String,
+    val hour: Int,
+    val packageName: String,
     val usageTimeMillis: Long,
     val lastUpdated: Long = System.currentTimeMillis()
 )

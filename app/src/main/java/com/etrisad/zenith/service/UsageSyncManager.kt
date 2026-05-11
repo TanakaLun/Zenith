@@ -61,7 +61,6 @@ class UsageSyncManager(
             }
         }
 
-        // Handle sessions still active at currentTime
         activeSessions.forEach { (pkg, startTime) ->
             processSession(pkg, startTime, currentTime, hourlyBuckets)
         }
@@ -110,7 +109,6 @@ class UsageSyncManager(
         val now = System.currentTimeMillis()
 
         buckets.forEach { (date, hours) ->
-            // Fetch all existing records for this date to avoid multiple queries in a loop
             val existingRecords = repository.getHourlyUsageForDate(date).first()
             
             hours.forEach { (hour, apps) ->
@@ -119,8 +117,8 @@ class UsageSyncManager(
                     val existing = existingRecords.find { it.hour == hour && it.packageName == pkg }
                     val totalDuration = (existing?.usageTimeMillis ?: 0L) + duration
                     
-                    hourTotal += duration // This is only for the new duration to be added to TOTAL
-                    
+                    hourTotal += duration
+
                     entities.add(
                         HourlyUsageEntity(
                             id = existing?.id ?: 0,

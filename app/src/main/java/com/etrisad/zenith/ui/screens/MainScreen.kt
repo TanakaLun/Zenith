@@ -91,7 +91,6 @@ fun MainScreen(
 
     val scrollBehavior = if (isDeepScreen) pinnedScrollBehavior else enterAlwaysScrollBehavior
 
-    // Reset scroll behavior when switching between top-level screens or returning from deep screens
     LaunchedEffect(currentRoute) {
         if (!isDeepScreen) {
             enterAlwaysScrollBehavior.state.heightOffset = 0f
@@ -107,7 +106,6 @@ fun MainScreen(
 
     val useNavigationRail = windowSizeClass.widthSizeClass != WindowWidthSizeClass.Compact
 
-    // Bedtime Switch Animation States
     var bedtimeSwitchVisible by remember { mutableStateOf(false) }
     var bedtimeSwitchInLayout by remember { mutableStateOf(false) }
     var showPauseSheet by remember { mutableStateOf(false) }
@@ -115,7 +113,6 @@ fun MainScreen(
     var showBatchDeleteSheet by remember { mutableStateOf(false) }
     var showBatchPauseSheet by remember { mutableStateOf(false) }
 
-    // Phased animation logic for the Bedtime Switch in the Top Bar
     LaunchedEffect(currentRoute, preferences.bedtimeEnabled) {
         val isBedtimeScreen = currentRoute == Screen.Bedtime.route
         val shouldShow = isBedtimeScreen && preferences.bedtimeEnabled
@@ -123,20 +120,15 @@ fun MainScreen(
         if (shouldShow) {
             if (!bedtimeSwitchInLayout) {
                 bedtimeSwitchInLayout = true
-                // Entrance "pre-load" effect: reserve the layout space first,
-                // then fade the switch in after a deliberate delay.
                 delay(1200)
             }
             bedtimeSwitchVisible = true
         } else {
             if (bedtimeSwitchVisible) {
                 bedtimeSwitchVisible = false
-                // Wait for the switch's exit animation to complete (800ms)
                 delay(800)
             }
             if (bedtimeSwitchInLayout) {
-                // Delayed removal: keep the layout slot active for a moment longer
-                // to ensure a smooth transition, especially during navigation.
                 delay(1500)
                 bedtimeSwitchInLayout = false
             }
@@ -388,7 +380,6 @@ fun MainScreen(
                                 }
                             }
 
-                            // Bedtime Switch with expressive entrance/exit sequences
                             if (bedtimeSwitchInLayout) {
                                 Box(
                                     modifier = Modifier

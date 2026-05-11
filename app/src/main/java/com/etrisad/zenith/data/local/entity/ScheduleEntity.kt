@@ -13,9 +13,9 @@ data class ScheduleEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
     val name: String,
-    val packageNames: List<String>, // Needs a TypeConverter for List<String>
-    val startTime: String, // HH:mm
-    val endTime: String, // HH:mm
+    val packageNames: List<String>,
+    val startTime: String,
+    val endTime: String,
     val mode: ScheduleMode,
     val isActive: Boolean = true,
     val interceptNotifications: Boolean = false,

@@ -85,7 +85,7 @@ fun AllowedBedAppsBottomSheet(
                         isPreinstalledApp = isSystemFlag && hasLauncher && !isCoreComponent
                     )
                 }
-                .filter { !it.isSystemApp } // Only show user apps and preinstalled apps (like YouTube)
+                .filter { !it.isSystemApp }
                 .filter { it.packageName !in generalWhitelisted }
                 .sortedBy { it.appName.lowercase() }
                 .toList()

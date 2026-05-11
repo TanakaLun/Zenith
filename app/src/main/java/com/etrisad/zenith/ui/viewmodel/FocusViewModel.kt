@@ -365,6 +365,16 @@ class FocusViewModel(
         val type = _uiState.value.selectedFocusType
         viewModelScope.launch {
             val existing = allShields.find { it.packageName == selectedApp.packageName }
+            
+            val shouldResetStreak = existing?.let { 
+                if (it.type == type) {
+                    when (type) {
+                        FocusType.SHIELD -> timeLimitMinutes > it.timeLimitMinutes
+                        FocusType.GOAL -> timeLimitMinutes < it.timeLimitMinutes
+                    }
+                } else true
+            } ?: false
+
             val shield = ShieldEntity(
                 packageName = selectedApp.packageName,
                 appName = selectedApp.appName,
@@ -387,7 +397,14 @@ class FocusViewModel(
                 isDelayAppEnabled = if (type == FocusType.SHIELD) isDelayAppEnabled else false,
                 isGoalCallerEnabled = isGoalCallerEnabled,
                 isGoalCallerSoundEnabled = isGoalCallerSoundEnabled,
-                goalCallerSoundUri = goalCallerSoundUri
+                goalCallerSoundUri = goalCallerSoundUri,
+                currentStreak = if (shouldResetStreak) 0 else (existing?.currentStreak ?: 0),
+                bestStreak = existing?.bestStreak ?: 0,
+                lastStreakUpdateTimestamp = existing?.lastStreakUpdateTimestamp ?: 0L,
+                lastSessionEndTimestamp = existing?.lastSessionEndTimestamp ?: 0L,
+                isPaused = existing?.isPaused ?: false,
+                pauseEndTimestamp = existing?.pauseEndTimestamp ?: 0L,
+                lastDelayStartTimestamp = existing?.lastDelayStartTimestamp ?: 0L
             )
             shieldRepository.insertShield(shield)
             closeSettingsSheet()

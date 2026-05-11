@@ -97,7 +97,6 @@ fun DataRepairmentScreen(
             }
         }
 
-        // Repairing Overlay
         AnimatedVisibility(
             visible = isRepairing,
             enter = fadeIn(),
@@ -107,7 +106,7 @@ fun DataRepairmentScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f))
-                    .clickable(enabled = false) {}, // Block touches
+                    .clickable(enabled = false) {},
                 contentAlignment = Alignment.Center
             ) {
                 Card(
