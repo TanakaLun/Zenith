@@ -177,14 +177,15 @@ fun InterceptOverlayContent(
     LaunchedEffect(isBlocked, isDelaying, isEmergencyHolding, isEmergencyUnlocked) {
         if (isBlocked) {
             if (!isEmergencyHolding) {
-                delay(1000)
                 autoKickProgress.snapTo(0f)
                 autoKickProgress.animateTo(
                     targetValue = 1f,
                     animationSpec = tween(durationMillis = 4000, easing = LinearEasing)
                 )
-                showContent = false
-                delay(400)
+                if (showContent) {
+                    showContent = false
+                    delay(300)
+                }
                 onCloseApp()
             } else {
                 autoKickProgress.stop()
@@ -197,8 +198,10 @@ fun InterceptOverlayContent(
                 targetValue = 1f,
                 animationSpec = tween(durationMillis = 5000, easing = LinearEasing)
             )
-            showContent = false
-            delay(400)
+            if (showContent) {
+                showContent = false
+                delay(300)
+            }
             onCloseApp()
         } else {
             autoKickProgress.snapTo(0f)
@@ -1378,14 +1381,16 @@ fun ScheduleOverlayContent(
     LaunchedEffect(isEmergencyUnlocked, isEmergencyHolding) {
         if (!isEmergencyUnlocked) {
             if (!isEmergencyHolding) {
-                delay(10000)
+                delay(2000)
                 autoKickProgress.snapTo(0f)
                 autoKickProgress.animateTo(
                     targetValue = 1f,
-                    animationSpec = tween(durationMillis = 5000, easing = LinearEasing)
+                    animationSpec = tween(durationMillis = 4000, easing = LinearEasing)
                 )
-                showContent = false
-                delay(400)
+                if (showContent) {
+                    showContent = false
+                    delay(300)
+                }
                 onCloseApp()
             } else {
                 autoKickProgress.stop()

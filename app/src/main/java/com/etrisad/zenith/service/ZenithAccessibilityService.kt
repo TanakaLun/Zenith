@@ -70,6 +70,9 @@ class ZenithAccessibilityService : AccessibilityService() {
     private var lastCheckedDay = -1
     private var lastCheckedDayTimestamp = 0L
 
+    private var lastKickTime = 0L
+    private var lastKickedPackage: String? = null
+
     private var isBedtimeActive = false
     private var isWindDownActive = false
     private var cachedBedtimeStartMinutes = -1
@@ -436,6 +439,10 @@ class ZenithAccessibilityService : AccessibilityService() {
 
     private suspend fun checkIfAppIsShielded(targetPackageName: String) {
         if (targetPackageName != lastForegroundApp) return
+        
+        if (targetPackageName == lastKickedPackage && System.currentTimeMillis() - lastKickTime < 3000) {
+            return
+        }
 
         val shield = currentShieldCache ?: allShieldsCache.find { it.packageName == targetPackageName }
         if (shield != null && !InterceptOverlayManager.isShowing) {
@@ -529,7 +536,11 @@ class ZenithAccessibilityService : AccessibilityService() {
                             }
                         }
                     },
-                    onCloseApp = { goToHomeScreen() },
+                    onCloseApp = { 
+                        lastKickTime = System.currentTimeMillis()
+                        lastKickedPackage = targetPackageName
+                        goToHomeScreen() 
+                    },
                     onGoalDismiss = {
                         allowedApps[targetPackageName] = System.currentTimeMillis() + (60 * 60 * 1000L)
                     }
@@ -739,7 +750,11 @@ class ZenithAccessibilityService : AccessibilityService() {
             overlayManager.showBedtimeOverlay(
                 packageName = packageName,
                 appName = appName,
-                onCloseApp = { goToHomeScreen() }
+                onCloseApp = { 
+                    lastKickTime = System.currentTimeMillis()
+                    lastKickedPackage = packageName
+                    goToHomeScreen() 
+                }
             )
         }
     }
@@ -759,7 +774,11 @@ class ZenithAccessibilityService : AccessibilityService() {
                     allowedApps[packageName] = System.currentTimeMillis() + (minutes * 60 * 1000L)
                     windDownUsedPackages[packageName] = true
                 },
-                onCloseApp = { goToHomeScreen() }
+                onCloseApp = { 
+                    lastKickTime = System.currentTimeMillis()
+                    lastKickedPackage = packageName
+                    goToHomeScreen() 
+                }
             )
         }
     }
@@ -873,7 +892,11 @@ class ZenithAccessibilityService : AccessibilityService() {
                         }
                     }
                 },
-                onCloseApp = { goToHomeScreen() }
+                onCloseApp = { 
+                    lastKickTime = System.currentTimeMillis()
+                    lastKickedPackage = packageName
+                    goToHomeScreen() 
+                }
             )
         }
     }
