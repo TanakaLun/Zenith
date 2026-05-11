@@ -9,8 +9,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -25,6 +23,9 @@ import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Stars
 import androidx.compose.material.icons.outlined.TrackChanges
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,6 +46,7 @@ import androidx.core.graphics.drawable.toBitmap
 import com.etrisad.zenith.data.local.entity.FocusType
 import com.etrisad.zenith.ui.components.SnapshotSection
 import com.etrisad.zenith.ui.components.UsageHistoryCard
+import com.etrisad.zenith.ui.components.ZenithContainedLoadingIndicator
 import com.etrisad.zenith.ui.viewmodel.AppUsageInfo
 import com.etrisad.zenith.ui.viewmodel.DailyUsage
 import com.etrisad.zenith.ui.viewmodel.HomeViewModel
@@ -57,6 +59,7 @@ import kotlin.math.sin
 
 import androidx.compose.runtime.saveable.rememberSaveable
 
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun UsageStatsScreen(
     viewModel: HomeViewModel,
@@ -65,6 +68,13 @@ fun UsageStatsScreen(
     onAppClick: (String) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val pullToRefreshState = rememberPullToRefreshState()
+    var isManualRefreshing by remember { mutableStateOf(false) }
+
+    LaunchedEffect(uiState.isLoading) {
+        if (!uiState.isLoading) isManualRefreshing = false
+    }
+    
     var selectedHour by rememberSaveable { mutableStateOf<Int?>(null) }
     var highlightedCategory by remember { mutableStateOf<String?>(null) } 
     
@@ -174,15 +184,52 @@ fun UsageStatsScreen(
         label = "HourlyAccentContainerColor"
     )
 
-    LazyColumn(
+    PullToRefreshBox(
+        isRefreshing = uiState.isLoading && (uiState.dailyUsageHistory.isEmpty() || isManualRefreshing),
+        onRefresh = {
+            isManualRefreshing = true
+            viewModel.syncDataNow()
+        },
+        state = pullToRefreshState,
+        indicator = {
+            val isRefreshing = uiState.isLoading && (uiState.dailyUsageHistory.isEmpty() || isManualRefreshing)
+            val scale by animateFloatAsState(
+                targetValue = if (isRefreshing) 1f else pullToRefreshState.distanceFraction.coerceIn(0f, 1f),
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessLow
+                ),
+                label = "LoadingIndicatorScale"
+            )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = innerPadding.calculateTopPadding() + 16.dp),
+                contentAlignment = Alignment.TopCenter
+            ) {
+                ZenithContainedLoadingIndicator(
+                    modifier = Modifier.graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                        alpha = scale.coerceIn(0f, 1f)
+                    }
+                )
+            }
+        },
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp),
-        contentPadding = PaddingValues(
-            top = innerPadding.calculateTopPadding() + 16.dp,
-            bottom = innerPadding.calculateBottomPadding() + 24.dp
-        )
+            .graphicsLayer { clip = false }
     ) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            contentPadding = PaddingValues(
+                top = innerPadding.calculateTopPadding() + 16.dp,
+                bottom = innerPadding.calculateBottomPadding() + 24.dp
+            )
+        ) {
         item(key = "zenith_dashboard") {
             Column(modifier = Modifier.animateItem()) {
                 val selectedDayTotal = remember(uiState.dailyUsageHistory, uiState.selectedDateMillis) {
@@ -663,6 +710,7 @@ fun UsageStatsScreen(
             }
         }
     }
+}
 }
 
 @Composable

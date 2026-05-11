@@ -29,6 +29,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
+import com.etrisad.zenith.ui.components.ZenithContainedLoadingIndicator
 import com.etrisad.zenith.ui.screens.settings.WhitelistAppInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -163,7 +164,7 @@ fun AllowedBedAppsBottomSheet(
                             .fillMaxWidth(),
                         contentAlignment = Alignment.Center
                     ) {
-                        ContainedLoadingIndicator()
+                        ZenithContainedLoadingIndicator()
                     }
                 } else {
                     LazyColumn(

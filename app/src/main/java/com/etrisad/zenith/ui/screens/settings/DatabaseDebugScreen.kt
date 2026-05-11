@@ -7,6 +7,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.etrisad.zenith.ui.components.UsageHistoryList
+import com.etrisad.zenith.ui.components.ZenithLoadingIndicator
 import com.etrisad.zenith.ui.viewmodel.HomeViewModel
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -29,7 +30,7 @@ fun DatabaseDebugScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                LoadingIndicator(
+                ZenithLoadingIndicator(
                     modifier = Modifier.size(48.dp)
                 )
                 Spacer(modifier = Modifier.height(24.dp))

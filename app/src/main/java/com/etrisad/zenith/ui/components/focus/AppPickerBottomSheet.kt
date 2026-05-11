@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.etrisad.zenith.data.local.entity.FocusType
+import com.etrisad.zenith.ui.components.ZenithContainedLoadingIndicator
 import com.etrisad.zenith.ui.viewmodel.AppInfo
 import com.etrisad.zenith.ui.viewmodel.FocusUiState
 import kotlinx.coroutines.launch
@@ -92,7 +93,7 @@ fun AppPickerBottomSheet(
 
                 if (uiState.isLoadingApps) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        ContainedLoadingIndicator()
+                        ZenithContainedLoadingIndicator()
                     }
                 } else {
                     LazyColumn(

@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.etrisad.zenith.ui.components.ZenithContainedLoadingIndicator
 import com.etrisad.zenith.ui.viewmodel.HomeViewModel
 import com.etrisad.zenith.ui.viewmodel.UsageHistoryGroup
 import com.etrisad.zenith.ui.viewmodel.UsageRecord
@@ -121,7 +122,7 @@ fun DataRepairmentScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        ContainedLoadingIndicator(
+                        ZenithContainedLoadingIndicator(
                             modifier = Modifier.size(48.dp)
                         )
                         Spacer(modifier = Modifier.height(24.dp))

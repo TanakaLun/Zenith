@@ -20,6 +20,9 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,6 +51,7 @@ import com.etrisad.zenith.data.local.entity.FocusType
 import com.etrisad.zenith.data.local.entity.ShieldEntity
 import com.etrisad.zenith.ui.components.ShieldSortHeader
 import com.etrisad.zenith.ui.components.UsageHistoryCard
+import com.etrisad.zenith.ui.components.ZenithContainedLoadingIndicator
 import com.etrisad.zenith.ui.theme.ZenithTheme
 import com.etrisad.zenith.ui.viewmodel.AppUsageInfo
 import com.etrisad.zenith.ui.viewmodel.HomeUiState
@@ -102,11 +106,12 @@ fun HomeScreen(
         onAppClick = onAppClick,
         onBedtimeClick = onBedtimeClick,
         onStatsClick = onSeeFullList,
-        onDaySelected = { viewModel.selectDate(it) }
+        onDaySelected = { viewModel.selectDate(it) },
+        onRefresh = { viewModel.syncDataNow() }
     )
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreenContent(
     uiState: HomeUiState,
@@ -120,9 +125,51 @@ fun HomeScreenContent(
     onAppClick: (String) -> Unit,
     onBedtimeClick: () -> Unit,
     onStatsClick: () -> Unit,
-    onDaySelected: (Long?) -> Unit
+    onDaySelected: (Long?) -> Unit,
+    onRefresh: () -> Unit
 ) {
-    Box(modifier = Modifier.fillMaxSize()) {
+    val pullToRefreshState = rememberPullToRefreshState()
+    var isManualRefreshing by remember { mutableStateOf(false) }
+    
+    LaunchedEffect(uiState.isLoading) {
+        if (!uiState.isLoading) isManualRefreshing = false
+    }
+
+    PullToRefreshBox(
+        isRefreshing = uiState.isLoading && (uiState.dailyUsageHistory.isEmpty() || isManualRefreshing),
+        onRefresh = {
+            isManualRefreshing = true
+            onRefresh()
+        },
+        state = pullToRefreshState,
+        indicator = {
+            val isRefreshing = uiState.isLoading && (uiState.dailyUsageHistory.isEmpty() || isManualRefreshing)
+            val scale by animateFloatAsState(
+                targetValue = if (isRefreshing) 1f else pullToRefreshState.distanceFraction.coerceIn(0f, 1f),
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessLow
+                ),
+                label = "LoadingIndicatorScale"
+            )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = innerPadding.calculateTopPadding() + 16.dp),
+                contentAlignment = Alignment.TopCenter
+            ) {
+                ZenithContainedLoadingIndicator(
+                    modifier = Modifier.graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                        alpha = scale.coerceIn(0f, 1f)
+                    }
+                )
+            }
+        },
+        modifier = Modifier.fillMaxSize()
+    ) {
         val targetMillis = preferences.screenTimeTargetMinutes * 60 * 1000L
         LazyColumn(
             modifier = Modifier
@@ -282,25 +329,6 @@ fun HomeScreenContent(
                 }
             } else {
                 shieldList(shields = uiState.activeShields, formatDuration = formatDuration, onAppClick = onAppClick)
-            }
-        }
-
-        AnimatedVisibility(
-            visible = uiState.isLoading && uiState.dailyUsageHistory.isEmpty(),
-            enter = fadeIn(animationSpec = spring(stiffness = Spring.StiffnessLow)),
-            exit = fadeOut(animationSpec = spring(stiffness = Spring.StiffnessLow))
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.4f))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) {},
-                contentAlignment = Alignment.Center
-            ) {
-                ContainedLoadingIndicator()
             }
         }
     }
@@ -1305,6 +1333,7 @@ fun HomeScreenExpressivePreview() {
             onBedtimeClick = {},
             onStatsClick = {},
             onDaySelected = {},
+            onRefresh = {},
             innerPadding = PaddingValues()
         )
     }

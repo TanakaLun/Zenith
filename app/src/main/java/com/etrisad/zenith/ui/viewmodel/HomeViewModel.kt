@@ -284,7 +284,7 @@ class HomeViewModel(
         viewModelScope.launch {
             shieldRepository.getAllUsage().collect { history ->
                 allHistory = history
-                refreshUsageStats()
+                refreshUsageStats(showLoading = false)
             }
         }
 
@@ -292,7 +292,7 @@ class HomeViewModel(
             shieldRepository.getLastNDaysGlobalUsage(60).collect { history ->
                 globalHistory = history
                 updateGlobalFallback()
-                refreshUsageStats()
+                refreshUsageStats(showLoading = false)
             }
         }
 
@@ -307,7 +307,7 @@ class HomeViewModel(
                     bedtimeEndTime = prefs.bedtimeEndTime,
                     bedtimeDays = prefs.bedtimeDays
                 ) }
-                refreshUsageStats()
+                refreshUsageStats(showLoading = false)
             }
         }
 
@@ -415,13 +415,13 @@ class HomeViewModel(
         if (_uiState.value.selectedDateMillis == date && refreshJob?.isActive == true) return
 
         _uiState.update { it.copy(selectedDateMillis = date) }
-        refreshUsageStats()
+        refreshUsageStats(showLoading = true)
     }
 
-    private fun refreshUsageStats() {
+    private fun refreshUsageStats(showLoading: Boolean = true) {
         refreshJob?.cancel()
         refreshJob = viewModelScope.launch(kotlinx.coroutines.Dispatchers.Default) {
-            _uiState.update { it.copy(isLoading = true) }
+            if (showLoading) _uiState.update { it.copy(isLoading = true) }
             val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
             val pm = context.packageManager
 
@@ -990,7 +990,7 @@ class HomeViewModel(
     }
 
     private fun updateShieldedLists() {
-        refreshUsageStats()
+        refreshUsageStats(showLoading = false)
     }
 
     private fun sortShields(shields: List<ShieldEntity>, sortType: ShieldSortType): List<ShieldEntity> {
@@ -1006,7 +1006,7 @@ class HomeViewModel(
         viewModelScope.launch {
             while (true) {
                 delay(10000)
-                refreshUsageStats()
+                refreshUsageStats(showLoading = false)
                 refreshCurrentAppDetailUsage()
             }
         }
