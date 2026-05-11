@@ -96,6 +96,13 @@ fun UsageStatsScreen(
         2 + appsCount
     }
 
+    val appTypes = remember(uiState.activeShields, uiState.activeGoals) {
+        val types = mutableMapOf<String, String>()
+        uiState.activeShields.forEach { types[it.packageName] = "SHIELD" }
+        uiState.activeGoals.forEach { types[it.packageName] = "GOAL" }
+        types
+    }
+
     fun getGroupShape(index: Int, total: Int): RoundedCornerShape {
         return when {
             total == 1 -> RoundedCornerShape(28.dp)
@@ -268,6 +275,7 @@ fun UsageStatsScreen(
                     Spacer(modifier = Modifier.height(4.dp))
                     UsageItem(
                         app = app,
+                        type = appTypes[app.packageName] ?: "OTHER",
                         formatDuration = viewModel::formatDuration,
                         index = groupIndex,
                         total = hourlyGroupTotal,
@@ -354,6 +362,7 @@ fun UsageStatsScreen(
                             Spacer(modifier = Modifier.height(4.dp))
                             UsageItem(
                                 app = app,
+                                type = appTypes[app.packageName] ?: "OTHER",
                                 formatDuration = viewModel::formatDuration,
                                 index = groupIndex,
                                 total = hourlyGroupTotal,
@@ -538,6 +547,7 @@ fun UsageStatsScreen(
             Column(modifier = Modifier.animateItem()) {
                 UsageItem(
                     app = app,
+                    type = appTypes[app.packageName] ?: "OTHER",
                     formatDuration = viewModel::formatDuration,
                     index = index,
                     total = total,
@@ -624,6 +634,7 @@ fun UsageStatsScreen(
                     Column(modifier = Modifier.animateItem()) {
                         UsageItem(
                             app = app,
+                            type = appTypes[app.packageName] ?: "OTHER",
                             formatDuration = viewModel::formatDuration,
                             index = otherIndex + 1 + index,
                             total = total,
@@ -1457,6 +1468,7 @@ fun GoalHeatmapItem(
 @Composable
 fun UsageItem(
     app: AppUsageInfo,
+    type: String?,
     formatDuration: (Long) -> String,
     index: Int,
     total: Int,
@@ -1468,11 +1480,37 @@ fun UsageItem(
     GroupedCard(index = index, total = total, onClick = onClick, modifier = modifier, containerColor = containerColor) {
         ListItem(
             headlineContent = {
-                Text(
-                    text = app.appName,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = app.appName,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    val badgeColor = when (type) {
+                        "GOAL" -> MaterialTheme.colorScheme.tertiary
+                        "SHIELD" -> MaterialTheme.colorScheme.primary
+                        else -> MaterialTheme.colorScheme.secondary
+                    }
+                    val badgeText = when (type) {
+                        "GOAL" -> "Goal"
+                        "SHIELD" -> "Shield"
+                        else -> "Other"
+                    }
+                    Surface(
+                        color = badgeColor.copy(alpha = 0.1f),
+                        contentColor = badgeColor,
+                        shape = CircleShape,
+                    ) {
+                        Text(
+                            text = badgeText,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        )
+                    }
+                }
             },
             trailingContent = {
                 Text(
