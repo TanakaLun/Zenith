@@ -5,6 +5,7 @@ import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.PowerManager
 import com.etrisad.zenith.data.local.entity.HourlyUsageEntity
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
 import com.etrisad.zenith.data.repository.ShieldRepository
@@ -27,6 +28,7 @@ class UsageSyncManager(
         if (currentTime - lastSyncTime < 60000) return 
 
         val pm = context.packageManager
+        val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
         val launcherIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
         val launcherPackage = pm.resolveActivity(launcherIntent, PackageManager.MATCH_DEFAULT_ONLY)
             ?.activityInfo?.packageName
@@ -43,16 +45,31 @@ class UsageSyncManager(
         val activeSessions = mutableMapOf<String, Long>()
         val hourlyBuckets = mutableMapOf<String, MutableMap<Int, MutableMap<String, Long>>>()
 
+        var isScreenOn = powerManager.isInteractive
+
         while (events.hasNextEvent()) {
             events.getNextEvent(event)
             val pkg = event.packageName
             val time = event.timeStamp
+            val type = event.eventType
 
-            if (pkg in excludePackages || pkg !in launcherApps) continue
-
-            when (event.eventType) {
+            when (type) {
+                UsageEvents.Event.SCREEN_INTERACTIVE -> isScreenOn = true
+                UsageEvents.Event.SCREEN_NON_INTERACTIVE -> {
+                    isScreenOn = false
+                    activeSessions.forEach { (p, start) ->
+                        processSession(p, start, time, hourlyBuckets)
+                    }
+                    activeSessions.clear()
+                }
                 UsageEvents.Event.MOVE_TO_FOREGROUND, UsageEvents.Event.ACTIVITY_RESUMED -> {
-                    activeSessions[pkg] = time
+                    if (isScreenOn && pkg !in excludePackages && pkg in launcherApps) {
+                        val className = event.className ?: ""
+                        if (!className.contains("Notification", ignoreCase = true) &&
+                            !className.contains("Toast", ignoreCase = true)) {
+                            activeSessions[pkg] = time
+                        }
+                    }
                 }
                 UsageEvents.Event.MOVE_TO_BACKGROUND, UsageEvents.Event.ACTIVITY_PAUSED -> {
                     val startTime = activeSessions.remove(pkg) ?: continue

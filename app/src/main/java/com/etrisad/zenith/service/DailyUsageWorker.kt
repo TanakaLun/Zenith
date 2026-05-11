@@ -103,26 +103,55 @@ class DailyUsageWorker(context: Context, params: WorkerParameters) : CoroutineWo
         val event = android.app.usage.UsageEvents.Event()
         val lastEventTime = mutableMapOf<String, Long>()
         val cal = Calendar.getInstance()
+        
+        var isScreenOn = false 
 
         while (events.hasNextEvent()) {
             events.getNextEvent(event)
             val pkg = event.packageName
             val time = event.timeStamp
-            
-            if (event.eventType == android.app.usage.UsageEvents.Event.ACTIVITY_RESUMED) {
-                lastEventTime[pkg] = time
-            } else if (event.eventType == android.app.usage.UsageEvents.Event.ACTIVITY_PAUSED) {
-                val sTime = lastEventTime.remove(pkg)
-                if (sTime != null) {
-                    val duration = time - sTime
-                    if (duration > 0) {
-                        cal.timeInMillis = sTime
-                        val hour = cal.get(Calendar.HOUR_OF_DAY)
-                        hourlyMap[hour] = (hourlyMap[hour] ?: 0L) + duration
+            val type = event.eventType
 
-                        if (pkg !in excludePackages && pkg in launcherApps) {
-                            val pkgMap = hourlyAppUsage.getOrPut(hour) { mutableMapOf() }
-                            pkgMap[pkg] = (pkgMap[pkg] ?: 0L) + duration
+            when (type) {
+                android.app.usage.UsageEvents.Event.SCREEN_INTERACTIVE -> isScreenOn = true
+                android.app.usage.UsageEvents.Event.SCREEN_NON_INTERACTIVE -> {
+                    isScreenOn = false
+                    lastEventTime.forEach { (p, sTime) ->
+                        val duration = time - sTime
+                        if (duration > 0) {
+                            cal.timeInMillis = sTime
+                            val hour = cal.get(Calendar.HOUR_OF_DAY)
+                            hourlyMap[hour] = (hourlyMap[hour] ?: 0L) + duration
+                            if (p !in excludePackages && p in launcherApps) {
+                                val pkgMap = hourlyAppUsage.getOrPut(hour) { mutableMapOf() }
+                                pkgMap[p] = (pkgMap[p] ?: 0L) + duration
+                            }
+                        }
+                    }
+                    lastEventTime.clear()
+                }
+                android.app.usage.UsageEvents.Event.ACTIVITY_RESUMED -> {
+                    if (isScreenOn) {
+                        val className = event.className ?: ""
+                        if (!className.contains("Notification", ignoreCase = true) &&
+                            !className.contains("Toast", ignoreCase = true)) {
+                            lastEventTime[pkg] = time
+                        }
+                    }
+                }
+                android.app.usage.UsageEvents.Event.ACTIVITY_PAUSED -> {
+                    val sTime = lastEventTime.remove(pkg)
+                    if (sTime != null) {
+                        val duration = time - sTime
+                        if (duration > 0) {
+                            cal.timeInMillis = sTime
+                            val hour = cal.get(Calendar.HOUR_OF_DAY)
+                            hourlyMap[hour] = (hourlyMap[hour] ?: 0L) + duration
+
+                            if (pkg !in excludePackages && pkg in launcherApps) {
+                                val pkgMap = hourlyAppUsage.getOrPut(hour) { mutableMapOf() }
+                                pkgMap[pkg] = (pkgMap[pkg] ?: 0L) + duration
+                            }
                         }
                     }
                 }
