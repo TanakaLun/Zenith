@@ -331,29 +331,38 @@ class AppUsageMonitorService : Service() {
                 try {
                     val currentTime = System.currentTimeMillis()
 
+                    val calendar = java.util.Calendar.getInstance()
+                    val currentDay = calendar.get(Calendar.DAY_OF_YEAR)
+
+                    if (lastCheckedDay != -1 && currentDay != lastCheckedDay) {
+                        updateStreaks()
+                        shieldRepository.resetAllRemainingTimes()
+                        notifiedGoals.clear()
+                        earlyKickManager.reset()
+                        dailyUsageCache.clear()
+                        lastAllowedRemainingTime.clear()
+                        usageStatsCache = null
+                        lastUsageCacheTime = 0L
+                        lastUsageFetchTime = 0L
+                        cachedTotalUsage = 0L
+                        cachedTotalGlobalUsage = 0L
+                        currentShieldCache = null
+                        
+                        sessionStartTime = currentTime
+                        baseUsageAtSessionStart = 0L
+                        baseGlobalUsageAtSessionStart = 0L
+                        lastHUDUpdateTime = 0L
+                        
+                        lastCheckedDay = currentDay
+                        lastCheckedDayTimestamp = currentTime
+                    }
+
                     if (currentTime - lastCheckedDayTimestamp > 60000) {
                         currentPreferences?.let { updateBedtimeStatus(it) }
 
-                        val currentDay = java.util.Calendar.getInstance().apply { timeInMillis = currentTime }.get(Calendar.DAY_OF_YEAR)
-                        val currentMinutes = java.util.Calendar.getInstance().apply { timeInMillis = currentTime }.get(Calendar.HOUR_OF_DAY) * 60 + 
-                                            java.util.Calendar.getInstance().apply { timeInMillis = currentTime }.get(Calendar.MINUTE)
+                        val currentMinutes = calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE)
                         
                         checkSchedulesTransition(currentMinutes)
-
-                        if (lastCheckedDay != -1 && currentDay != lastCheckedDay) {
-                            updateStreaks()
-                            shieldRepository.resetAllRemainingTimes()
-                            notifiedGoals.clear()
-                            earlyKickManager.reset()
-                            dailyUsageCache.clear()
-                            lastAllowedRemainingTime.clear()
-                            usageStatsCache = null
-                            lastUsageCacheTime = 0L
-                            lastUsageFetchTime = 0L
-                            cachedTotalUsage = 0L
-                            currentShieldCache = null
-                        }
-                        lastCheckedDay = currentDay
                         lastCheckedDayTimestamp = currentTime
                     }
 
@@ -1007,11 +1016,7 @@ class AppUsageMonitorService : Service() {
         val currentTime = System.currentTimeMillis()
         val startTime = getStartOfDay()
 
-        val statsMap = try {
-            usageStatsManager.queryAndAggregateUsageStats(startTime, currentTime)
-        } catch (_: Exception) {
-            emptyMap<String, android.app.usage.UsageStats>()
-        }
+        getUsageStatsList()
 
         if (currentTime - lastLauncherAppsRefreshTime > 3600000 || launcherAppsCache.isEmpty()) {
             val pm = packageManager
@@ -1027,12 +1032,11 @@ class AppUsageMonitorService : Service() {
             lastLauncherRefreshTime = currentTime
         }
 
-        val excludePackages = launcherPackages + packageName
+        val excludePackages = launcherPackages + (packageName ?: "")
 
         var totalToday = 0L
-        statsMap.forEach { (pkg, stat) ->
+        dailyUsageCache.forEach { (pkg, time) ->
             if (pkg !in excludePackages && pkg in launcherAppsCache) {
-                val time = stat.totalTimeVisible.coerceAtLeast(stat.totalTimeInForeground)
                 if (time > 0) {
                     totalToday += time
                 }
@@ -1060,29 +1064,56 @@ class AppUsageMonitorService : Service() {
         }
 
         val startTime = getStartOfDay()
+        val timeSinceMidnight = currentTime - startTime
 
         try {
-            val statsMap = usageStatsManager.queryAndAggregateUsageStats(startTime, currentTime)
-            
-            if (statsMap != null && statsMap.isNotEmpty()) {
-                val tempUsageMap = mutableMapOf<String, Long>()
-                val statsList = mutableListOf<android.app.usage.UsageStats>()
+            val tempUsageMap = mutableMapOf<String, Long>()
+            val statsList = mutableListOf<android.app.usage.UsageStats>()
+
+            if (timeSinceMidnight < 3 * 3600000) {
+                val events = usageStatsManager.queryEvents(startTime, currentTime)
+                val event = android.app.usage.UsageEvents.Event()
+                val lastResumed = mutableMapOf<String, Long>()
                 
-                statsMap.forEach { (pkg, stat) ->
-                    val time = stat.totalTimeVisible.coerceAtLeast(stat.totalTimeInForeground)
-                    if (time > 0) {
-                        tempUsageMap[pkg] = time
-                        statsList.add(stat)
+                while (events.hasNextEvent()) {
+                    events.getNextEvent(event)
+                    val pkg = event.packageName
+                    when (event.eventType) {
+                        android.app.usage.UsageEvents.Event.ACTIVITY_RESUMED -> lastResumed[pkg] = event.timeStamp
+                        android.app.usage.UsageEvents.Event.ACTIVITY_PAUSED -> {
+                            val start = lastResumed.remove(pkg)
+                            if (start != null) {
+                                tempUsageMap[pkg] = (tempUsageMap[pkg] ?: 0L) + (event.timeStamp - start)
+                            }
+                        }
                     }
                 }
-
-                dailyUsageCache.clear()
-                dailyUsageCache.putAll(tempUsageMap)
-                usageStatsCache = statsList
+                lastResumed.forEach { (pkg, start) ->
+                    tempUsageMap[pkg] = (tempUsageMap[pkg] ?: 0L) + (currentTime - start)
+                }
+                
+                usageStatsManager.queryAndAggregateUsageStats(startTime, currentTime)?.forEach { (_, stat) ->
+                    statsList.add(stat)
+                }
             } else {
-                dailyUsageCache.clear()
-                usageStatsCache = emptyList()
+                val statsMap = usageStatsManager.queryAndAggregateUsageStats(startTime, currentTime)
+                if (statsMap != null && statsMap.isNotEmpty()) {
+                    statsMap.forEach { (pkg, stat) ->
+                        var time = stat.totalTimeVisible.coerceAtLeast(stat.totalTimeInForeground)
+                        if (time > timeSinceMidnight + 10000) {
+                            time = timeSinceMidnight 
+                        }
+                        if (time > 0) {
+                            tempUsageMap[pkg] = time
+                            statsList.add(stat)
+                        }
+                    }
+                }
             }
+
+            dailyUsageCache.clear()
+            dailyUsageCache.putAll(tempUsageMap)
+            usageStatsCache = statsList
         } catch (e: Exception) {
             usageStatsCache = null
         }
@@ -1092,17 +1123,12 @@ class AppUsageMonitorService : Service() {
     }
 
     private fun getStartOfDay(): Long {
-        val calendar = Calendar.getInstance()
-        val today = calendar.get(Calendar.DAY_OF_YEAR)
-        if (today != lastStartOfDayDate) {
-            calendar.set(Calendar.HOUR_OF_DAY, 0)
-            calendar.set(Calendar.MINUTE, 0)
-            calendar.set(Calendar.SECOND, 0)
-            calendar.set(Calendar.MILLISECOND, 0)
-            cachedStartOfDay = calendar.timeInMillis
-            lastStartOfDayDate = today
-        }
-        return cachedStartOfDay
+        return Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
     }
 
     private fun goToHomeScreen() {
