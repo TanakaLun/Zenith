@@ -216,6 +216,7 @@ class UsageSyncManager(
                     )
                 }
             }
+            carryOver.clear()
             if (dateIdx > 100) break 
         }
 
