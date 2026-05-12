@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
@@ -31,6 +32,9 @@ import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import com.etrisad.zenith.data.preferences.UserPreferencesRepository
+import com.etrisad.zenith.ui.components.TooltipArrowPosition
+import com.etrisad.zenith.ui.components.ZenithTooltipBox
 import com.etrisad.zenith.ui.theme.ZenithTheme
 import kotlinx.coroutines.*
 import kotlin.math.roundToInt
@@ -38,6 +42,7 @@ import kotlin.math.roundToInt
 class SessionUsageOverlayManager(private val context: Context) {
 
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+    private val preferencesRepository = UserPreferencesRepository(context)
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
@@ -72,6 +77,7 @@ class SessionUsageOverlayManager(private val context: Context) {
         val secondsElapsedState = mutableIntStateOf(initialSeconds)
         val secondsLeftState = mutableIntStateOf(if (isGoal) (totalSeconds - initialSeconds).coerceAtLeast(0) else totalSeconds)
         val isVisibleState = mutableStateOf(true)
+        val isTemporarilyHiddenState = mutableStateOf(false)
         @Volatile
         var hudInstance: HUDInstance? = null
         var timerJob: Job? = null
@@ -191,14 +197,21 @@ class SessionUsageOverlayManager(private val context: Context) {
 
         val composeView = ComposeView(context).apply {
             setContent {
-                ZenithTheme {
+                val userPrefs by preferencesRepository.userPreferencesFlow.collectAsState(initial = null)
+                
+                ZenithTheme(
+                    fontOption = userPrefs?.fontOption ?: com.etrisad.zenith.data.preferences.FontOption.SYSTEM,
+                    dynamicColor = userPrefs?.dynamicColor ?: true,
+                    expressiveColors = userPrefs?.expressiveColors ?: false
+                ) {
                     SessionUsageHUD(
                         secondsLeftProvider = { if (session.isGoal) session.secondsElapsedState.intValue else session.secondsLeftState.intValue },
                         totalSeconds = session.totalSeconds,
                         size = session.size,
                         opacity = session.opacity,
-                        isVisibleProvider = { session.isVisibleState.value },
+                        isVisibleProvider = { session.isVisibleState.value && !session.isTemporarilyHiddenState.value },
                         isGoal = session.isGoal,
+                        preferencesRepository = preferencesRepository,
                         onDrag = { dx, dy ->
                             params.x += dx.roundToInt()
                             params.y += dy.roundToInt()
@@ -208,14 +221,24 @@ class SessionUsageOverlayManager(private val context: Context) {
                                 windowManager.updateViewLayout(this, params)
                             } catch (_: Exception) { }
                         },
+                        onHideTemporarily = {
+                            session.isTemporarilyHiddenState.value = true
+                            scope.launch {
+                                delay(30000)
+                                session.isTemporarilyHiddenState.value = false
+                                updateForegroundApp(currentForegroundPackage, force = true)
+                            }
+                        },
                         onFinish = {
                             val isTimeUp = if (session.isGoal) 
                                 session.secondsElapsedState.intValue >= session.totalSeconds 
                                 else session.secondsLeftState.intValue <= 0
                                 
+                            val shouldBeVisible = session.isVisibleState.value && !session.isTemporarilyHiddenState.value
+                                
                             if (isTimeUp) {
                                 hideHUD(session.packageName)
-                            } else if (!session.isVisibleState.value) {
+                            } else if (!shouldBeVisible) {
                                 session.hudInstance?.let { destroyHUDInstance(it) }
                                 session.hudInstance = null
                             }
@@ -283,9 +306,9 @@ class SessionUsageOverlayManager(private val context: Context) {
         }
     }
 
-    fun updateForegroundApp(packageName: String) {
+    fun updateForegroundApp(packageName: String, force: Boolean = false) {
         if (packageName.isEmpty() || SYSTEM_UI_PACKAGES.contains(packageName)) return
-        if (currentForegroundPackage == packageName) return
+        if (!force && currentForegroundPackage == packageName) return
         currentForegroundPackage = packageName
         
         foregroundUpdateJob?.cancel()
@@ -298,7 +321,7 @@ class SessionUsageOverlayManager(private val context: Context) {
                 if (isForeground) {
                     session.backgroundTimestamp = 0L
                     session.isVisibleState.value = true
-                    if (session.hudInstance == null && ((!session.isGoal && session.secondsLeftState.intValue > 0) || (session.isGoal && session.secondsElapsedState.intValue < session.totalSeconds))) {
+                    if (session.hudInstance == null && !session.isTemporarilyHiddenState.value && ((!session.isGoal && session.secondsLeftState.intValue > 0) || (session.isGoal && session.secondsElapsedState.intValue < session.totalSeconds))) {
                         session.hudInstance = createHUDInstance(session)
                     }
                 } else {
@@ -342,12 +365,27 @@ fun SessionUsageHUD(
     opacity: Int,
     isVisibleProvider: () -> Boolean,
     isGoal: Boolean = false,
+    preferencesRepository: UserPreferencesRepository,
     onDrag: (Float, Float) -> Unit,
+    onHideTemporarily: () -> Unit,
     onFinish: () -> Unit
 ) {
     CompositionLocalProvider(LocalRippleConfiguration provides null) {
         val entranceAnimationStarted = remember { mutableStateOf(false) }
         LaunchedEffect(Unit) { entranceAnimationStarted.value = true }
+
+        val userPrefs by preferencesRepository.userPreferencesFlow.collectAsState(initial = null)
+        val tooltipState = rememberTooltipState(isPersistent = true)
+        val scope = rememberCoroutineScope()
+
+        LaunchedEffect(userPrefs?.hudHideFeatureLearned) {
+            if (userPrefs?.hudHideFeatureLearned == false) {
+                delay(3000)
+                tooltipState.show()
+                delay(8000) // Show for 8 seconds
+                tooltipState.dismiss()
+            }
+        }
 
         val isCompleted = remember {
             derivedStateOf {
@@ -417,51 +455,68 @@ fun SessionUsageHUD(
         val baseSize = 80.dp
         val animationBuffer = 24.dp
 
-        Box(
-            modifier = Modifier
-                .size((baseSize + animationBuffer) * scaleFactor)
-                .pointerInput(scaleFactor) {
-                    detectDragGestures { change, dragAmount ->
-                        change.consume()
-                        onDrag(dragAmount.x, dragAmount.y)
-                    }
-                },
-            contentAlignment = Alignment.Center
+        ZenithTooltipBox(
+            tooltipText = "Double click to\nhide for 30s",
+            state = tooltipState,
+            arrowPosition = TooltipArrowPosition.StartCenter,
+            modifier = Modifier.offset(x = 12.dp)
         ) {
             Box(
                 modifier = Modifier
-                    .requiredSize(baseSize + animationBuffer)
-                    .graphicsLayer {
-                        val scale = scaleState.value * celebrationScale.value
-                        scaleX = scale
-                        scaleY = scale
-                        alpha = if (scaleFactor > 0f) (scale / scaleFactor).coerceIn(0f, 1f) * (opacity / 100f) else 0f
-                        transformOrigin = TransformOrigin.Center
+                    .size((baseSize + animationBuffer) * scaleFactor)
+                    .pointerInput(scaleFactor) {
+                        detectDragGestures { change, dragAmount ->
+                            change.consume()
+                            onDrag(dragAmount.x, dragAmount.y)
+                        }
+                    }
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onDoubleTap = {
+                                onHideTemporarily()
+                                scope.launch {
+                                    preferencesRepository.setHudHideFeatureLearned(true)
+                                }
+                            }
+                        )
                     },
                 contentAlignment = Alignment.Center
             ) {
                 Box(
                     modifier = Modifier
-                        .requiredSize(baseSize)
-                        .background(hudColors.surface, CircleShape)
-                        .clip(CircleShape),
+                        .requiredSize(baseSize + animationBuffer)
+                        .graphicsLayer {
+                            val scale = scaleState.value * celebrationScale.value
+                            scaleX = scale
+                            scaleY = scale
+                            alpha = if (scaleFactor > 0f) (scale / scaleFactor).coerceIn(0f, 1f) * (opacity / 100f) else 0f
+                            transformOrigin = TransformOrigin.Center
+                        },
                     contentAlignment = Alignment.Center
                 ) {
-                    HUDProgress(
-                        secondsLeftProvider = secondsLeftProvider,
-                        totalSeconds = totalSeconds,
-                        color = hudColors.primary,
-                        tertiaryColor = hudColors.tertiary,
-                        trackColor = hudColors.track,
-                        isCompleted = isCompleted.value && isGoal
-                    )
+                    Box(
+                        modifier = Modifier
+                            .requiredSize(baseSize)
+                            .background(hudColors.surface, CircleShape)
+                            .clip(CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        HUDProgress(
+                            secondsLeftProvider = secondsLeftProvider,
+                            totalSeconds = totalSeconds,
+                            color = hudColors.primary,
+                            tertiaryColor = hudColors.tertiary,
+                            trackColor = hudColors.track,
+                            isCompleted = isCompleted.value && isGoal
+                        )
 
-                    HUDTimerText(
-                        secondsProvider = secondsLeftProvider,
-                        isCompleted = isCompleted.value && isGoal,
-                        color = if (isCompleted.value && isGoal) hudColors.tertiary else hudColors.onSurface,
-                        iconColor = if (isCompleted.value && isGoal) hudColors.tertiary else hudColors.onSurface
-                    )
+                        HUDTimerText(
+                            secondsProvider = secondsLeftProvider,
+                            isCompleted = isCompleted.value && isGoal,
+                            color = if (isCompleted.value && isGoal) hudColors.tertiary else hudColors.onSurface,
+                            iconColor = if (isCompleted.value && isGoal) hudColors.tertiary else hudColors.onSurface
+                        )
+                    }
                 }
             }
         }
