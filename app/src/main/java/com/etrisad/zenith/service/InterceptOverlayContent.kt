@@ -174,7 +174,7 @@ fun InterceptOverlayContent(
     val autoKickProgress = remember(packageName) { Animatable(0f) }
     var isEmergencyHolding by remember(packageName) { mutableStateOf(false) }
 
-    LaunchedEffect(isBlocked, isDelaying, isEmergencyHolding, isEmergencyUnlocked) {
+    LaunchedEffect(packageName, isBlocked, isDelaying, isEmergencyHolding, isEmergencyUnlocked) {
         if (isBlocked) {
             if (!isEmergencyHolding) {
                 autoKickProgress.snapTo(0f)
@@ -194,10 +194,14 @@ fun InterceptOverlayContent(
         } else if (!isDelaying && !isEmergencyUnlocked && (shield?.type == FocusType.SHIELD || shield == null)) {
             autoKickProgress.snapTo(0f)
             delay(8000)
+            
+            if (isDelaying || isEmergencyUnlocked) return@LaunchedEffect
+
             autoKickProgress.animateTo(
                 targetValue = 1f,
                 animationSpec = tween(durationMillis = 5000, easing = LinearEasing)
             )
+            
             if (showContent) {
                 showContent = false
                 delay(300)
@@ -1378,10 +1382,12 @@ fun ScheduleOverlayContent(
         showContent = true
     }
 
-    LaunchedEffect(isEmergencyUnlocked, isEmergencyHolding) {
+    LaunchedEffect(packageName, isEmergencyUnlocked, isEmergencyHolding) {
         if (!isEmergencyUnlocked) {
             if (!isEmergencyHolding) {
                 delay(2000)
+                if (isEmergencyUnlocked || isEmergencyHolding) return@LaunchedEffect
+
                 autoKickProgress.snapTo(0f)
                 autoKickProgress.animateTo(
                     targetValue = 1f,
