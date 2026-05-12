@@ -159,10 +159,6 @@ class SessionUsageOverlayManager(private val context: Context) {
                     }
                     lastUpdateMillis = now - (elapsedMillis % 1000)
                 }
-
-                if (isGoal) {
-                    session.secondsElapsedState.intValue = session.lastReportedUsageSeconds
-                }
             }
             
             if (session.hudInstance == null) {
@@ -279,7 +275,9 @@ class SessionUsageOverlayManager(private val context: Context) {
         synchronized(activeSessions) {
             activeSessions.find { it.packageName == packageName }?.let { session ->
                 if (session.isGoal) {
-                    session.lastReportedUsageSeconds = (usageMillis / 1000).toInt()
+                    val seconds = (usageMillis / 1000).toInt()
+                    session.lastReportedUsageSeconds = seconds
+                    session.secondsElapsedState.intValue = seconds
                 }
             }
         }
