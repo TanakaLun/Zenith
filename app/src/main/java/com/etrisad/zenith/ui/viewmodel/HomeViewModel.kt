@@ -125,6 +125,7 @@ data class UsageHistoryGroup(
     val otherTotalMillis: Long = 0L
 )
 
+@OptIn(kotlinx.coroutines.FlowPreview::class)
 class HomeViewModel(
     context: Context,
     private val shieldRepository: ShieldRepository,
@@ -314,9 +315,11 @@ class HomeViewModel(
 
     init {
         viewModelScope.launch {
-            shieldRepository.allShields.collect { shields ->
-                allShields = shields
-                updateShieldedLists()
+            shieldRepository.allShields
+                .debounce(5000)
+                .collect { shields ->
+                    allShields = shields
+                    updateShieldedLists()
 
                 val currentPkg = _appDetailUiState.value.packageName
                 if (currentPkg.isNotEmpty()) {
@@ -334,22 +337,28 @@ class HomeViewModel(
         }
 
         viewModelScope.launch {
-            shieldRepository.getAllUsage().collect { history ->
-                allHistory = history
-                refreshUsageStats(showLoading = false)
-            }
+            shieldRepository.getAllUsage()
+                .debounce(5000)
+                .collect { history ->
+                    allHistory = history
+                    refreshUsageStats(showLoading = false)
+                }
         }
 
         viewModelScope.launch {
-            shieldRepository.getLastNDaysGlobalUsage(60).collect { history ->
-                globalHistory = history
-                updateGlobalFallback()
-                refreshUsageStats(showLoading = false)
-            }
+            shieldRepository.getLastNDaysGlobalUsage(60)
+                .debounce(5000)
+                .collect { history ->
+                    globalHistory = history
+                    updateGlobalFallback()
+                    refreshUsageStats(showLoading = false)
+                }
         }
 
         viewModelScope.launch {
-            userPreferencesRepository.userPreferencesFlow.collect { prefs ->
+            userPreferencesRepository.userPreferencesFlow
+                .debounce(2000)
+                .collect { prefs ->
                 currentTargetMinutes = prefs.screenTimeTargetMinutes
                 prefGlobalBestStreak = prefs.globalBestStreak
                 preferSystemUsageHistory = prefs.preferSystemUsageHistory
@@ -1246,7 +1255,7 @@ class HomeViewModel(
         viewModelScope.launch {
             var lastUpdateDay = Calendar.getInstance().get(Calendar.DAY_OF_YEAR)
             while (true) {
-                delay(10000)
+                delay(15000) // Lowered refresh rate to 15 seconds
                 val currentDay = Calendar.getInstance().get(Calendar.DAY_OF_YEAR)
                 if (currentDay != lastUpdateDay) {
                     val today = getMidnight(0)

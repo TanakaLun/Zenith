@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -51,6 +52,7 @@ data class FocusUiState(
     val selectedSchedules: Set<Long> = emptySet()
 )
 
+@OptIn(kotlinx.coroutines.FlowPreview::class)
 class FocusViewModel(
     private val context: Context,
     private val shieldRepository: ShieldRepository,
@@ -65,21 +67,27 @@ class FocusViewModel(
 
     init {
         viewModelScope.launch {
-            shieldRepository.allShields.collect { shields ->
-                allShields = shields
-                updateShieldedLists()
-                updateInstalledAppsFilter()
-            }
+            shieldRepository.allShields
+                .debounce(5000)
+                .collect { shields ->
+                    allShields = shields
+                    updateShieldedLists()
+                    updateInstalledAppsFilter()
+                }
         }
         viewModelScope.launch {
-            shieldRepository.allSchedules.collect { schedules ->
-                _uiState.value = _uiState.value.copy(activeSchedules = schedules)
-            }
+            shieldRepository.allSchedules
+                .debounce(5000)
+                .collect { schedules ->
+                    _uiState.value = _uiState.value.copy(activeSchedules = schedules)
+                }
         }
         viewModelScope.launch {
-            preferencesRepository.userPreferencesFlow.collect {
-                loadInstalledApps()
-            }
+            preferencesRepository.userPreferencesFlow
+                .debounce(2000)
+                .collect {
+                    loadInstalledApps()
+                }
         }
         startRealTimeUpdates()
     }
@@ -118,7 +126,7 @@ class FocusViewModel(
     private fun startRealTimeUpdates() {
         viewModelScope.launch {
             while (true) {
-                kotlinx.coroutines.delay(10000)
+                kotlinx.coroutines.delay(15000) // Lowered refresh rate to 15 seconds
                 updateShieldedLists()
             }
         }
