@@ -143,15 +143,20 @@ fun UsageGraph(
     }
     val pages = remember(history) { history.chunked(7) }
     val pageCount = pages.size.coerceAtLeast(1)
-    val initialPage = remember(history) { (pageCount - 1).coerceAtLeast(0) }
-    val pagerState = rememberPagerState(pageCount = { pageCount }, initialPage = initialPage)
+    
+    val pagerState = key(history.isNotEmpty()) {
+        rememberPagerState(
+            initialPage = (pageCount - 1).coerceAtLeast(0),
+            pageCount = { pageCount }
+        )
+    }
 
     LaunchedEffect(pagerState.currentPage) {
         onPageSelected(pagerState.currentPage)
     }
 
-    var hasInitializedPager by remember { mutableStateOf(false) }
-    LaunchedEffect(history, selectedDateMillis) {
+    var hasInitializedPager by remember(history.isNotEmpty()) { mutableStateOf(false) }
+    LaunchedEffect(history, selectedDateMillis, pagerState) {
         if (history.isNotEmpty()) {
             val targetIndex = if (selectedDateMillis != null) {
                 history.indexOfFirst { it.date == selectedDateMillis }
@@ -166,7 +171,17 @@ fun UsageGraph(
             }
 
             if (targetPage != -1 && targetPage != pagerState.currentPage) {
-                pagerState.animateScrollToPage(targetPage)
+                if (!hasInitializedPager) {
+                    pagerState.scrollToPage(targetPage)
+                } else {
+                    pagerState.animateScrollToPage(
+                        page = targetPage,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = Spring.StiffnessLow
+                        )
+                    )
+                }
             }
             hasInitializedPager = true
         }
