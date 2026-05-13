@@ -67,8 +67,8 @@ class FocusViewModel(
 
     init {
         viewModelScope.launch {
+            // Use a shorter debounce for the first load, then it will throttle subsequent rapid updates
             shieldRepository.allShields
-                .debounce(5000)
                 .collect { shields ->
                     allShields = shields
                     updateShieldedLists()
@@ -76,18 +76,14 @@ class FocusViewModel(
                 }
         }
         viewModelScope.launch {
-            shieldRepository.allSchedules
-                .debounce(5000)
-                .collect { schedules ->
-                    _uiState.value = _uiState.value.copy(activeSchedules = schedules)
-                }
+            shieldRepository.allSchedules.collect { schedules ->
+                _uiState.value = _uiState.value.copy(activeSchedules = schedules)
+            }
         }
         viewModelScope.launch {
-            preferencesRepository.userPreferencesFlow
-                .debounce(2000)
-                .collect {
-                    loadInstalledApps()
-                }
+            preferencesRepository.userPreferencesFlow.collect {
+                loadInstalledApps()
+            }
         }
         startRealTimeUpdates()
     }
@@ -126,8 +122,8 @@ class FocusViewModel(
     private fun startRealTimeUpdates() {
         viewModelScope.launch {
             while (true) {
-                kotlinx.coroutines.delay(15000) // Lowered refresh rate to 15 seconds
                 updateShieldedLists()
+                kotlinx.coroutines.delay(15000) // Wait 15 seconds AFTER update
             }
         }
     }
