@@ -5,6 +5,11 @@ import android.app.usage.UsageStatsManager
 import java.util.Calendar
 
 object ScreenUsageHelper {
+    /**
+     * Fetches accurate app usage for today by processing UsageEvents.
+     * Handles screen off events to prevent "hanging" sessions from inflating stats.
+     * Returns a map of package names to usage time in MILLISECONDS.
+     */
     fun fetchAppUsageTodayTillNow(usageStatsManager: UsageStatsManager): Map<String, Long> {
         val calendar = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 0)
@@ -16,33 +21,66 @@ object ScreenUsageHelper {
         val end = System.currentTimeMillis()
 
         val usageMap = mutableMapOf<String, Long>()
-        val lastResumedEvents = mutableMapOf<String, Long>()
+        val lastEventTime = mutableMapOf<String, Long>()
         
-        val events = usageStatsManager.queryEvents(start - (3 * 3600000), end)
+        // Use a 24-hour buffer to catch sessions starting before midnight
+        val events = usageStatsManager.queryEvents(start - (24 * 60 * 60 * 1000L), end)
         val event = UsageEvents.Event()
+        
+        var isScreenOn = true 
 
         while (events.hasNextEvent()) {
             events.getNextEvent(event)
+            val pkg = event.packageName
+            val time = event.timeStamp
+            
             when (event.eventType) {
-                UsageEvents.Event.ACTIVITY_RESUMED -> lastResumedEvents[event.packageName] = event.timeStamp
-                UsageEvents.Event.ACTIVITY_PAUSED -> {
-                    lastResumedEvents.remove(event.packageName)?.let { resumeTime ->
-                        if (event.timeStamp > start) {
-                            val duration = event.timeStamp - maxOf(resumeTime, start)
-                            usageMap[event.packageName] = usageMap.getOrDefault(event.packageName, 0L) + duration
+                UsageEvents.Event.SCREEN_INTERACTIVE -> {
+                    isScreenOn = true
+                }
+                UsageEvents.Event.SCREEN_NON_INTERACTIVE -> {
+                    isScreenOn = false
+                    // When screen goes off, end all active sessions
+                    lastEventTime.forEach { (p, startTime) ->
+                        val segmentStart = maxOf(startTime, start)
+                        val segmentEnd = minOf(time, end)
+                        if (segmentStart < segmentEnd) {
+                            usageMap[p] = (usageMap[p] ?: 0L) + (segmentEnd - segmentStart)
+                        }
+                    }
+                    lastEventTime.clear()
+                }
+                UsageEvents.Event.ACTIVITY_RESUMED,
+                UsageEvents.Event.MOVE_TO_FOREGROUND -> {
+                    if (isScreenOn) {
+                        // Usually only one app can be resumed, but we track per package just in case
+                        lastEventTime[pkg] = time
+                    }
+                }
+                UsageEvents.Event.ACTIVITY_PAUSED,
+                UsageEvents.Event.MOVE_TO_BACKGROUND -> {
+                    lastEventTime.remove(pkg)?.let { startTime ->
+                        val segmentStart = maxOf(startTime, start)
+                        val segmentEnd = minOf(time, end)
+                        if (segmentStart < segmentEnd) {
+                            usageMap[pkg] = (usageMap[pkg] ?: 0L) + (segmentEnd - segmentStart)
                         }
                     }
                 }
             }
         }
         
-        lastResumedEvents.forEach { (packageName, resumeTime) ->
-            if (end > start) {
-                val duration = end - maxOf(resumeTime, start)
-                usageMap[packageName] = usageMap.getOrDefault(packageName, 0L) + duration
+        // Handle app currently in foreground if screen is still on
+        if (isScreenOn) {
+            lastEventTime.forEach { (pkg, startTime) ->
+                val segmentStart = maxOf(startTime, start)
+                val segmentEnd = end
+                if (segmentStart < segmentEnd) {
+                    usageMap[pkg] = (usageMap[pkg] ?: 0L) + (segmentEnd - segmentStart)
+                }
             }
         }
 
-        return usageMap.mapValues { it.value / 1000 }
+        return usageMap
     }
 }

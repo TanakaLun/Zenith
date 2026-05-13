@@ -1101,8 +1101,8 @@ class AppUsageMonitorService : Service() {
 
             // Always use the accurate helper for today's app usage to ensure midnight reset is perfect
             val accurateUsageMap = com.etrisad.zenith.util.ScreenUsageHelper.fetchAppUsageTodayTillNow(usageStatsManager)
-            accurateUsageMap.forEach { (pkg, seconds) ->
-                tempUsageMap[pkg] = seconds * 1000L
+            accurateUsageMap.forEach { (pkg, millis) ->
+                tempUsageMap[pkg] = millis
             }
             
             // Still query aggregate stats for other metadata if needed, but the time is taken from accurateUsageMap

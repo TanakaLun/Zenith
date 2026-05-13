@@ -101,7 +101,7 @@ class FocusViewModel(
         val accurateUsageMap = com.etrisad.zenith.util.ScreenUsageHelper.fetchAppUsageTodayTillNow(usm)
 
         val liveShields = allShields.map { shield ->
-            val usage = (accurateUsageMap[shield.packageName] ?: 0L) * 1000L
+            val usage = accurateUsageMap[shield.packageName] ?: 0L
             val limitMillis = shield.timeLimitMinutes * 60 * 1000L
             shield.copy(remainingTimeMillis = (limitMillis - usage).coerceAtLeast(0L))
         }
@@ -321,7 +321,7 @@ class FocusViewModel(
     private fun getUsageTodayForPackage(packageName: String): Long {
         val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as android.app.usage.UsageStatsManager
         val accurateUsageMap = com.etrisad.zenith.util.ScreenUsageHelper.fetchAppUsageTodayTillNow(usm)
-        return (accurateUsageMap[packageName] ?: 0L) * 1000L
+        return accurateUsageMap[packageName] ?: 0L
     }
 
     fun closeSettingsSheet() {

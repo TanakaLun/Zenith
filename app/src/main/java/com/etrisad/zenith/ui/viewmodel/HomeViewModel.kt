@@ -536,31 +536,101 @@ class HomeViewModel(
             val cal = Calendar.getInstance()
 
             val accurateAppTotals = mutableMapOf<String, Long>()
+            var isScreenOn = true 
 
             while (events.hasNextEvent()) {
                 events.getNextEvent(event)
                 val pkg = event.packageName
-                if (pkg in excludePackages || pkg !in launcherApps) continue
-                
                 val time = event.timeStamp
-                if (event.eventType == android.app.usage.UsageEvents.Event.MOVE_TO_FOREGROUND) {
-                    lastEventTime[pkg] = time
-                    if (time in dayStart..dayEnd) {
-                        appSessionCounts[pkg] = (appSessionCounts[pkg] ?: 0) + 1
+                val type = event.eventType
+
+                when (type) {
+                    android.app.usage.UsageEvents.Event.SCREEN_INTERACTIVE -> isScreenOn = true
+                    android.app.usage.UsageEvents.Event.SCREEN_NON_INTERACTIVE -> {
+                        isScreenOn = false
+                        lastEventTime.forEach { (p, startTime) ->
+                            val segmentStart = maxOf(startTime, dayStart)
+                            val segmentEnd = minOf(time, dayEnd)
+                            if (segmentStart < segmentEnd) {
+                                val duration = segmentEnd - segmentStart
+                                accurateAppTotals[p] = (accurateAppTotals[p] ?: 0L) + duration
+                                
+                                var current = segmentStart
+                                while (current < segmentEnd) {
+                                    cal.timeInMillis = current
+                                    val hour = cal.get(Calendar.HOUR_OF_DAY)
+                                    val nextHourStart = (cal.clone() as Calendar).apply {
+                                        add(Calendar.HOUR_OF_DAY, 1)
+                                        set(Calendar.MINUTE, 0)
+                                        set(Calendar.SECOND, 0)
+                                        set(Calendar.MILLISECOND, 0)
+                                    }.timeInMillis
+                                    
+                                    val end = minOf(segmentEnd, nextHourStart)
+                                    val d = end - current
+                                    if (d > 0) {
+                                        val pkgMap = hourlyAppUsage.getOrPut(hour) { mutableMapOf() }
+                                        pkgMap[p] = (pkgMap[p] ?: 0L) + d
+                                    }
+                                    current = end
+                                }
+                            }
+                        }
+                        lastEventTime.clear()
                     }
-                } else if (event.eventType == android.app.usage.UsageEvents.Event.ACTIVITY_RESUMED) {
-                    lastEventTime[pkg] = time
-                } else if (event.eventType == android.app.usage.UsageEvents.Event.MOVE_TO_BACKGROUND || 
-                           event.eventType == android.app.usage.UsageEvents.Event.ACTIVITY_PAUSED) {
-                    val startTime = lastEventTime.remove(pkg) ?: continue
-                    
+                    android.app.usage.UsageEvents.Event.MOVE_TO_FOREGROUND,
+                    android.app.usage.UsageEvents.Event.ACTIVITY_RESUMED -> {
+                        if (pkg in excludePackages || pkg !in launcherApps) continue
+                        if (isScreenOn) {
+                            lastEventTime[pkg] = time
+                            if (time in dayStart..dayEnd && type == android.app.usage.UsageEvents.Event.MOVE_TO_FOREGROUND) {
+                                appSessionCounts[pkg] = (appSessionCounts[pkg] ?: 0) + 1
+                            }
+                        }
+                    }
+                    android.app.usage.UsageEvents.Event.MOVE_TO_BACKGROUND,
+                    android.app.usage.UsageEvents.Event.ACTIVITY_PAUSED -> {
+                        val startTime = lastEventTime.remove(pkg) ?: continue
+                        
+                        val segmentStart = maxOf(startTime, dayStart)
+                        val segmentEnd = minOf(time, dayEnd)
+                        
+                        if (segmentStart < segmentEnd) {
+                            val duration = segmentEnd - segmentStart
+                            accurateAppTotals[pkg] = (accurateAppTotals[pkg] ?: 0L) + duration
+                            
+                            var current = segmentStart
+                            while (current < segmentEnd) {
+                                cal.timeInMillis = current
+                                val hour = cal.get(Calendar.HOUR_OF_DAY)
+                                val nextHourStart = (cal.clone() as Calendar).apply {
+                                    add(Calendar.HOUR_OF_DAY, 1)
+                                    set(Calendar.MINUTE, 0)
+                                    set(Calendar.SECOND, 0)
+                                    set(Calendar.MILLISECOND, 0)
+                                }.timeInMillis
+                                
+                                val end = minOf(segmentEnd, nextHourStart)
+                                val d = end - current
+                                if (d > 0) {
+                                    val pkgMap = hourlyAppUsage.getOrPut(hour) { mutableMapOf() }
+                                    pkgMap[pkg] = (pkgMap[pkg] ?: 0L) + d
+                                }
+                                current = end
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (isScreenOn) {
+                lastEventTime.forEach { (pkg, startTime) ->
                     val segmentStart = maxOf(startTime, dayStart)
-                    val segmentEnd = minOf(time, dayEnd)
-                    
+                    val segmentEnd = dayEnd
                     if (segmentStart < segmentEnd) {
                         val duration = segmentEnd - segmentStart
                         accurateAppTotals[pkg] = (accurateAppTotals[pkg] ?: 0L) + duration
-                        
+
                         var current = segmentStart
                         while (current < segmentEnd) {
                             cal.timeInMillis = current
@@ -584,62 +654,22 @@ class HomeViewModel(
                 }
             }
 
-            lastEventTime.forEach { (pkg, startTime) ->
-                val segmentStart = maxOf(startTime, dayStart)
-                val segmentEnd = dayEnd
-                if (segmentStart < segmentEnd) {
-                    val duration = segmentEnd - segmentStart
-                    accurateAppTotals[pkg] = (accurateAppTotals[pkg] ?: 0L) + duration
-
-                    var current = segmentStart
-                    while (current < segmentEnd) {
-                        cal.timeInMillis = current
-                        val hour = cal.get(Calendar.HOUR_OF_DAY)
-                        val nextHourStart = (cal.clone() as Calendar).apply {
-                            add(Calendar.HOUR_OF_DAY, 1)
-                            set(Calendar.MINUTE, 0)
-                            set(Calendar.SECOND, 0)
-                            set(Calendar.MILLISECOND, 0)
-                        }.timeInMillis
-                        
-                        val end = minOf(segmentEnd, nextHourStart)
-                        val d = end - current
-                        if (d > 0) {
-                            val pkgMap = hourlyAppUsage.getOrPut(hour) { mutableMapOf() }
-                            pkgMap[pkg] = (pkgMap[pkg] ?: 0L) + d
-                        }
-                        current = end
+            if (isSelectedToday) {
+                // For today, ONLY use event-based totals to avoid any sticky aggregate stats
+                accurateAppTotals.forEach { (pkg, time) ->
+                    if (pkg !in excludePackages && pkg in launcherApps) {
+                        val cappedTime = time.coerceAtMost(timeSinceMidnight + 5000)
+                        if (cappedTime > 0) appTotals[pkg] = cappedTime
                     }
                 }
-            }
-
-            val dayStats = if (isSelectedToday) trueTodayStats else usm.queryAndAggregateUsageStats(dayStart, dayEnd)
-            
-            dayStats.forEach { (pkg, stat) ->
-                if (pkg in excludePackages || pkg !in launcherApps) return@forEach
-                var time = stat.totalTimeVisible.coerceAtLeast(stat.totalTimeInForeground)
-                
-                // For today, use the more accurate event-based totals if available
-                val eventTime = accurateAppTotals[pkg]
-                if (isSelectedToday && eventTime != null) {
-                    time = eventTime
-                }
-
-                if (isSelectedToday && time > timeSinceMidnight + 5000) {
-                    time = timeSinceMidnight
-                }
-                if (time > 0) appTotals[pkg] = time
-            }
-
-            // Also include apps only found in events but not in aggregate stats
-            accurateAppTotals.forEach { (pkg, time) ->
-                if (pkg !in appTotals && pkg !in excludePackages && pkg in launcherApps) {
-                    appTotals[pkg] = if (isSelectedToday) time.coerceAtMost(timeSinceMidnight) else time
-                }
-            }
-
-            if (isSelectedToday) {
                 totalToday = appTotals.values.sum().coerceAtMost(timeSinceMidnight)
+            } else {
+                val dayStats = usm.queryAndAggregateUsageStats(dayStart, dayEnd)
+                dayStats.forEach { (pkg, stat) ->
+                    if (pkg in excludePackages || pkg !in launcherApps) return@forEach
+                    val time = stat.totalTimeVisible.coerceAtLeast(stat.totalTimeInForeground)
+                    if (time > 0) appTotals[pkg] = time
+                }
             }
 
 
@@ -674,7 +704,7 @@ class HomeViewModel(
             val storedOtherUsage = selectedDayHistory.find { it.packageName == "OTHER_TOTAL" }?.usageTimeMillis
 
             val liveShields = allShields.map { shield ->
-                val usage = trueTodayStats.getUsageTime(shield.packageName)
+                val usage = if (isSelectedToday) (appTotals[shield.packageName] ?: 0L) else trueTodayStats.getUsageTime(shield.packageName)
                 val limitMillis = shield.timeLimitMinutes * 60 * 1000L
                 shield.copy(remainingTimeMillis = (limitMillis - usage).coerceAtLeast(0L))
             }
@@ -704,29 +734,8 @@ class HomeViewModel(
                 val lockedHours = dbHourly.map { it.hour }.distinct().toSet()
                 for (h in 0 until currentHour) {
                     if (h !in lockedHours) {
-                        val startOfH = Calendar.getInstance().apply {
-                            timeInMillis = selectedDate
-                            set(Calendar.HOUR_OF_DAY, h)
-                            set(Calendar.MINUTE, 0)
-                            set(Calendar.SECOND, 0)
-                            set(Calendar.MILLISECOND, 0)
-                        }.timeInMillis
-                        
-                        val endOfH = Calendar.getInstance().apply {
-                            timeInMillis = selectedDate
-                            set(Calendar.HOUR_OF_DAY, h)
-                            set(Calendar.MINUTE, 59)
-                            set(Calendar.SECOND, 59)
-                            set(Calendar.MILLISECOND, 999)
-                        }.timeInMillis
-
-                        val statsUntilH = usm.queryAndAggregateUsageStats(dayStart, endOfH)
-                        val statsUntilPrevH = if (h == 0) emptyMap() else usm.queryAndAggregateUsageStats(dayStart, startOfH - 1)
-
                         appTotals.keys.forEach { pkg ->
-                            val totalUntilH = statsUntilH[pkg]?.let { it.totalTimeVisible.coerceAtLeast(it.totalTimeInForeground) } ?: 0L
-                            val totalUntilPrevH = statsUntilPrevH[pkg]?.let { it.totalTimeVisible.coerceAtLeast(it.totalTimeInForeground) } ?: 0L
-                            val diff = (totalUntilH - totalUntilPrevH).coerceAtLeast(0L)
+                            val diff = hourlyAppUsage[h]?.get(pkg) ?: 0L
                             
                             if (diff > 0) {
                                 newlyLocked.add(HourlyUsageEntity(
@@ -737,6 +746,18 @@ class HomeViewModel(
                                     lastUpdated = System.currentTimeMillis()
                                 ))
                             }
+                        }
+                        
+                        // Also add the TOTAL entry for this hour
+                        val hourTotal = hourlyAppUsage[h]?.values?.sum() ?: 0L
+                        if (hourTotal > 0) {
+                            newlyLocked.add(HourlyUsageEntity(
+                                date = selectedDateStr,
+                                hour = h,
+                                packageName = "TOTAL",
+                                usageTimeMillis = hourTotal,
+                                lastUpdated = System.currentTimeMillis()
+                            ))
                         }
                     }
                 }
@@ -840,15 +861,21 @@ class HomeViewModel(
                     val dEnd = if (i == 0) now else dStart + (24 * 60 * 60 * 1000L)
                     val dateStr = dateFormat.format(Date(dStart))
                     
-                    val dayStatsMap = if (i == 0) trueTodayStats else usm.queryAndAggregateUsageStats(dStart, dEnd)
-                    val topEntry = dayStatsMap.filter { (pkg, _) -> 
-                        pkg !in excludePackages && pkg in launcherApps 
-                    }.maxByOrNull { (_, stat) -> 
-                        stat.totalTimeVisible.coerceAtLeast(stat.totalTimeInForeground) 
+                    val topEntry = if (i == 0 && isSelectedToday) {
+                        appTotals.filter { (pkg, _) -> 
+                            pkg !in excludePackages && pkg in launcherApps 
+                        }.maxByOrNull { it.value }?.let { it.key to it.value }
+                    } else {
+                        val statsMap = if (i == 0) trueTodayStats else usm.queryAndAggregateUsageStats(dStart, dEnd)
+                        statsMap.filter { (pkg, _) -> 
+                            pkg !in excludePackages && pkg in launcherApps 
+                        }.maxByOrNull { (_, stat) -> 
+                            stat.totalTimeVisible.coerceAtLeast(stat.totalTimeInForeground) 
+                        }?.let { it.key to it.value.totalTimeVisible.coerceAtLeast(it.value.totalTimeInForeground) }
                     }
                     
-                    val topPackage = topEntry?.key
-                    var usageTime = topEntry?.value?.let { it.totalTimeVisible.coerceAtLeast(it.totalTimeInForeground) } ?: 0L
+                    val topPackage = topEntry?.first
+                    var usageTime = topEntry?.second ?: 0L
                     
                     if (i == 0 && usageTime > timeSinceMidnight + 10000) {
                         usageTime = timeSinceMidnight
