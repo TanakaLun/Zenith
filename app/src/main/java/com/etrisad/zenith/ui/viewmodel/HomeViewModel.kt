@@ -46,8 +46,12 @@ data class AppDetailUiState(
     val type: com.etrisad.zenith.data.local.entity.FocusType? = null,
     val todayUsage: Long = 0L,
     val yesterdayUsage: Long = 0L,
+    val averageUsage: Long = 0L,
+    val totalSessions: Int = 0,
+    val peakHour: Int = -1,
     val percentageChange: Float = 0f,
     val usageHistory: List<DailyUsage> = emptyList(),
+    val hourlyUsage: List<Long> = emptyList(),
     val currentStreak: Int = 0,
     val bestStreak: Int = 0,
     val shieldEntity: ShieldEntity? = null,
@@ -958,6 +962,72 @@ class HomeViewModel(
                 val currentTodayUsage = usm.queryAndAggregateUsageStats(todayStart, currentNow)
                     .getUsageTime(packageName)
 
+                // Fetch session count and hourly data for today
+                val events = usm.queryEvents(todayStart, currentNow)
+                val event = android.app.usage.UsageEvents.Event()
+                var sessionCount = 0
+                val appHourlyUsage = MutableList(24) { 0L }
+                val lastEventTime = mutableMapOf<String, Long>()
+                val cal = Calendar.getInstance()
+
+                while (events.hasNextEvent()) {
+                    events.getNextEvent(event)
+                    if (event.packageName != packageName) continue
+                    
+                    val time = event.timeStamp
+                    if (event.eventType == android.app.usage.UsageEvents.Event.MOVE_TO_FOREGROUND || 
+                        event.eventType == android.app.usage.UsageEvents.Event.ACTIVITY_RESUMED) {
+                        if (event.eventType == android.app.usage.UsageEvents.Event.MOVE_TO_FOREGROUND) {
+                            sessionCount++
+                        }
+                        lastEventTime[packageName] = time
+                    } else if (event.eventType == android.app.usage.UsageEvents.Event.MOVE_TO_BACKGROUND ||
+                               event.eventType == android.app.usage.UsageEvents.Event.ACTIVITY_PAUSED) {
+                        val startTime = lastEventTime.remove(packageName) ?: continue
+                        
+                        var current = startTime
+                        while (current < time) {
+                            cal.timeInMillis = current
+                            val hour = cal.get(Calendar.HOUR_OF_DAY)
+                            val nextHourStart = (cal.clone() as Calendar).apply {
+                                add(Calendar.HOUR_OF_DAY, 1)
+                                set(Calendar.MINUTE, 0)
+                                set(Calendar.SECOND, 0)
+                                set(Calendar.MILLISECOND, 0)
+                            }.timeInMillis
+                            
+                            val end = minOf(time, nextHourStart)
+                            if (end > current) {
+                                appHourlyUsage[hour] += (end - current)
+                            }
+                            current = end
+                        }
+                    }
+                }
+                
+                // Handle case where app is currently in foreground
+                lastEventTime[packageName]?.let { startTime ->
+                    var current = startTime
+                    while (current < currentNow) {
+                        cal.timeInMillis = current
+                        val hour = cal.get(Calendar.HOUR_OF_DAY)
+                        val nextHourStart = (cal.clone() as Calendar).apply {
+                            add(Calendar.HOUR_OF_DAY, 1)
+                            set(Calendar.MINUTE, 0)
+                            set(Calendar.SECOND, 0)
+                            set(Calendar.MILLISECOND, 0)
+                        }.timeInMillis
+                        
+                        val end = minOf(currentNow, nextHourStart)
+                        if (end > current) {
+                            appHourlyUsage[hour] += (end - current)
+                        }
+                        current = end
+                    }
+                }
+
+                val peakHour = appHourlyUsage.indices.maxByOrNull { appHourlyUsage[it] } ?: -1
+
                 val yesterdayCal = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }
                 val yesterdayDateStr = dateFormat.format(yesterdayCal.time)
 
@@ -988,6 +1058,10 @@ class HomeViewModel(
                     )
                 }
 
+                val avgUsage = if (history.any { it.totalTime > 0 }) {
+                    history.filter { it.totalTime > 0 }.map { it.totalTime }.average().toLong()
+                } else 0L
+
                 val percentageChange = when {
                     yesterdayUsage > 0 -> ((currentTodayUsage - yesterdayUsage).toFloat() / yesterdayUsage) * 100
                     currentTodayUsage > 0     -> 100f
@@ -1003,8 +1077,12 @@ class HomeViewModel(
                     type             = shield?.type,
                     todayUsage       = currentTodayUsage,
                     yesterdayUsage   = yesterdayUsage,
+                    averageUsage     = avgUsage,
+                    totalSessions    = sessionCount.coerceAtLeast(if (currentTodayUsage > 0) 1 else 0),
+                    peakHour         = peakHour,
                     percentageChange = percentageChange,
                     usageHistory     = history.reversed(),
+                    hourlyUsage      = appHourlyUsage,
                     currentStreak    = shield?.currentStreak ?: 0,
                     bestStreak       = shield?.bestStreak ?: 0,
                     shieldEntity     = shield,

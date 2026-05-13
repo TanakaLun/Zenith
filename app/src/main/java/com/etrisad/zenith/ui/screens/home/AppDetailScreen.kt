@@ -40,6 +40,8 @@ import com.etrisad.zenith.data.local.entity.ShieldEntity
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import com.etrisad.zenith.ui.components.ConfirmBottomSheet
 import com.etrisad.zenith.ui.components.UsageHistoryCard
 import com.etrisad.zenith.ui.components.focus.GoalSettingsBottomSheet
@@ -49,7 +51,7 @@ import com.etrisad.zenith.ui.viewmodel.HomeViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
-import java.util.Locale
+import java.util.*
 
 @Composable
 fun AppDetailScreen(
@@ -80,6 +82,8 @@ fun AppDetailScreen(
         it.isPaused && (it.pauseEndTimestamp == 0L || nowMillis < it.pauseEndTimestamp)
     } ?: false
     val targetMillis = shield?.timeLimitMinutes?.let { it * 60 * 1000L } ?: 0L
+
+    var selectedHour by remember { mutableStateOf<Int?>(null) }
 
     LazyColumn(
         modifier = Modifier
@@ -146,28 +150,56 @@ fun AppDetailScreen(
             }
 
             item {
-                if (uiState.usageHistory.isNotEmpty()) {
-                    UsageHistoryCard(
-                        history = uiState.usageHistory,
-                        targetMillis = targetMillis,
+                UsageHistoryCard(
+                    history = uiState.usageHistory,
+                    targetMillis = targetMillis,
+                    focusType = uiState.type,
+                    showDatabaseIndicator = preferences.showDatabaseIndicator,
+                    formatDuration = { viewModel.formatDuration(it) },
+                    onDaySelected = { },
+                    title = "History (21 Days)",
+                    shape = RoundedCornerShape(8.dp)
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+
+            item {
+                if (uiState.hourlyUsage.any { it > 0 }) {
+                    HourlyUsageChart(
+                        hourlyUsage = uiState.hourlyUsage,
+                        selectedHour = selectedHour,
+                        onHourClick = { selectedHour = if (selectedHour == it) null else it },
                         focusType = uiState.type,
-                        showDatabaseIndicator = preferences.showDatabaseIndicator,
                         formatDuration = { viewModel.formatDuration(it) },
-                        onDaySelected = { },
-                        title = "History (21 Days)",
-                        shape = RoundedCornerShape(
-                            topStart = 8.dp,
-                            topEnd = 8.dp,
-                            bottomStart = if (!isFocusActive) 24.dp else 8.dp,
-                            bottomEnd = if (!isFocusActive) 24.dp else 8.dp
-                        )
+                        bedtimeEnabled = preferences.bedtimeEnabled,
+                        bedtimeStartTime = preferences.bedtimeStartTime,
+                        bedtimeEndTime = preferences.bedtimeEndTime,
+                        bedtimeDays = preferences.bedtimeDays
                     )
-                } else {
-                    Box(modifier = Modifier.fillMaxWidth().height(250.dp))
-                }
-                if (isFocusActive) {
                     Spacer(modifier = Modifier.height(4.dp))
-                } else {
+                }
+            }
+
+            item {
+                SecondaryStatsRow(
+                    averageUsage = viewModel.formatDuration(uiState.averageUsage),
+                    totalSessions = uiState.totalSessions,
+                    shape = RoundedCornerShape(8.dp)
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+
+            item {
+                PeakHourCard(
+                    peakHour = uiState.peakHour,
+                    shape = RoundedCornerShape(
+                        topStart = 8.dp,
+                        topEnd = 8.dp,
+                        bottomStart = if (!isFocusActive) 24.dp else 8.dp,
+                        bottomEnd = if (!isFocusActive) 24.dp else 8.dp
+                    )
+                )
+                if (isFocusActive) {
                     Spacer(modifier = Modifier.height(4.dp))
                 }
             }
@@ -901,6 +933,284 @@ fun ResumeCard(
                         color = MaterialTheme.colorScheme.outline
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun SecondaryStatsRow(
+    averageUsage: String,
+    totalSessions: Int,
+    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(8.dp)
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Card(
+            modifier = Modifier.weight(1f),
+            shape = shape,
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+            )
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    "Daily Average",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    averageUsage,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        Card(
+            modifier = Modifier.weight(1f),
+            shape = shape,
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+            )
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    "Today's Opens",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Outlined.Launch,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        "$totalSessions",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PeakHourCard(
+    peakHour: Int,
+    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(8.dp)
+) {
+    if (peakHour != -1) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = shape,
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+            )
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Timeline,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        "Peak Usage Hour",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    val amPm = if (peakHour < 12) "AM" else "PM"
+                    val displayHour = when {
+                        peakHour == 0 -> 12
+                        peakHour > 12 -> peakHour - 12
+                        else -> peakHour
+                    }
+                    Text(
+                        "Most active around $displayHour $amPm",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun HourlyUsageChart(
+    hourlyUsage: List<Long>,
+    selectedHour: Int?,
+    onHourClick: (Int) -> Unit,
+    focusType: FocusType?,
+    formatDuration: (Long) -> String,
+    bedtimeEnabled: Boolean,
+    bedtimeStartTime: String,
+    bedtimeEndTime: String,
+    bedtimeDays: Set<Int>
+) {
+    val maxUsage = remember(hourlyUsage) { hourlyUsage.maxOrNull()?.coerceAtLeast(1L) ?: 1L }
+    val accentColor = if (focusType == FocusType.GOAL) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary
+
+    val isBedtimeHour = remember(bedtimeEnabled, bedtimeStartTime, bedtimeEndTime, bedtimeDays) {
+        val cal = Calendar.getInstance()
+        val todayDay = cal.get(Calendar.DAY_OF_WEEK)
+        
+        cal.add(Calendar.DAY_OF_YEAR, -1)
+        val yesterdayDay = cal.get(Calendar.DAY_OF_WEEK)
+        
+        val startH = bedtimeStartTime.split(":").firstOrNull()?.toIntOrNull() ?: 22
+        val endH = bedtimeEndTime.split(":").firstOrNull()?.toIntOrNull() ?: 7
+        
+        val todayActive = bedtimeEnabled && todayDay in bedtimeDays
+        val yesterdayActive = bedtimeEnabled && yesterdayDay in bedtimeDays
+        
+        { hour: Int ->
+            if (startH <= endH) {
+                todayActive && hour in startH until endH
+            } else {
+                (todayActive && hour >= startH) || (yesterdayActive && hour < endH)
+            }
+        }
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Outlined.Schedule,
+                        contentDescription = null,
+                        tint = accentColor,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Hourly Usage",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                AnimatedContent(
+                    targetState = selectedHour,
+                    transitionSpec = {
+                        (fadeIn(animationSpec = spring(stiffness = Spring.StiffnessLow)) + 
+                         slideInVertically(animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)) { it / 2 })
+                            .togetherWith(fadeOut(animationSpec = spring(stiffness = Spring.StiffnessLow)) + 
+                                         slideOutVertically(animationSpec = spring(stiffness = Spring.StiffnessLow)) { -it / 2 })
+                    },
+                    label = "SelectedHourText"
+                ) { hour ->
+                    if (hour != null) {
+                        val usage = hourlyUsage.getOrNull(hour) ?: 0L
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                text = String.format("%02d:00 - %02d:00", hour, (hour + 1) % 24),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = formatDuration(usage),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = accentColor
+                            )
+                        }
+                    } else {
+                        Text(
+                            text = "Tap a bar for details",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(100.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Bottom
+            ) {
+                val currentHour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+                
+                hourlyUsage.forEachIndexed { hour, usage ->
+                    val isSelected = selectedHour == hour
+                    val isCurrentHour = hour == currentHour
+                    
+                    val barHeight = (usage.toFloat() / maxUsage).coerceIn(0.05f, 1f)
+                    val animatedHeight by animateFloatAsState(
+                        targetValue = barHeight,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioLowBouncy,
+                            stiffness = Spring.StiffnessLow
+                        ),
+                        label = "HourlyBarHeight_$hour"
+                    )
+                    
+                    val isBedtime = isBedtimeHour(hour)
+                    val baseColor = if (isBedtime) MaterialTheme.colorScheme.tertiary else accentColor
+
+                    val barColor = when {
+                        isSelected -> baseColor
+                        isCurrentHour -> baseColor.copy(alpha = 0.7f)
+                        else -> baseColor.copy(alpha = 0.3f)
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 1.5.dp)
+                            .fillMaxHeight(animatedHeight)
+                            .clip(CircleShape)
+                            .background(barColor)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null
+                            ) { onHourClick(hour) }
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("00:00", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("12:00", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("23:59", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
