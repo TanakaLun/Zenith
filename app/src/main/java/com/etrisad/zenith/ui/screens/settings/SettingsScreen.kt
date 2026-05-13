@@ -98,6 +98,7 @@ fun SettingsScreen(
             uri?.let {
                 coroutineScope.launch {
                     BackupUtils.backupDatabase(context, it).onSuccess {
+                        preferencesRepository.setLastBackupTimestamp(System.currentTimeMillis())
                         Toast.makeText(context, "Backup successful!", Toast.LENGTH_SHORT).show()
                     }.onFailure { e ->
                         Toast.makeText(context, "Backup failed: ${e.message}", Toast.LENGTH_LONG).show()
@@ -530,6 +531,7 @@ fun SettingsScreenContent(
                         AutoBackupSettings(
                             directoryUri = preferences.backupDirectoryUri,
                             intervalHours = preferences.backupIntervalHours,
+                            lastBackupTimestamp = preferences.lastBackupTimestamp,
                             onPickDirectory = onPickBackupDirectory,
                             onSetInterval = onSetBackupInterval,
                             shape = RoundedCornerShape(8.dp)
@@ -1583,10 +1585,37 @@ fun SettingsActionItem(
 fun AutoBackupSettings(
     directoryUri: String,
     intervalHours: Int,
+    lastBackupTimestamp: Long,
     onPickDirectory: () -> Unit,
     onSetInterval: (Int) -> Unit,
     shape: Shape = RoundedCornerShape(8.dp)
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val readablePath = remember(directoryUri) {
+        if (directoryUri.isEmpty()) "Not selected"
+        else {
+            try {
+                val uri = android.net.Uri.parse(directoryUri)
+                val path = uri.path ?: ""
+                if (path.contains(":")) {
+                    path.substringAfterLast(":")
+                } else {
+                    path
+                }
+            } catch (e: Exception) {
+                "Selected Folder"
+            }
+        }
+    }
+
+    val lastBackupText = remember(lastBackupTimestamp) {
+        if (lastBackupTimestamp == 0L) "Never"
+        else {
+            val sdf = java.text.SimpleDateFormat("MMM d, yyyy HH:mm", java.util.Locale.getDefault())
+            sdf.format(java.util.Date(lastBackupTimestamp))
+        }
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = shape,
@@ -1606,10 +1635,14 @@ fun AutoBackupSettings(
 
             Surface(
                 onClick = onPickDirectory,
-                color = Color.Transparent,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Box(
                         modifier = Modifier
                             .size(40.dp)
@@ -1628,14 +1661,55 @@ fun AutoBackupSettings(
                     }
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Backup Location", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                        Text("Backup Location", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
                         Text(
-                            text = if (directoryUri.isEmpty()) "Not selected" else "Folder selected",
+                            text = readablePath,
                             style = MaterialTheme.typography.bodySmall,
-                            color = if (directoryUri.isEmpty()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                            color = if (directoryUri.isEmpty()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                         )
                     }
                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(
+                                MaterialTheme.colorScheme.secondaryContainer,
+                                CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.History,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column {
+                        Text("Last Backup", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = lastBackupText,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
 
@@ -1643,8 +1717,8 @@ fun AutoBackupSettings(
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Spacer(modifier = Modifier.height(16.dp))
 
-            Text("Backup Interval", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(16.dp))
+            Text("Backup Interval", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(12.dp))
             
             val intervals = listOf(3, 6, 12, 24)
             Row(

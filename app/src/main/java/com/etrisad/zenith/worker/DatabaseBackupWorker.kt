@@ -35,6 +35,9 @@ class DatabaseBackupWorker(
             val result = BackupUtils.backupDatabase(applicationContext, targetFile.uri)
 
             if (result.isSuccess) {
+                val app = applicationContext as com.etrisad.zenith.ZenithApplication
+                app.userPreferencesRepository.setLastBackupTimestamp(System.currentTimeMillis())
+
                 cleanupOldBackups(backupFolder)
                 sendNotification("Backup Successful", "Your data has been automatically backed up as $fileName")
                 Result.success()

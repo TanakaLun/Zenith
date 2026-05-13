@@ -47,6 +47,7 @@ class UserPreferencesRepository(private val context: Context) {
         val AUTO_BACKUP_ENABLED = booleanPreferencesKey("auto_backup_enabled")
         val BACKUP_DIRECTORY_URI = stringPreferencesKey("backup_directory_uri")
         val BACKUP_INTERVAL_HOURS = intPreferencesKey("backup_interval_hours")
+        val LAST_BACKUP_TIMESTAMP = longPreferencesKey("last_backup_timestamp")
         val FLOATING_TAB_BAR_ENABLED = booleanPreferencesKey("floating_tab_bar_enabled")
         val EXPRESSIVE_COLORS = booleanPreferencesKey("expressive_colors")
         val TOTAL_USAGE_PILL_ENABLED = booleanPreferencesKey("total_usage_pill_enabled")
@@ -105,6 +106,7 @@ class UserPreferencesRepository(private val context: Context) {
             val autoBackupEnabled = preferences[PreferencesKeys.AUTO_BACKUP_ENABLED] ?: false
             val backupDirectoryUri = preferences[PreferencesKeys.BACKUP_DIRECTORY_URI] ?: ""
             val backupIntervalHours = preferences[PreferencesKeys.BACKUP_INTERVAL_HOURS] ?: 3
+            val lastBackupTimestamp = preferences[PreferencesKeys.LAST_BACKUP_TIMESTAMP] ?: 0L
             val floatingTabBarEnabled = preferences[PreferencesKeys.FLOATING_TAB_BAR_ENABLED] ?: false
             val expressiveColors = preferences[PreferencesKeys.EXPRESSIVE_COLORS] ?: false
             val totalUsagePillEnabled = preferences[PreferencesKeys.TOTAL_USAGE_PILL_ENABLED] ?: false
@@ -150,6 +152,7 @@ class UserPreferencesRepository(private val context: Context) {
                 autoBackupEnabled = autoBackupEnabled,
                 backupDirectoryUri = backupDirectoryUri,
                 backupIntervalHours = backupIntervalHours,
+                lastBackupTimestamp = lastBackupTimestamp,
                 floatingTabBarEnabled = floatingTabBarEnabled,
                 expressiveColors = expressiveColors,
                 totalUsagePillEnabled = totalUsagePillEnabled,
@@ -288,6 +291,12 @@ class UserPreferencesRepository(private val context: Context) {
     suspend fun setBackupIntervalHours(hours: Int) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.BACKUP_INTERVAL_HOURS] = hours
+        }
+    }
+
+    suspend fun setLastBackupTimestamp(timestamp: Long) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.LAST_BACKUP_TIMESTAMP] = timestamp
         }
     }
 
@@ -439,6 +448,7 @@ data class UserPreferences(
     val autoBackupEnabled: Boolean = false,
     val backupDirectoryUri: String = "",
     val backupIntervalHours: Int = 3,
+    val lastBackupTimestamp: Long = 0L,
     val floatingTabBarEnabled: Boolean = false,
     val expressiveColors: Boolean = false,
     val totalUsagePillEnabled: Boolean = false,
