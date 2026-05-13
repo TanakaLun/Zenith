@@ -124,10 +124,38 @@ class AppUsageMonitorService : Service() {
     private var parsedSchedulesCache = listOf<ParsedSchedule>()
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == "SEND_TEST_NOTIFICATION") {
-            sendTestNotification()
+        when (intent?.action) {
+            "SEND_TEST_NOTIFICATION" -> sendTestNotification()
+            "com.etrisad.zenith.action.MIDNIGHT_RESET_SERVICE" -> onMidnightReset()
         }
         return START_STICKY
+    }
+
+    private fun onMidnightReset() {
+        serviceScope.launch {
+            updateStreaks()
+            shieldRepository.resetAllRemainingTimes()
+            notifiedGoals.clear()
+            earlyKickManager.reset()
+            dailyUsageCache.clear()
+            lastAllowedRemainingTime.clear()
+            usageStatsCache = null
+            lastUsageCacheTime = 0L
+            lastUsageFetchTime = 0L
+            cachedTotalUsage = 0L
+            cachedTotalGlobalUsage = 0L
+            currentShieldCache = null
+            
+            val currentTime = System.currentTimeMillis()
+            sessionStartTime = currentTime
+            baseUsageAtSessionStart = 0L
+            baseGlobalUsageAtSessionStart = 0L
+            lastHUDUpdateTime = 0L
+            
+            val calendar = Calendar.getInstance()
+            lastCheckedDay = calendar.get(Calendar.DAY_OF_YEAR)
+            lastCheckedDayTimestamp = currentTime
+        }
     }
 
     override fun onCreate() {
@@ -200,6 +228,7 @@ class AppUsageMonitorService : Service() {
 
         serviceScope.launch {
             currentPreferences = preferencesRepository.userPreferencesFlow.first()
+            com.etrisad.zenith.util.AlarmTasksSchedulingHelper.scheduleMidnightResetTask(this@AppUsageMonitorService)
             startMonitoring()
         }
         startGoalReminderCheck()
@@ -1071,25 +1100,9 @@ class AppUsageMonitorService : Service() {
             val statsList = mutableListOf<android.app.usage.UsageStats>()
 
             if (timeSinceMidnight < 3 * 3600000) {
-                val events = usageStatsManager.queryEvents(startTime, currentTime)
-                val event = android.app.usage.UsageEvents.Event()
-                val lastResumed = mutableMapOf<String, Long>()
-                
-                while (events.hasNextEvent()) {
-                    events.getNextEvent(event)
-                    val pkg = event.packageName
-                    when (event.eventType) {
-                        android.app.usage.UsageEvents.Event.ACTIVITY_RESUMED -> lastResumed[pkg] = event.timeStamp
-                        android.app.usage.UsageEvents.Event.ACTIVITY_PAUSED -> {
-                            val start = lastResumed.remove(pkg)
-                            if (start != null) {
-                                tempUsageMap[pkg] = (tempUsageMap[pkg] ?: 0L) + (event.timeStamp - start)
-                            }
-                        }
-                    }
-                }
-                lastResumed.forEach { (pkg, start) ->
-                    tempUsageMap[pkg] = (tempUsageMap[pkg] ?: 0L) + (currentTime - start)
+                val usageMap = com.etrisad.zenith.util.ScreenUsageHelper.fetchAppUsageTodayTillNow(usageStatsManager)
+                usageMap.forEach { (pkg, seconds) ->
+                    tempUsageMap[pkg] = seconds * 1000L
                 }
                 
                 usageStatsManager.queryAndAggregateUsageStats(startTime, currentTime)?.forEach { (_, stat) ->

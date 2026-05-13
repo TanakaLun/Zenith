@@ -70,6 +70,7 @@ class UserPreferencesRepository(private val context: Context) {
         val PREFER_SYSTEM_USAGE_HISTORY = booleanPreferencesKey("prefer_system_usage_history")
         val ONBOARDING_STATS_COMPLETED = booleanPreferencesKey("onboarding_stats_completed")
         val HUD_HIDE_FEATURE_LEARNED = booleanPreferencesKey("hud_hide_feature_learned")
+        val SHORTS_SCREEN_TIME_MS = longPreferencesKey("shorts_screen_time_ms")
     }
 
     val userPreferencesFlow: Flow<UserPreferences> = context.dataStore.data
@@ -127,6 +128,7 @@ class UserPreferencesRepository(private val context: Context) {
             val preferSystemUsageHistory = preferences[PreferencesKeys.PREFER_SYSTEM_USAGE_HISTORY] ?: true
             val onboardingStatsCompleted = preferences[PreferencesKeys.ONBOARDING_STATS_COMPLETED] ?: false
             val hudHideFeatureLearned = preferences[PreferencesKeys.HUD_HIDE_FEATURE_LEARNED] ?: false
+            val shortsScreenTimeMs = preferences[PreferencesKeys.SHORTS_SCREEN_TIME_MS] ?: 0L
 
             UserPreferences(
                 themeConfig = themeConfig,
@@ -169,9 +171,11 @@ class UserPreferencesRepository(private val context: Context) {
                 lastSyncTimestamp = lastSyncTimestamp,
                 preferSystemUsageHistory = preferSystemUsageHistory,
                 onboardingStatsCompleted = onboardingStatsCompleted,
-                hudHideFeatureLearned = hudHideFeatureLearned
+                hudHideFeatureLearned = hudHideFeatureLearned,
+                shortsScreenTimeMs = shortsScreenTimeMs
             )
         }
+
 
     suspend fun setUserName(name: String) {
         context.dataStore.edit { preferences ->
@@ -407,6 +411,12 @@ class UserPreferencesRepository(private val context: Context) {
             preferences[PreferencesKeys.HUD_HIDE_FEATURE_LEARNED] = learned
         }
     }
+
+    suspend fun setShortsScreenTimeMs(ms: Long) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.SHORTS_SCREEN_TIME_MS] = ms
+        }
+    }
 }
 
 data class UserPreferences(
@@ -450,5 +460,6 @@ data class UserPreferences(
     val lastSyncTimestamp: Long = 0L,
     val preferSystemUsageHistory: Boolean = true,
     val onboardingStatsCompleted: Boolean = false,
-    val hudHideFeatureLearned: Boolean = false
+    val hudHideFeatureLearned: Boolean = false,
+    val shortsScreenTimeMs: Long = 0L
 )
