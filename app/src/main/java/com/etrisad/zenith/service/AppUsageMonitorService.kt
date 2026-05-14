@@ -1068,9 +1068,9 @@ class AppUsageMonitorService : Service() {
 
     private fun getSystemGlobalUsageToday(): Long {
         val currentTime = System.currentTimeMillis()
-        val startTime = getStartOfDay()
 
-        getUsageStatsList()
+        // Use accurate helper to ensure consistency with Home screen
+        val accurateUsageMap = com.etrisad.zenith.util.ScreenUsageHelper.fetchAppUsageTodayTillNow(usageStatsManager)
 
         if (currentTime - lastLauncherAppsRefreshTime > 3600000 || launcherAppsCache.isEmpty()) {
             val pm = packageManager
@@ -1089,7 +1089,7 @@ class AppUsageMonitorService : Service() {
         val excludePackages = launcherPackages + (packageName ?: "")
 
         var totalToday = 0L
-        dailyUsageCache.forEach { (pkg, time) ->
+        accurateUsageMap.forEach { (pkg, time) ->
             if (pkg !in excludePackages && pkg in launcherAppsCache) {
                 if (time > 0) {
                     totalToday += time

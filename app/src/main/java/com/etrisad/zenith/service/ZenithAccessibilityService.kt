@@ -597,35 +597,21 @@ class ZenithAccessibilityService : AccessibilityService() {
 
         val excludePackages = setOfNotNull(packageName, launcherPackage)
 
-        synchronized(reusableCalendar) {
-            reusableCalendar.timeInMillis = currentTime
-            reusableCalendar.set(Calendar.HOUR_OF_DAY, 0)
-            reusableCalendar.set(Calendar.MINUTE, 0)
-            reusableCalendar.set(Calendar.SECOND, 0)
-            reusableCalendar.set(Calendar.MILLISECOND, 0)
-            val startTime = reusableCalendar.timeInMillis
+        // Use accurate helper to ensure consistency with Home screen
+        val accurateUsageMap = com.etrisad.zenith.util.ScreenUsageHelper.fetchAppUsageTodayTillNow(usageStatsManager)
 
-            val stats = try {
-                usageStatsManager.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, startTime, currentTime)
-            } catch (_: Exception) {
-                null
-            }
-
-            var totalToday = 0L
-            stats?.forEach { stat ->
-                val pkg = stat.packageName
-                if (pkg !in excludePackages && pkg in launcherApps) {
-                    val time = stat.totalTimeVisible.coerceAtLeast(stat.totalTimeInForeground)
-                    if (time > 0) {
-                        totalToday += time
-                    }
+        var totalToday = 0L
+        accurateUsageMap.forEach { (pkg, time) ->
+            if (pkg !in excludePackages && pkg in launcherApps) {
+                if (time > 0) {
+                    totalToday += time
                 }
             }
-
-            cachedTotalGlobalUsage = totalToday
-            lastGlobalUsageCacheTime = currentTime
-            return totalToday
         }
+
+        cachedTotalGlobalUsage = totalToday
+        lastGlobalUsageCacheTime = currentTime
+        return totalToday
     }
 
     private fun getTotalUsageToday(packageName: String): Long {
