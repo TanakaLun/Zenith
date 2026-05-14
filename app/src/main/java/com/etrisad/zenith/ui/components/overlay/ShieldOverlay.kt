@@ -23,7 +23,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -32,7 +31,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.etrisad.zenith.data.local.entity.FocusType
 import com.etrisad.zenith.data.local.entity.ShieldEntity
 import com.etrisad.zenith.data.preferences.UserPreferences
@@ -89,7 +87,7 @@ fun ShieldOverlay(
         ) { s, appUsage, globalUsage ->
             Triple(s ?: shield, appUsage?.usageTimeMillis ?: 0L, globalUsage?.usageTimeMillis ?: 0L)
         }
-    }.collectAsStateWithLifecycle(initialValue = Triple(shield, 0L, 0L))
+    }.collectAsState(initial = Triple(shield, 0L, 0L))
 
     val (currentShield, dbAppUsage, dbGlobalUsage) = combinedState
 
@@ -98,16 +96,20 @@ fun ShieldOverlay(
 
     var sampledUsage by remember { mutableLongStateOf(totalUsageToday) }
     LaunchedEffect(packageName) {
-        snapshotFlow { totalUsageToday }
-            .debounce(2000)
-            .collect { sampledUsage = it }
+        snapshotFlow { totalUsageToday to showContent }
+            .debounce(5000L)
+            .collect { (usage, visible) ->
+                if (visible) sampledUsage = usage
+            }
     }
 
     var sampledGlobalUsage by remember { mutableLongStateOf(totalGlobalUsageToday) }
     LaunchedEffect(packageName) {
-        snapshotFlow { totalGlobalUsageToday }
-            .debounce(2000)
-            .collect { sampledGlobalUsage = it }
+        snapshotFlow { totalGlobalUsageToday to showContent }
+            .debounce(5000L)
+            .collect { (usage, visible) ->
+                if (visible) sampledGlobalUsage = usage
+            }
     }
 
     val currentTotalUsageToday = remember(sampledUsage, dbAppUsage) { maxOf(sampledUsage, dbAppUsage) }
@@ -151,7 +153,7 @@ fun ShieldOverlay(
     val userPrefsRepo = remember(context.applicationContext) { UserPreferencesRepository(context.applicationContext) }
     val userPrefs by userPrefsRepo.userPreferencesFlow.collectAsState(initial = UserPreferences())
 
-    val backgroundAlphaState = animateFloatAsState(
+    val backgroundAlpha by animateFloatAsState(
         targetValue = if (showContent) 0.6f else 0f,
         animationSpec = tween(durationMillis = 400),
         label = "backgroundAlpha"
@@ -291,8 +293,7 @@ fun ShieldOverlay(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .graphicsLayer { alpha = backgroundAlphaState.value }
-                .background(Color.Black)
+                .background(Color.Black.copy(alpha = backgroundAlpha))
                 .pointerInput(Unit) {
                     detectTapGestures { }
                 }
