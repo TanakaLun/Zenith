@@ -81,7 +81,6 @@ class InterceptOverlayManager(
         }
 
         if (isShowing && currentPackage == packageName && overlayView != null) {
-            overlayUsageState?.value = Pair(totalUsageToday, totalGlobalUsageToday)
             return
         }
 
@@ -156,7 +155,6 @@ class InterceptOverlayManager(
             return
         }
         if (isShowing && currentPackage == packageName && overlayView != null) {
-            overlayUsageState?.value = Pair(0L, totalGlobalUsageToday)
             return
         }
         if (isShowing || overlayView != null) hideOverlay()
