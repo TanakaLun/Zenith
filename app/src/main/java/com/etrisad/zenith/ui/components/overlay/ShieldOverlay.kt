@@ -32,12 +32,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.etrisad.zenith.data.local.entity.FocusType
 import com.etrisad.zenith.data.local.entity.ShieldEntity
 import com.etrisad.zenith.data.preferences.UserPreferences
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -57,36 +61,50 @@ fun ShieldOverlay(
     val context = LocalContext.current
     val app = context.applicationContext as com.etrisad.zenith.ZenithApplication
     val shieldRepository = app.shieldRepository
+    val scope = rememberCoroutineScope()
 
-    val appIcon = remember(packageName) {
-        try {
-            val drawable = context.packageManager.getApplicationIcon(packageName)
-            drawable.toBitmap(width = 120, height = 120).asImageBitmap()
-        } catch (_: Exception) {
-            null
+    var appIconBitmap by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    DisposableEffect(packageName) {
+        val job = scope.launch(Dispatchers.IO) {
+            val bmp = try {
+                context.packageManager.getApplicationIcon(packageName)
+                    .toBitmap(120, 120).asImageBitmap()
+            } catch (_: Exception) { null }
+            withContext(Dispatchers.Main) { appIconBitmap = bmp }
+        }
+        onDispose {
+            job.cancel()
+            appIconBitmap = null
         }
     }
 
-    val allShields by shieldRepository.allShields.collectAsState(initial = emptyList())
-    val currentShield = remember(allShields, packageName) {
-        allShields.find { it.packageName == packageName } ?: shield
-    }
-
-    val databaseUsage by shieldRepository.getAllUsage().collectAsState(initial = emptyList())
     val todayDate = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date()) }
+    val combinedState by remember(packageName, todayDate) {
+        combine(
+            shieldRepository.getShieldByPackageNameFlow(packageName),
+            shieldRepository.getUsageByDateAndPackageFlow(todayDate, packageName),
+            shieldRepository.getUsageByDateAndPackageFlow(todayDate, "TOTAL")
+        ) { s, appUsage, globalUsage ->
+            Triple(s ?: shield, appUsage?.usageTimeMillis ?: 0L, globalUsage?.usageTimeMillis ?: 0L)
+        }
+    }.collectAsStateWithLifecycle(initialValue = Triple(shield, 0L, 0L))
 
-    val dbAppUsage = remember(databaseUsage, packageName, todayDate) {
-        databaseUsage.find { it.date == todayDate && it.packageName == packageName }?.usageTimeMillis ?: 0L
-    }
-    val dbGlobalUsage = remember(databaseUsage, todayDate) {
-        databaseUsage.find { it.date == todayDate && it.packageName == "TOTAL" }?.usageTimeMillis ?: 0L
-    }
+    val (currentShield, dbAppUsage, dbGlobalUsage) = combinedState
 
     var showContent by remember { mutableStateOf(false) }
     var isEmergencyUnlocked by remember { mutableStateOf(false) }
 
-    val currentTotalUsageToday = remember(totalUsageToday, dbAppUsage) { maxOf(totalUsageToday, dbAppUsage) }
-    val currentTotalGlobalUsageToday = remember(totalGlobalUsageToday, dbGlobalUsage) { maxOf(totalGlobalUsageToday, dbGlobalUsage) }
+    val sampledUsage by produceState(totalUsageToday, totalUsageToday) {
+        delay(2000)
+        value = totalUsageToday
+    }
+    val sampledGlobalUsage by produceState(totalGlobalUsageToday, totalGlobalUsageToday) {
+        delay(2000)
+        value = totalGlobalUsageToday
+    }
+
+    val currentTotalUsageToday = remember(sampledUsage, dbAppUsage) { maxOf(sampledUsage, dbAppUsage) }
+    val currentTotalGlobalUsageToday = remember(sampledGlobalUsage, dbGlobalUsage) { maxOf(sampledGlobalUsage, dbGlobalUsage) }
 
     val isDelayEnabled = currentShield?.isDelayAppEnabled == true && currentShield.type == FocusType.SHIELD
     
@@ -101,7 +119,7 @@ fun ShieldOverlay(
 
     val delayProgressAnimatable = remember(packageName) { Animatable(initialProgress) }
     var isDelaying by remember(packageName) { 
-        mutableStateOf(isDelayEnabled && (shield?.lastDelayStartTimestamp ?: 0L) != 0L && initialProgress < 1f) 
+        mutableStateOf(isDelayEnabled && (currentShield?.lastDelayStartTimestamp ?: 0L) != 0L && initialProgress < 1f) 
     }
 
     val motivationalMessages = remember {
@@ -123,8 +141,7 @@ fun ShieldOverlay(
         if (isDelaying) motivationalMessages.random() else ""
     }
     
-    val scope = rememberCoroutineScope()
-    val userPrefsRepo = remember { UserPreferencesRepository(context) }
+    val userPrefsRepo = remember(context.applicationContext) { UserPreferencesRepository(context.applicationContext) }
     val userPrefs by userPrefsRepo.userPreferencesFlow.collectAsState(initial = UserPreferences())
 
     val backgroundAlphaState = animateFloatAsState(
@@ -157,20 +174,20 @@ fun ShieldOverlay(
         }
     }
 
-    val isPeriodExpired = remember(packageName, currentShield?.lastPeriodResetTimestamp) {
+    val isPeriodExpired = remember(currentShield) {
         currentShield != null && (System.currentTimeMillis() - currentShield.lastPeriodResetTimestamp > currentShield.refreshPeriodMinutes * 60 * 1000L)
     }
     
-    val currentUses = remember(packageName, currentShield?.currentPeriodUses, isPeriodExpired) {
+    val currentUses = remember(currentShield, isPeriodExpired) {
         if (isPeriodExpired) 0 else (currentShield?.currentPeriodUses ?: 0)
     }
     val maxUses = currentShield?.maxUsesPerPeriod ?: 5
     val isUsesExceeded = remember(currentUses, maxUses) { currentUses >= maxUses }
-    val isTimeLimitReached = remember(packageName, currentTotalUsageToday, currentShield?.timeLimitMinutes) {
+    val isTimeLimitReached = remember(currentTotalUsageToday, currentShield) {
         currentShield != null && currentShield.timeLimitMinutes > 0 && currentTotalUsageToday >= (currentShield.timeLimitMinutes * 60 * 1000L)
     }
 
-    val remainingMinutes = remember(packageName, currentTotalUsageToday, currentShield?.timeLimitMinutes) {
+    val remainingMinutes = remember(currentTotalUsageToday, currentShield) {
         currentShield?.let {
             if (it.timeLimitMinutes <= 0) return@let null
             val limitMillis = it.timeLimitMinutes * 60 * 1000L
@@ -186,42 +203,58 @@ fun ShieldOverlay(
     val autoKickProgress = remember(packageName) { Animatable(0f) }
     var isEmergencyHolding by remember(packageName) { mutableStateOf(false) }
 
-    LaunchedEffect(packageName, isBlocked, isDelaying, isEmergencyHolding, isEmergencyUnlocked) {
-        if (isBlocked) {
-            if (!isEmergencyHolding) {
-                autoKickProgress.snapTo(0f)
-                autoKickProgress.animateTo(
-                    targetValue = 1f,
-                    animationSpec = tween(durationMillis = 4000, easing = LinearEasing)
-                )
-                if (showContent) {
-                    showContent = false
-                    delay(300)
-                }
-                onCloseApp()
-            } else {
-                autoKickProgress.stop()
-                autoKickProgress.snapTo(0f)
-            }
-        } else if (!isDelaying && !isEmergencyUnlocked && (currentShield?.type == FocusType.SHIELD || currentShield == null)) {
-            autoKickProgress.snapTo(0f)
-            delay(8000)
-            
-            if (isDelaying || isEmergencyUnlocked) return@LaunchedEffect
-
-            autoKickProgress.animateTo(
-                targetValue = 1f,
-                animationSpec = tween(durationMillis = 5000, easing = LinearEasing)
-            )
-            
-            if (showContent) {
-                showContent = false
-                delay(300)
-            }
-            onCloseApp()
-        } else {
-            autoKickProgress.snapTo(0f)
+    LaunchedEffect(showContent) {
+        if (!showContent) {
+            autoKickProgress.stop()
+            delayProgressAnimatable.stop()
         }
+    }
+
+    LaunchedEffect(packageName) {
+        snapshotFlow { 
+            listOf(isBlocked, isEmergencyHolding, isDelaying, isEmergencyUnlocked)
+        }
+            .collect { state ->
+                val blocked = state[0]
+                val holding = state[1]
+                val delaying = state[2]
+                val unlocked = state[3]
+
+                if (blocked) {
+                    if (!holding) {
+                        autoKickProgress.snapTo(0f)
+                        autoKickProgress.animateTo(
+                            targetValue = 1f,
+                            animationSpec = tween(durationMillis = 4000, easing = LinearEasing)
+                        )
+                        if (showContent) {
+                            showContent = false
+                            delay(300)
+                        }
+                        onCloseApp()
+                    } else {
+                        autoKickProgress.stop()
+                        autoKickProgress.snapTo(0f)
+                    }
+                } else if (!delaying && !unlocked && (currentShield?.type == FocusType.SHIELD || currentShield == null)) {
+                    autoKickProgress.snapTo(0f)
+                    delay(8000)
+                    
+                    autoKickProgress.animateTo(
+                        targetValue = 1f,
+                        animationSpec = tween(durationMillis = 5000, easing = LinearEasing)
+                    )
+                    
+                    if (showContent) {
+                        showContent = false
+                        delay(300)
+                    }
+                    onCloseApp()
+                } else {
+                    autoKickProgress.stop()
+                    autoKickProgress.snapTo(0f)
+                }
+            }
     }
     
     val refreshTimeLeftMillis = if (currentShield != null) {
@@ -231,6 +264,10 @@ fun ShieldOverlay(
 
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+    val currentOnAllowUse by rememberUpdatedState(onAllowUse)
+    val currentOnCloseApp by rememberUpdatedState(onCloseApp)
+    val currentOnGoalDismiss by rememberUpdatedState(onGoalDismiss)
 
     Box(
         modifier = Modifier
@@ -277,7 +314,7 @@ fun ShieldOverlay(
                 if (isLandscape) {
                     LandscapeInterceptLayout(
                         appName = appName,
-                        appIcon = appIcon,
+                        appIcon = appIconBitmap,
                         shield = currentShield,
                         totalUsageToday = currentTotalUsageToday,
                         totalGlobalUsageToday = currentTotalGlobalUsageToday,
@@ -300,28 +337,28 @@ fun ShieldOverlay(
                             scope.launch {
                                 showContent = false
                                 delay(400)
-                                onAllowUse(minutes, isEmergencyUnlocked)
+                                currentOnAllowUse(minutes, isEmergencyUnlocked)
                             }
                         },
                         onCloseApp = {
                             scope.launch {
                                 showContent = false
                                 delay(400)
-                                onCloseApp()
+                                currentOnCloseApp()
                             }
                         },
                         onGoalDismiss = {
                             scope.launch {
                                 showContent = false
                                 delay(400)
-                                onGoalDismiss()
+                                currentOnGoalDismiss()
                             }
                         }
                     )
                 } else {
                     PortraitInterceptLayout(
                         appName = appName,
-                        appIcon = appIcon,
+                        appIcon = appIconBitmap,
                         shield = currentShield,
                         totalUsageToday = currentTotalUsageToday,
                         totalGlobalUsageToday = currentTotalGlobalUsageToday,
@@ -344,21 +381,21 @@ fun ShieldOverlay(
                             scope.launch {
                                 showContent = false
                                 delay(400)
-                                onAllowUse(minutes, isEmergencyUnlocked)
+                                currentOnAllowUse(minutes, isEmergencyUnlocked)
                             }
                         },
                         onCloseApp = {
                             scope.launch {
                                 showContent = false
                                 delay(400)
-                                onCloseApp()
+                                currentOnCloseApp()
                             }
                         },
                         onGoalDismiss = {
                             scope.launch {
                                 showContent = false
                                 delay(400)
-                                onGoalDismiss()
+                                currentOnGoalDismiss()
                             }
                         }
                     )

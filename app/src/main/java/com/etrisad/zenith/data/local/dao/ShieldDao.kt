@@ -17,6 +17,9 @@ interface ShieldDao {
     @Query("SELECT * FROM shields WHERE packageName = :packageName")
     suspend fun getShieldByPackageName(packageName: String): ShieldEntity?
 
+    @Query("SELECT * FROM shields WHERE packageName = :packageName")
+    fun getShieldByPackageNameFlow(packageName: String): Flow<ShieldEntity?>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertShield(shield: ShieldEntity)
 

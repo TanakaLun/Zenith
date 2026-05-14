@@ -53,6 +53,14 @@ class ShieldRepository(
         return hourlyUsageDao.getHourlyUsageForDate(date)
     }
 
+    fun getShieldByPackageNameFlow(packageName: String): Flow<ShieldEntity?> {
+        return shieldDao.getShieldByPackageNameFlow(packageName)
+    }
+
+    fun getUsageByDateAndPackageFlow(date: String, packageName: String): Flow<DailyUsageEntity?> {
+        return dailyUsageDao.getUsageByDateAndPackageFlow(date, packageName)
+    }
+
     fun getDatesWithHourlyUsage(): Flow<List<String>> {
         return hourlyUsageDao.getDatesWithHourlyUsage()
     }
