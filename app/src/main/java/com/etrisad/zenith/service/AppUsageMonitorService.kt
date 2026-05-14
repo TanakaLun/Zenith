@@ -453,8 +453,11 @@ class AppUsageMonitorService : Service() {
                                 sessionStartTime = currentTime
                                 currentSessionPackage = currentApp
                                 
-                                val systemUsage = getSystemUsageToday(currentApp)
-                                val systemGlobal = getSystemGlobalUsageToday()
+                                // Fetch fresh usage immediately to avoid "app lain" usage contamination
+                                val detailedUsage = com.etrisad.zenith.util.ScreenUsageHelper.fetchDetailedUsageToday(usageStatsManager)
+                                val systemUsage = detailedUsage.appUsageMap[currentApp] ?: 0L
+                                val systemGlobal = detailedUsage.appUsageMap.values.sum()
+
                                 val startOfDay = getStartOfDay()
                                 val shield = currentShieldCache
                                 val dbUsage = if (shield != null && shield.lastUsedTimestamp >= startOfDay) {
@@ -554,13 +557,6 @@ class AppUsageMonitorService : Service() {
                                                 }
                                             }
                                         )
-                                        if (isGoal && currentTime - lastHUDUpdateTime > HUD_UPDATE_INTERVAL) {
-                                            lastHUDUpdateTime = currentTime
-                                            val currentUsageToReport = cachedTotalUsage
-                                            serviceScope.launch(Dispatchers.Main) {
-                                                sessionUsageOverlayManager.updateHUDUsage(currentApp, currentUsageToReport)
-                                            }
-                                        }
                                     }
                                 }
                             }
@@ -664,7 +660,7 @@ class AppUsageMonitorService : Service() {
         if (packageName != currentSessionPackage) return
 
         val currentTime = System.currentTimeMillis()
-        val sessionElapsed = currentTime - sessionStartTime
+        val sessionElapsed = (currentTime - sessionStartTime).coerceAtLeast(0L)
         
         cachedTotalUsage = baseUsageAtSessionStart + sessionElapsed
         cachedTotalGlobalUsage = baseGlobalUsageAtSessionStart + sessionElapsed
@@ -676,24 +672,32 @@ class AppUsageMonitorService : Service() {
             val remaining = (limitMillis - cachedTotalUsage).coerceAtLeast(0L)
             
             val uiUpdateInterval = when {
-                remaining < 60000 -> 1000L
-                remaining < 300000 -> 2500L
-                remaining < 900000 -> 8000L
-                else -> 5000L
+                remaining < 60000 -> 2500L
+                remaining < 300000 -> 6000L
+                remaining < 900000 -> 12000L
+                else -> 20000L
             }
 
-            if (currentTime - lastHUDUpdateTime > uiUpdateInterval) {
+            if (currentTime - lastHUDUpdateTime > uiUpdateInterval || lastHUDUpdateTime == 0L) {
                 lastHUDUpdateTime = currentTime
-                val currentUsageToReport = cachedTotalUsage
+                
+                // Fetch fresh, event-based usage for this SPECIFIC package to ensure accuracy
+                val detailedUsage = com.etrisad.zenith.util.ScreenUsageHelper.fetchDetailedUsageToday(usageStatsManager)
+                val realUsage = detailedUsage.appUsageMap[packageName] ?: 0L
+                
+                // Sync our live trackers with the accurate query results
+                baseUsageAtSessionStart = realUsage
+                sessionStartTime = currentTime
+                cachedTotalUsage = realUsage
+                
                 serviceScope.launch(Dispatchers.Main) {
-                    sessionUsageOverlayManager.updateHUDUsage(packageName, currentUsageToReport)
+                    sessionUsageOverlayManager.updateHUDUsage(packageName, realUsage)
                 }
             }
-        }
-
-        if (currentTime - lastUsageFetchTime > 30000) {
-            val systemUsage = getSystemUsageToday(packageName)
-            val systemGlobal = getSystemGlobalUsageToday()
+        } else if (currentTime - lastUsageFetchTime > 30000) {
+            val detailedUsage = com.etrisad.zenith.util.ScreenUsageHelper.fetchDetailedUsageToday(usageStatsManager)
+            val systemUsage = detailedUsage.appUsageMap[packageName] ?: 0L
+            val systemGlobal = detailedUsage.appUsageMap.values.sum()
             val startOfDay = getStartOfDay()
             
             val dbUsage = if (shield.lastUsedTimestamp >= startOfDay) {
