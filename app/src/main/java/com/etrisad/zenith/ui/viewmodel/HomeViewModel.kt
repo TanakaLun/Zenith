@@ -538,6 +538,8 @@ class HomeViewModel(
 
             val accurateAppTotals = mutableMapOf<String, Long>()
             var isScreenOn = true 
+            var activePkg: String? = null
+            var activeStartTime: Long = 0L
 
             while (events.hasNextEvent()) {
                 events.getNextEvent(event)
@@ -549,41 +551,80 @@ class HomeViewModel(
                     android.app.usage.UsageEvents.Event.SCREEN_INTERACTIVE -> isScreenOn = true
                     android.app.usage.UsageEvents.Event.SCREEN_NON_INTERACTIVE -> {
                         isScreenOn = false
-                        lastEventTime.forEach { (p, startTime) ->
-                            val segmentStart = maxOf(startTime, dayStart)
+                        if (activePkg != null) {
+                            val segmentStart = maxOf(activeStartTime, dayStart)
                             val segmentEnd = minOf(time, dayEnd)
                             if (segmentStart < segmentEnd) {
                                 val duration = segmentEnd - segmentStart
-                                accurateAppTotals[p] = (accurateAppTotals[p] ?: 0L) + duration
-                                
-                                var current = segmentStart
-                                while (current < segmentEnd) {
-                                    cal.timeInMillis = current
-                                    val hour = cal.get(Calendar.HOUR_OF_DAY)
-                                    val nextHourStart = (cal.clone() as Calendar).apply {
-                                        add(Calendar.HOUR_OF_DAY, 1)
-                                        set(Calendar.MINUTE, 0)
-                                        set(Calendar.SECOND, 0)
-                                        set(Calendar.MILLISECOND, 0)
-                                    }.timeInMillis
+                                if (duration > 1500) { // Ignore background transients < 1.5s
+                                    accurateAppTotals[activePkg!!] = (accurateAppTotals[activePkg!!] ?: 0L) + duration
                                     
-                                    val end = minOf(segmentEnd, nextHourStart)
-                                    val d = end - current
-                                    if (d > 0) {
-                                        val pkgMap = hourlyAppUsage.getOrPut(hour) { mutableMapOf() }
-                                        pkgMap[p] = (pkgMap[p] ?: 0L) + d
+                                    var current = segmentStart
+                                    while (current < segmentEnd) {
+                                        cal.timeInMillis = current
+                                        val hour = cal.get(Calendar.HOUR_OF_DAY)
+                                        val nextHourStart = (cal.clone() as Calendar).apply {
+                                            add(Calendar.HOUR_OF_DAY, 1)
+                                            set(Calendar.MINUTE, 0)
+                                            set(Calendar.SECOND, 0)
+                                            set(Calendar.MILLISECOND, 0)
+                                        }.timeInMillis
+                                        
+                                        val end = minOf(segmentEnd, nextHourStart)
+                                        val d = end - current
+                                        if (d > 0) {
+                                            val pkgMap = hourlyAppUsage.getOrPut(hour) { mutableMapOf() }
+                                            pkgMap[activePkg!!] = (pkgMap[activePkg!!] ?: 0L) + d
+                                        }
+                                        current = end
                                     }
-                                    current = end
                                 }
                             }
+                            activePkg = null
+                            activeStartTime = 0L
                         }
-                        lastEventTime.clear()
                     }
                     android.app.usage.UsageEvents.Event.MOVE_TO_FOREGROUND,
                     android.app.usage.UsageEvents.Event.ACTIVITY_RESUMED -> {
                         if (pkg in excludePackages || pkg !in launcherApps) continue
                         if (isScreenOn) {
-                            lastEventTime[pkg] = time
+                            val className = event.className ?: ""
+                            if (className.contains("Notification", ignoreCase = true) || 
+                                className.contains("Toast", ignoreCase = true)) continue
+
+                            // End previous session if different app takes focus
+                            if (activePkg != null && activePkg != pkg) {
+                                val segmentStart = maxOf(activeStartTime, dayStart)
+                                val segmentEnd = minOf(time, dayEnd)
+                                if (segmentStart < segmentEnd) {
+                                    val duration = segmentEnd - segmentStart
+                                    if (duration > 1500) {
+                                        accurateAppTotals[activePkg!!] = (accurateAppTotals[activePkg!!] ?: 0L) + duration
+                                        // Process hourly data for previous app
+                                        var current = segmentStart
+                                        while (current < segmentEnd) {
+                                            cal.timeInMillis = current
+                                            val hour = cal.get(Calendar.HOUR_OF_DAY)
+                                            val nextHourStart = (cal.clone() as Calendar).apply {
+                                                add(Calendar.HOUR_OF_DAY, 1)
+                                                set(Calendar.MINUTE, 0)
+                                                set(Calendar.SECOND, 0)
+                                                set(Calendar.MILLISECOND, 0)
+                                            }.timeInMillis
+                                            val end = minOf(segmentEnd, nextHourStart)
+                                            val d = end - current
+                                            if (d > 0) {
+                                                val pkgMap = hourlyAppUsage.getOrPut(hour) { mutableMapOf() }
+                                                pkgMap[activePkg!!] = (pkgMap[activePkg!!] ?: 0L) + d
+                                            }
+                                            current = end
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            activePkg = pkg
+                            activeStartTime = time
                             if (time in dayStart..dayEnd && type == android.app.usage.UsageEvents.Event.MOVE_TO_FOREGROUND) {
                                 appSessionCounts[pkg] = (appSessionCounts[pkg] ?: 0) + 1
                             }
@@ -591,46 +632,50 @@ class HomeViewModel(
                     }
                     android.app.usage.UsageEvents.Event.MOVE_TO_BACKGROUND,
                     android.app.usage.UsageEvents.Event.ACTIVITY_PAUSED -> {
-                        val startTime = lastEventTime.remove(pkg) ?: continue
-                        
-                        val segmentStart = maxOf(startTime, dayStart)
-                        val segmentEnd = minOf(time, dayEnd)
-                        
-                        if (segmentStart < segmentEnd) {
-                            val duration = segmentEnd - segmentStart
-                            accurateAppTotals[pkg] = (accurateAppTotals[pkg] ?: 0L) + duration
+                        if (activePkg == pkg) {
+                            val segmentStart = maxOf(activeStartTime, dayStart)
+                            val segmentEnd = minOf(time, dayEnd)
                             
-                            var current = segmentStart
-                            while (current < segmentEnd) {
-                                cal.timeInMillis = current
-                                val hour = cal.get(Calendar.HOUR_OF_DAY)
-                                val nextHourStart = (cal.clone() as Calendar).apply {
-                                    add(Calendar.HOUR_OF_DAY, 1)
-                                    set(Calendar.MINUTE, 0)
-                                    set(Calendar.SECOND, 0)
-                                    set(Calendar.MILLISECOND, 0)
-                                }.timeInMillis
-                                
-                                val end = minOf(segmentEnd, nextHourStart)
-                                val d = end - current
-                                if (d > 0) {
-                                    val pkgMap = hourlyAppUsage.getOrPut(hour) { mutableMapOf() }
-                                    pkgMap[pkg] = (pkgMap[pkg] ?: 0L) + d
+                            if (segmentStart < segmentEnd) {
+                                val duration = segmentEnd - segmentStart
+                                if (duration > 1500) {
+                                    accurateAppTotals[pkg] = (accurateAppTotals[pkg] ?: 0L) + duration
+                                    
+                                    var current = segmentStart
+                                    while (current < segmentEnd) {
+                                        cal.timeInMillis = current
+                                        val hour = cal.get(Calendar.HOUR_OF_DAY)
+                                        val nextHourStart = (cal.clone() as Calendar).apply {
+                                            add(Calendar.HOUR_OF_DAY, 1)
+                                            set(Calendar.MINUTE, 0)
+                                            set(Calendar.SECOND, 0)
+                                            set(Calendar.MILLISECOND, 0)
+                                        }.timeInMillis
+                                        
+                                        val end = minOf(segmentEnd, nextHourStart)
+                                        val d = end - current
+                                        if (d > 0) {
+                                            val pkgMap = hourlyAppUsage.getOrPut(hour) { mutableMapOf() }
+                                            pkgMap[pkg] = (pkgMap[pkg] ?: 0L) + d
+                                        }
+                                        current = end
+                                    }
                                 }
-                                current = end
                             }
+                            activePkg = null
+                            activeStartTime = 0L
                         }
                     }
                 }
             }
 
-            if (isScreenOn) {
-                lastEventTime.forEach { (pkg, startTime) ->
-                    val segmentStart = maxOf(startTime, dayStart)
-                    val segmentEnd = dayEnd
-                    if (segmentStart < segmentEnd) {
-                        val duration = segmentEnd - segmentStart
-                        accurateAppTotals[pkg] = (accurateAppTotals[pkg] ?: 0L) + duration
+            if (isScreenOn && activePkg != null) {
+                val segmentStart = maxOf(activeStartTime, dayStart)
+                val segmentEnd = dayEnd
+                if (segmentStart < segmentEnd) {
+                    val duration = segmentEnd - segmentStart
+                    if (duration > 1500) {
+                        accurateAppTotals[activePkg!!] = (accurateAppTotals[activePkg!!] ?: 0L) + duration
 
                         var current = segmentStart
                         while (current < segmentEnd) {
@@ -647,7 +692,7 @@ class HomeViewModel(
                             val d = end - current
                             if (d > 0) {
                                 val pkgMap = hourlyAppUsage.getOrPut(hour) { mutableMapOf() }
-                                pkgMap[pkg] = (pkgMap[pkg] ?: 0L) + d
+                                pkgMap[activePkg!!] = (pkgMap[activePkg!!] ?: 0L) + d
                             }
                             current = end
                         }

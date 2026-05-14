@@ -7,7 +7,7 @@ import java.util.Calendar
 object ScreenUsageHelper {
     /**
      * Fetches accurate app usage for today by processing UsageEvents.
-     * Handles screen off events to prevent "hanging" sessions from inflating stats.
+     * Filters out transient background events and ensures no overlapping sessions.
      * Returns a map of package names to usage time in MILLISECONDS.
      */
     fun fetchAppUsageTodayTillNow(usageStatsManager: UsageStatsManager): Map<String, Long> {
@@ -22,7 +22,7 @@ object ScreenUsageHelper {
 
         val usageMap = mutableMapOf<String, Long>()
         
-        // Track only ONE active app at a time to prevent notification-related overlaps
+        // We only track ONE active app at a time to prevent notification-related "fake" overlaps
         var activePkg: String? = null
         var activeStartTime: Long = 0L
         
@@ -38,15 +38,18 @@ object ScreenUsageHelper {
             val time = event.timeStamp
             
             when (event.eventType) {
-                UsageEvents.Event.SCREEN_INTERACTIVE -> isScreenOn = true
+                UsageEvents.Event.SCREEN_INTERACTIVE -> {
+                    isScreenOn = true
+                }
                 UsageEvents.Event.SCREEN_NON_INTERACTIVE -> {
                     isScreenOn = false
+                    // Terminate current session immediately when screen goes off
                     if (activePkg != null) {
                         val segmentStart = maxOf(activeStartTime, start)
                         val segmentEnd = minOf(time, end)
                         if (segmentStart < segmentEnd) {
                             val duration = segmentEnd - segmentStart
-                            if (duration > 1500) { // Ignore segments < 1.5s
+                            if (duration > 1000) { // Ignore segments < 1s
                                 usageMap[activePkg!!] = (usageMap[activePkg!!] ?: 0L) + duration
                             }
                         }
@@ -57,22 +60,26 @@ object ScreenUsageHelper {
                 UsageEvents.Event.ACTIVITY_RESUMED,
                 UsageEvents.Event.MOVE_TO_FOREGROUND -> {
                     if (isScreenOn) {
+                        // Class name check to filter out known system transients/notifications
                         val className = event.className ?: ""
                         if (className.contains("Notification", ignoreCase = true) || 
-                            className.contains("Toast", ignoreCase = true)) {
+                            className.contains("Toast", ignoreCase = true) ||
+                            className.contains("ResolverActivity", ignoreCase = true)) {
                             continue
                         }
 
+                        // If a different app takes focus, end the previous one's session
                         if (activePkg != null && activePkg != pkg) {
                             val segmentStart = maxOf(activeStartTime, start)
                             val segmentEnd = minOf(time, end)
                             if (segmentStart < segmentEnd) {
                                 val duration = segmentEnd - segmentStart
-                                if (duration > 1500) {
+                                if (duration > 1000) {
                                     usageMap[activePkg!!] = (usageMap[activePkg!!] ?: 0L) + duration
                                 }
                             }
                         }
+                        
                         activePkg = pkg
                         activeStartTime = time
                     }
@@ -84,7 +91,7 @@ object ScreenUsageHelper {
                         val segmentEnd = minOf(time, end)
                         if (segmentStart < segmentEnd) {
                             val duration = segmentEnd - segmentStart
-                            if (duration > 1500) {
+                            if (duration > 1000) {
                                 usageMap[activePkg!!] = (usageMap[activePkg!!] ?: 0L) + duration
                             }
                         }
@@ -95,12 +102,13 @@ object ScreenUsageHelper {
             }
         }
         
+        // Handle app currently in foreground
         if (isScreenOn && activePkg != null) {
             val segmentStart = maxOf(activeStartTime, start)
             val segmentEnd = end
             if (segmentStart < segmentEnd) {
                 val duration = segmentEnd - segmentStart
-                if (duration > 1500) {
+                if (duration > 1000) {
                     usageMap[activePkg!!] = (usageMap[activePkg!!] ?: 0L) + duration
                 }
             }
