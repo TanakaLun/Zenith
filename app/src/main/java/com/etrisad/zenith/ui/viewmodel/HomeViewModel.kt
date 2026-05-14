@@ -600,6 +600,12 @@ class HomeViewModel(
                                     val duration = segmentEnd - segmentStart
                                     if (duration > 1500) {
                                         accurateAppTotals[activePkg!!] = (accurateAppTotals[activePkg!!] ?: 0L) + duration
+                                        
+                                        // Count as a "Session Open" only if used for more than 4 seconds
+                                        if (duration > 4000) {
+                                            appSessionCounts[activePkg!!] = (appSessionCounts[activePkg!!] ?: 0) + 1
+                                        }
+
                                         // Process hourly data for previous app
                                         var current = segmentStart
                                         while (current < segmentEnd) {
@@ -625,9 +631,6 @@ class HomeViewModel(
                             
                             activePkg = pkg
                             activeStartTime = time
-                            if (time in dayStart..dayEnd && type == android.app.usage.UsageEvents.Event.MOVE_TO_FOREGROUND) {
-                                appSessionCounts[pkg] = (appSessionCounts[pkg] ?: 0) + 1
-                            }
                         }
                     }
                     android.app.usage.UsageEvents.Event.MOVE_TO_BACKGROUND,
@@ -641,6 +644,11 @@ class HomeViewModel(
                                 if (duration > 1500) {
                                     accurateAppTotals[pkg] = (accurateAppTotals[pkg] ?: 0L) + duration
                                     
+                                    // Count as a "Session Open" only if used for more than 4 seconds
+                                    if (duration > 4000) {
+                                        appSessionCounts[pkg] = (appSessionCounts[pkg] ?: 0) + 1
+                                    }
+
                                     var current = segmentStart
                                     while (current < segmentEnd) {
                                         cal.timeInMillis = current
@@ -720,7 +728,7 @@ class HomeViewModel(
 
 
             val appList = appTotals.mapNotNull { (pkg, time) ->
-                val sessions = appSessionCounts[pkg]?.coerceAtLeast(1) ?: 1
+                val sessions = appSessionCounts[pkg] ?: (if (time > 4000) 1 else 0)
                 val cached = appInfoCache[pkg]
                 if (cached != null) {
                     AppUsageInfo(pkg, cached.first, time, cached.second, sessionCount = sessions)
