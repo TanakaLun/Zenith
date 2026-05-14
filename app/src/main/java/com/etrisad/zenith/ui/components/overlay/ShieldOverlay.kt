@@ -40,6 +40,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
@@ -79,41 +80,21 @@ fun ShieldOverlay(
     }
 
     val todayDate = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date()) }
-    val combinedState by remember(packageName, todayDate) {
-        combine(
-            shieldRepository.getShieldByPackageNameFlow(packageName),
-            shieldRepository.getUsageByDateAndPackageFlow(todayDate, packageName),
-            shieldRepository.getUsageByDateAndPackageFlow(todayDate, "TOTAL")
-        ) { s, appUsage, globalUsage ->
-            Triple(s ?: shield, appUsage?.usageTimeMillis ?: 0L, globalUsage?.usageTimeMillis ?: 0L)
-        }
-    }.collectAsState(initial = Triple(shield, 0L, 0L))
+    val combinedState by produceState(initialValue = Triple(shield, totalUsageToday, totalGlobalUsageToday)) {
+        val s = shieldRepository.getShieldByPackageNameFlow(packageName).first()
+        val appUsage = shieldRepository.getUsageByDateAndPackageFlow(todayDate, packageName).first()
+        val globalUsage = shieldRepository.getUsageByDateAndPackageFlow(todayDate, "TOTAL").first()
 
-    val (currentShield, dbAppUsage, dbGlobalUsage) = combinedState
+        val dbAppUsage = appUsage?.usageTimeMillis ?: 0L
+        val dbGlobalUsage = globalUsage?.usageTimeMillis ?: 0L
+
+        value = Triple(s ?: shield, maxOf(totalUsageToday, dbAppUsage), maxOf(totalGlobalUsageToday, dbGlobalUsage))
+    }
+
+    val (currentShield, currentTotalUsageToday, currentTotalGlobalUsageToday) = combinedState
 
     var showContent by remember { mutableStateOf(false) }
     var isEmergencyUnlocked by remember { mutableStateOf(false) }
-
-    var sampledUsage by remember { mutableLongStateOf(totalUsageToday) }
-    LaunchedEffect(packageName) {
-        snapshotFlow { totalUsageToday to showContent }
-            .debounce(5000L)
-            .collect { (usage, visible) ->
-                if (visible) sampledUsage = usage
-            }
-    }
-
-    var sampledGlobalUsage by remember { mutableLongStateOf(totalGlobalUsageToday) }
-    LaunchedEffect(packageName) {
-        snapshotFlow { totalGlobalUsageToday to showContent }
-            .debounce(5000L)
-            .collect { (usage, visible) ->
-                if (visible) sampledGlobalUsage = usage
-            }
-    }
-
-    val currentTotalUsageToday = remember(sampledUsage, dbAppUsage) { maxOf(sampledUsage, dbAppUsage) }
-    val currentTotalGlobalUsageToday = remember(sampledGlobalUsage, dbGlobalUsage) { maxOf(sampledGlobalUsage, dbGlobalUsage) }
 
     val isDelayEnabled = currentShield?.isDelayAppEnabled == true && currentShield.type == FocusType.SHIELD
     
@@ -151,7 +132,9 @@ fun ShieldOverlay(
     }
     
     val userPrefsRepo = remember(context.applicationContext) { UserPreferencesRepository(context.applicationContext) }
-    val userPrefs by userPrefsRepo.userPreferencesFlow.collectAsState(initial = UserPreferences())
+    val userPrefs by produceState(initialValue = UserPreferences()) {
+        value = userPrefsRepo.userPreferencesFlow.first()
+    }
 
     val backgroundAlpha by animateFloatAsState(
         targetValue = if (showContent) 0.6f else 0f,

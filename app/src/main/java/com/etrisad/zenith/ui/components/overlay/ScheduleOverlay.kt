@@ -29,11 +29,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
+import com.etrisad.zenith.data.local.entity.DailyUsageEntity
 import com.etrisad.zenith.data.local.entity.ScheduleEntity
 import com.etrisad.zenith.data.local.entity.ScheduleMode
 import com.etrisad.zenith.data.preferences.UserPreferences
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -58,21 +60,25 @@ fun ScheduleOverlay(
     val app = context.applicationContext as com.etrisad.zenith.ZenithApplication
     val shieldRepository = app.shieldRepository
     
-    val allSchedules by shieldRepository.allSchedules.collectAsState(initial = emptyList())
-    val currentSchedule = remember(allSchedules, schedule.id) {
-        allSchedules.find { it.id == schedule.id } ?: schedule
+    val currentSchedule by produceState(initialValue = schedule) {
+        value = shieldRepository.allSchedules.first().find { it.id == schedule.id } ?: schedule
     }
 
-    val databaseUsage by shieldRepository.getAllUsage().collectAsState(initial = emptyList())
+    val databaseUsage by produceState(initialValue = emptyList<DailyUsageEntity>()) {
+        value = shieldRepository.getAllUsage().first()
+    }
     val todayDate = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date()) }
     val dbGlobalUsage = remember(databaseUsage, todayDate) {
         databaseUsage.find { it.date == todayDate && it.packageName == "TOTAL" }?.usageTimeMillis ?: 0L
     }
 
-    val currentTotalGlobalUsageToday = remember(totalGlobalUsageToday, dbGlobalUsage) { maxOf(totalGlobalUsageToday, dbGlobalUsage) }
+    val initialTotalGlobalUsageToday = remember { totalGlobalUsageToday }
+    val currentTotalGlobalUsageToday = remember(dbGlobalUsage) { maxOf(initialTotalGlobalUsageToday, dbGlobalUsage) }
 
     val userPrefsRepo = remember { UserPreferencesRepository(context) }
-    val userPrefs by userPrefsRepo.userPreferencesFlow.collectAsState(initial = UserPreferences())
+    val userPrefs by produceState(initialValue = UserPreferences()) {
+        value = userPrefsRepo.userPreferencesFlow.first()
+    }
 
     val appIcon = remember(packageName) {
         try {
@@ -117,37 +123,33 @@ fun ScheduleOverlay(
         }
     }
 
-    val progress by produceState(initialValue = 0f) {
+    val progress = remember(schedule) {
         val calendar = java.util.Calendar.getInstance()
+        calendar.timeInMillis = System.currentTimeMillis()
+        val nowH = calendar.get(java.util.Calendar.HOUR_OF_DAY)
+        val nowM = calendar.get(java.util.Calendar.MINUTE)
+        val nowTotalMin = nowH * 60 + nowM
 
-        while (true) {
-            calendar.timeInMillis = System.currentTimeMillis()
-            val nowH = calendar.get(java.util.Calendar.HOUR_OF_DAY)
-            val nowM = calendar.get(java.util.Calendar.MINUTE)
-            val nowTotalMin = nowH * 60 + nowM
-
-            fun toMinutes(timeStr: String): Int {
-                return try {
-                    val parts = timeStr.split(":")
-                    parts[0].toInt() * 60 + parts[1].toInt()
-                } catch (_: Exception) { 0 }
-            }
-
-            val startMin = toMinutes(schedule.startTime)
-            var endMin = toMinutes(schedule.endTime)
-            var currentMin = nowTotalMin
-
-            if (endMin <= startMin) {
-                endMin += 24 * 60
-                if (currentMin < startMin) currentMin += 24 * 60
-            }
-
-            val total = (endMin - startMin).coerceAtLeast(1)
-            val elapsed = (currentMin - startMin).coerceIn(0, total)
-
-            value = elapsed.toFloat() / total.toFloat()
-            delay(30000)
+        fun toMinutes(timeStr: String): Int {
+            return try {
+                val parts = timeStr.split(":")
+                parts[0].toInt() * 60 + parts[1].toInt()
+            } catch (_: Exception) { 0 }
         }
+
+        val startMin = toMinutes(schedule.startTime)
+        var endMin = toMinutes(schedule.endTime)
+        var currentMin = nowTotalMin
+
+        if (endMin <= startMin) {
+            endMin += 24 * 60
+            if (currentMin < startMin) currentMin += 24 * 60
+        }
+
+        val total = (endMin - startMin).coerceAtLeast(1)
+        val elapsed = (currentMin - startMin).coerceIn(0, total)
+
+        elapsed.toFloat() / total.toFloat()
     }
 
     val configuration = LocalConfiguration.current
