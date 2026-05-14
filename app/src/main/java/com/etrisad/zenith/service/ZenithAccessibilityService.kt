@@ -186,8 +186,12 @@ class ZenithAccessibilityService : AccessibilityService() {
 
         val packageName = event.packageName?.toString() ?: return
         if (packageName == this.packageName) return
-        
-        if (!event.isFullScreen && !shouldBypassBlocking(packageName)) {
+
+        if (shouldBypassBlocking(packageName)) {
+            serviceScope.launch(Dispatchers.Main) {
+                overlayManager.checkAndHide(packageName)
+                sessionUsageOverlayManager.updateForegroundApp(packageName)
+            }
             return
         }
 
@@ -199,6 +203,7 @@ class ZenithAccessibilityService : AccessibilityService() {
         serviceScope.launch(Dispatchers.Main) {
             overlayManager.checkAndHide(packageName)
             sessionUsageOverlayManager.updateForegroundApp(packageName)
+
             packageChangeFlow.tryEmit(packageName)
         }
     }
@@ -215,6 +220,7 @@ class ZenithAccessibilityService : AccessibilityService() {
             if (currentApp != lastForegroundApp) {
                 lastUsageFetchTime = 0L
                 localSessionStartTime = System.currentTimeMillis()
+
                 localBaseUsage = getTotalUsageToday(currentApp)
                 
                 sessionStartTime = localSessionStartTime
@@ -223,6 +229,8 @@ class ZenithAccessibilityService : AccessibilityService() {
                 lastForegroundApp = currentApp
             }
         }
+
+        checkBlockingInstant(currentApp, localShield)
 
         while (lastForegroundApp == currentApp) {
             lastEventTime = System.currentTimeMillis()
@@ -348,6 +356,26 @@ class ZenithAccessibilityService : AccessibilityService() {
             } else 1500L
 
             delay(delayTime)
+        }
+    }
+
+    private suspend fun checkBlockingInstant(currentApp: String, shield: ShieldEntity?) {
+        if (shouldBypassBlocking(currentApp)) return
+        
+        val currentTime = System.currentTimeMillis()
+        val isAppPaused = shield != null && isPaused(shield)
+        
+        if (!isAppPaused) {
+            val allowedUntil = allowedApps[currentApp] ?: 0L
+            val isBedtimeBlocking = isBedtimeActive || (isWindDownActive && (currentPreferences?.bedtimeWindDownEnabled == true))
+            val shouldCheckSchedules = (isBedtimeBlocking && currentApp !in bedtimeWhitelistedPackages) || currentTime > allowedUntil
+
+            if (shouldCheckSchedules && !InterceptOverlayManager.isShowing) {
+                val isScheduled = checkSchedules(currentApp)
+                if (!isScheduled && shield != null && currentTime > allowedUntil) {
+                    checkIfAppIsShielded(currentApp)
+                }
+            }
         }
     }
 

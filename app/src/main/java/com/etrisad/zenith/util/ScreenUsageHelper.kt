@@ -5,11 +5,6 @@ import android.app.usage.UsageStatsManager
 import java.util.Calendar
 
 object ScreenUsageHelper {
-    /**
-     * Fetches accurate app usage for today by processing UsageEvents.
-     * Handles screen off events to prevent "hanging" sessions from inflating stats.
-     * Returns a map of package names to usage time in MILLISECONDS.
-     */
     fun fetchAppUsageTodayTillNow(usageStatsManager: UsageStatsManager): Map<String, Long> {
         val calendar = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 0)
@@ -21,12 +16,10 @@ object ScreenUsageHelper {
         val end = System.currentTimeMillis()
 
         val usageMap = mutableMapOf<String, Long>()
-        
-        // Track only ONE active app at a time to prevent notification-related overlaps
+
         var activePkg: String? = null
-        var activeStartTime: Long = 0L
-        
-        // Use a 24-hour buffer to catch sessions starting before midnight
+        var activeStartTime = 0L
+
         val events = usageStatsManager.queryEvents(start - (24 * 60 * 60 * 1000L), end)
         val event = UsageEvents.Event()
         
@@ -41,18 +34,18 @@ object ScreenUsageHelper {
                 UsageEvents.Event.SCREEN_INTERACTIVE -> isScreenOn = true
                 UsageEvents.Event.SCREEN_NON_INTERACTIVE -> {
                     isScreenOn = false
-                    if (activePkg != null) {
+                    activePkg?.let { p ->
                         val segmentStart = maxOf(activeStartTime, start)
                         val segmentEnd = minOf(time, end)
                         if (segmentStart < segmentEnd) {
                             val duration = segmentEnd - segmentStart
-                            if (duration > 1500) { // Ignore segments < 1.5s
-                                usageMap[activePkg!!] = (usageMap[activePkg!!] ?: 0L) + duration
+                            if (duration > 1500) {
+                                usageMap[p] = (usageMap[p] ?: 0L) + duration
                             }
                         }
-                        activePkg = null
-                        activeStartTime = 0L
                     }
+                    activePkg = null
+                    activeStartTime = 0L
                 }
                 UsageEvents.Event.ACTIVITY_RESUMED,
                 UsageEvents.Event.MOVE_TO_FOREGROUND -> {
@@ -85,7 +78,7 @@ object ScreenUsageHelper {
                         if (segmentStart < segmentEnd) {
                             val duration = segmentEnd - segmentStart
                             if (duration > 1500) {
-                                usageMap[activePkg!!] = (usageMap[activePkg!!] ?: 0L) + duration
+                                usageMap[pkg] = (usageMap[pkg] ?: 0L) + duration
                             }
                         }
                         activePkg = null

@@ -466,6 +466,10 @@ class AppUsageMonitorService : Service() {
                                 cachedTotalUsage = baseUsageAtSessionStart
                                 baseGlobalUsageAtSessionStart = systemGlobal
                                 cachedTotalGlobalUsage = systemGlobal
+
+                                if (!shouldBypassBlocking(currentApp)) {
+                                    checkBlockingInstant(currentApp, currentShieldCache)
+                                }
                             }
                         }
 
@@ -631,6 +635,27 @@ class AppUsageMonitorService : Service() {
                     else -> 1200L
                 }
                 delay(delayTime)
+            }
+        }
+    }
+
+    private suspend fun checkBlockingInstant(currentApp: String, shield: ShieldEntity?) {
+        val currentTime = System.currentTimeMillis()
+        val isAppPaused = shield != null && isPaused(shield)
+        
+        if (!isAppPaused) {
+            val allowedUntil = allowedApps[currentApp]
+            val isBedtimeBlocking = isBedtimeActive || (isWindDownActive && currentPreferences?.bedtimeWindDownEnabled == true)
+            val shouldCheckSchedules = (isBedtimeBlocking && currentApp !in bedtimeWhitelistedPackages) || (allowedUntil == null || currentTime > allowedUntil)
+
+            if (shouldCheckSchedules && !InterceptOverlayManager.isShowing) {
+                if (checkSchedules(currentApp)) return
+
+                if (allowedUntil == null || currentTime > allowedUntil) {
+                    if (shield != null) {
+                        checkIfAppIsShielded(currentApp)
+                    }
+                }
             }
         }
     }
@@ -1099,13 +1124,11 @@ class AppUsageMonitorService : Service() {
             val tempUsageMap = mutableMapOf<String, Long>()
             val statsList = mutableListOf<android.app.usage.UsageStats>()
 
-            // Always use the accurate helper for today's app usage to ensure midnight reset is perfect
             val accurateUsageMap = com.etrisad.zenith.util.ScreenUsageHelper.fetchAppUsageTodayTillNow(usageStatsManager)
             accurateUsageMap.forEach { (pkg, millis) ->
                 tempUsageMap[pkg] = millis
             }
-            
-            // Still query aggregate stats for other metadata if needed, but the time is taken from accurateUsageMap
+
             usageStatsManager.queryAndAggregateUsageStats(startTime, currentTime)?.forEach { (_, stat) ->
                 statsList.add(stat)
             }
@@ -1469,6 +1492,11 @@ class AppUsageMonitorService : Service() {
             usageEvents.getNextEvent(reusableEvent)
             if (reusableEvent.eventType == UsageEvents.Event.MOVE_TO_FOREGROUND || 
                 reusableEvent.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
+
+                val className = reusableEvent.className ?: ""
+                if (className.contains("Notification", ignoreCase = true) || 
+                    className.contains("Toast", ignoreCase = true)) continue
+                
                 lastPackage = reusableEvent.packageName
             }
         }
