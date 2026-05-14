@@ -170,14 +170,14 @@ fun UsageStatsScreen(
     )
 
     PullToRefreshBox(
-        isRefreshing = uiState.isLoading && (uiState.dailyUsageHistory.isEmpty() || isManualRefreshing),
+        isRefreshing = uiState.isLoading,
         onRefresh = {
             isManualRefreshing = true
             viewModel.syncDataNow()
         },
         state = pullToRefreshState,
         indicator = {
-            val isRefreshing = uiState.isLoading && (uiState.dailyUsageHistory.isEmpty() || isManualRefreshing)
+            val isRefreshing = uiState.isLoading
             val scale by animateFloatAsState(
                 targetValue = if (isRefreshing) 1f else pullToRefreshState.distanceFraction.coerceIn(0f, 1f),
                 animationSpec = spring(

@@ -100,7 +100,7 @@ data class HomeUiState(
         set(Calendar.SECOND, 0)
         set(Calendar.MILLISECOND, 0)
     }.timeInMillis,
-    val isLoading: Boolean = false
+    val isLoading: Boolean = true
 )
 
 sealed class UsageRecord {
@@ -371,13 +371,14 @@ class HomeViewModel(
             shieldRepository.deleteOldHourlyUsage(thresholdDate)
         }
 
-        refreshUsageStats()
+        // Perform initial load and then sync
         startRealTimeUpdates()
         syncDataNow()
     }
 
     fun syncDataNow() {
         viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
             val syncManager = UsageSyncManager(context, shieldRepository, userPreferencesRepository)
             syncManager.syncUsageData()
             refreshUsageStats()
@@ -479,9 +480,14 @@ class HomeViewModel(
     }
 
     private fun refreshUsageStats(showLoading: Boolean = true) {
+        if (showLoading) _uiState.update { it.copy(isLoading = true) }
+        
+        // If a refresh is already running, don't cancel it if we don't want to show loading
+        // because we want the current "loading" one to finish its job.
+        if (!showLoading && refreshJob?.isActive == true) return
+
         refreshJob?.cancel()
         refreshJob = viewModelScope.launch(kotlinx.coroutines.Dispatchers.Default) {
-            if (showLoading) _uiState.update { it.copy(isLoading = true) }
             val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
             val pm = context.packageManager
 
