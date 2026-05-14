@@ -78,6 +78,36 @@ fun InterceptOverlayContent(
     var showContent by remember { mutableStateOf(false) }
     var isEmergencyUnlocked by remember { mutableStateOf(false) }
 
+    var currentTotalUsageToday by remember { mutableLongStateOf(totalUsageToday) }
+    var currentTotalGlobalUsageToday by remember { mutableLongStateOf(totalGlobalUsageToday) }
+
+    LaunchedEffect(packageName) {
+        while (true) {
+            delay(10000)
+            val usm = context.getSystemService(android.content.Context.USAGE_STATS_SERVICE) as android.app.usage.UsageStatsManager
+            val accurateUsageMap = com.etrisad.zenith.util.ScreenUsageHelper.fetchAppUsageTodayTillNow(usm)
+
+            currentTotalUsageToday = accurateUsageMap[packageName] ?: currentTotalUsageToday
+
+            val pm = context.packageManager
+            val launcherIntent = android.content.Intent(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_HOME)
+            val launcherPackage = pm.resolveActivity(launcherIntent, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY)
+                ?.activityInfo?.packageName
+            val launcherApps = pm.queryIntentActivities(
+                android.content.Intent(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_LAUNCHER), 0
+            ).map { it.activityInfo.packageName }.toSet()
+            val excludePackages = setOfNotNull(context.packageName, launcherPackage)
+
+            var newGlobalTotal = 0L
+            accurateUsageMap.forEach { (pkg, time) ->
+                if (pkg !in excludePackages && pkg in launcherApps) {
+                    if (time > 0) newGlobalTotal += time
+                }
+            }
+            currentTotalGlobalUsageToday = newGlobalTotal
+        }
+    }
+
     val isDelayEnabled = shield?.isDelayAppEnabled == true && shield.type == FocusType.SHIELD
     
     val initialProgress = remember(packageName, delayDurationSeconds) {
@@ -267,8 +297,8 @@ fun InterceptOverlayContent(
                         appName = appName,
                         appIcon = appIcon,
                         shield = shield,
-                        totalUsageToday = totalUsageToday,
-                        totalGlobalUsageToday = totalGlobalUsageToday,
+                        totalUsageToday = currentTotalUsageToday,
+                        totalGlobalUsageToday = currentTotalGlobalUsageToday,
                         remainingMinutes = remainingMinutes,
                         isEmergencyUnlocked = isEmergencyUnlocked,
                         isDelaying = isDelaying,
@@ -310,8 +340,8 @@ fun InterceptOverlayContent(
                         appName = appName,
                         appIcon = appIcon,
                         shield = shield,
-                        totalUsageToday = totalUsageToday,
-                        totalGlobalUsageToday = totalGlobalUsageToday,
+                        totalUsageToday = currentTotalUsageToday,
+                        totalGlobalUsageToday = currentTotalGlobalUsageToday,
                         remainingMinutes = remainingMinutes,
                         isEmergencyUnlocked = isEmergencyUnlocked,
                         isDelaying = isDelaying,
