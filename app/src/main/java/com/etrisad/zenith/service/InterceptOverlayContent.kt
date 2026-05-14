@@ -41,10 +41,12 @@ import androidx.compose.ui.geometry.Size
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
 import com.etrisad.zenith.data.preferences.UserPreferences
 import androidx.core.graphics.drawable.toBitmap
+import com.etrisad.zenith.data.local.entity.DailyUsageEntity
 import com.etrisad.zenith.data.local.entity.FocusType
 import com.etrisad.zenith.data.local.entity.ShieldEntity
 import com.etrisad.zenith.data.local.entity.ScheduleEntity
 import com.etrisad.zenith.data.local.entity.ScheduleMode
+import java.util.Calendar
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -65,6 +67,9 @@ fun InterceptOverlayContent(
     onGoalDismiss: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val app = context.applicationContext as com.etrisad.zenith.ZenithApplication
+    val shieldRepository = app.shieldRepository
+
     val appIcon = remember(packageName) {
         try {
             val drawable = context.packageManager.getApplicationIcon(packageName)
@@ -74,44 +79,71 @@ fun InterceptOverlayContent(
         }
     }
 
+    val allShields by shieldRepository.allShields.collectAsState(initial = emptyList())
+    val currentShield = remember(allShields, packageName) {
+        allShields.find { it.packageName == packageName } ?: shield
+    }
+
+    val databaseUsage by shieldRepository.getAllUsage().collectAsState(initial = emptyList())
+    val todayDate = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date()) }
+
+    val dbAppUsage = remember(databaseUsage, packageName, todayDate) {
+        databaseUsage.find { it.date == todayDate && it.packageName == packageName }?.usageTimeMillis ?: 0L
+    }
+    val dbGlobalUsage = remember(databaseUsage, todayDate) {
+        databaseUsage.find { it.date == todayDate && it.packageName == "TOTAL" }?.usageTimeMillis ?: 0L
+    }
+
     var showContent by remember { mutableStateOf(false) }
     var isEmergencyUnlocked by remember { mutableStateOf(false) }
 
-    var currentTotalUsageToday by remember { mutableLongStateOf(totalUsageToday) }
-    var currentTotalGlobalUsageToday by remember { mutableLongStateOf(totalGlobalUsageToday) }
+    var currentTotalUsageToday by remember { mutableLongStateOf(maxOf(totalUsageToday, dbAppUsage)) }
+    var currentTotalGlobalUsageToday by remember { mutableLongStateOf(maxOf(totalGlobalUsageToday, dbGlobalUsage)) }
 
-    LaunchedEffect(packageName) {
+    LaunchedEffect(packageName, dbAppUsage, dbGlobalUsage) {
+        val usm = context.getSystemService(android.content.Context.USAGE_STATS_SERVICE) as android.app.usage.UsageStatsManager
+        val pm = context.packageManager
+        
         while (true) {
-            delay(10000)
-            val usm = context.getSystemService(android.content.Context.USAGE_STATS_SERVICE) as android.app.usage.UsageStatsManager
             val accurateUsageMap = com.etrisad.zenith.util.ScreenUsageHelper.fetchAppUsageTodayTillNow(usm)
 
-            currentTotalUsageToday = accurateUsageMap[packageName] ?: currentTotalUsageToday
+            val liveAppUsage = accurateUsageMap[packageName] ?: 0L
+            
+            val todayStart = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }.timeInMillis
+            val timeSinceMidnight = System.currentTimeMillis() - todayStart
 
-            val pm = context.packageManager
+            currentTotalUsageToday = maxOf(dbAppUsage, liveAppUsage).coerceAtMost(timeSinceMidnight)
+
             val launcherIntent = android.content.Intent(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_HOME)
             val launcherPackage = pm.resolveActivity(launcherIntent, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY)
                 ?.activityInfo?.packageName
-            val launcherApps = pm.queryIntentActivities(
+            val launcherAppsSet = pm.queryIntentActivities(
                 android.content.Intent(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_LAUNCHER), 0
             ).map { it.activityInfo.packageName }.toSet()
             val excludePackages = setOfNotNull(context.packageName, launcherPackage)
 
             var newGlobalTotal = 0L
             accurateUsageMap.forEach { (pkg, time) ->
-                if (pkg !in excludePackages && pkg in launcherApps) {
+                if (pkg !in excludePackages && pkg in launcherAppsSet) {
                     if (time > 0) newGlobalTotal += time
                 }
             }
-            currentTotalGlobalUsageToday = newGlobalTotal
+            currentTotalGlobalUsageToday = maxOf(dbGlobalUsage, newGlobalTotal).coerceAtMost(timeSinceMidnight)
+            
+            delay(10000)
         }
     }
 
-    val isDelayEnabled = shield?.isDelayAppEnabled == true && shield.type == FocusType.SHIELD
+    val isDelayEnabled = currentShield?.isDelayAppEnabled == true && currentShield.type == FocusType.SHIELD
     
     val initialProgress = remember(packageName, delayDurationSeconds) {
-        if (isDelayEnabled && (shield?.lastDelayStartTimestamp ?: 0L) > 0 && delayDurationSeconds > 0) {
-            val elapsed = System.currentTimeMillis() - shield.lastDelayStartTimestamp
+        if (isDelayEnabled && (currentShield?.lastDelayStartTimestamp ?: 0L) > 0 && delayDurationSeconds > 0) {
+            val elapsed = System.currentTimeMillis() - currentShield.lastDelayStartTimestamp
             (elapsed.toFloat() / (delayDurationSeconds * 1000f)).coerceIn(0f, 1f)
         } else {
             0f
@@ -176,30 +208,30 @@ fun InterceptOverlayContent(
         }
     }
 
-    val isPeriodExpired = remember(packageName, shield?.lastPeriodResetTimestamp) {
-        shield != null && (System.currentTimeMillis() - shield.lastPeriodResetTimestamp > shield.refreshPeriodMinutes * 60 * 1000L)
+    val isPeriodExpired = remember(packageName, currentShield?.lastPeriodResetTimestamp) {
+        currentShield != null && (System.currentTimeMillis() - currentShield.lastPeriodResetTimestamp > currentShield.refreshPeriodMinutes * 60 * 1000L)
     }
     
-    val currentUses = remember(packageName, shield?.currentPeriodUses, isPeriodExpired) {
-        if (isPeriodExpired) 0 else (shield?.currentPeriodUses ?: 0)
+    val currentUses = remember(packageName, currentShield?.currentPeriodUses, isPeriodExpired) {
+        if (isPeriodExpired) 0 else (currentShield?.currentPeriodUses ?: 0)
     }
-    val maxUses = shield?.maxUsesPerPeriod ?: 5
+    val maxUses = currentShield?.maxUsesPerPeriod ?: 5
     val isUsesExceeded = remember(currentUses, maxUses) { currentUses >= maxUses }
-    val isTimeLimitReached = remember(packageName, totalUsageToday, shield?.timeLimitMinutes) {
-        shield != null && shield.timeLimitMinutes > 0 && totalUsageToday >= (shield.timeLimitMinutes * 60 * 1000L)
+    val isTimeLimitReached = remember(packageName, currentTotalUsageToday, currentShield?.timeLimitMinutes) {
+        currentShield != null && currentShield.timeLimitMinutes > 0 && currentTotalUsageToday >= (currentShield.timeLimitMinutes * 60 * 1000L)
     }
 
-    val remainingMinutes = remember(packageName, totalUsageToday, shield?.timeLimitMinutes) {
-        shield?.let {
+    val remainingMinutes = remember(packageName, currentTotalUsageToday, currentShield?.timeLimitMinutes) {
+        currentShield?.let {
             if (it.timeLimitMinutes <= 0) return@let null
             val limitMillis = it.timeLimitMinutes * 60 * 1000L
-            ((limitMillis - totalUsageToday) / (60 * 1000L)).toInt().coerceAtLeast(0)
+            ((limitMillis - currentTotalUsageToday) / (60 * 1000L)).toInt().coerceAtLeast(0)
         }
     }
 
-    val isBlocked = remember(isUsesExceeded, isTimeLimitReached, remainingMinutes, isEmergencyUnlocked, shield?.type) {
+    val isBlocked = remember(isUsesExceeded, isTimeLimitReached, remainingMinutes, isEmergencyUnlocked, currentShield?.type) {
         val effectivelyTimeReached = isTimeLimitReached || (remainingMinutes != null && remainingMinutes <= 0)
-        (isUsesExceeded || effectivelyTimeReached) && !isEmergencyUnlocked && shield?.type == FocusType.SHIELD
+        (isUsesExceeded || effectivelyTimeReached) && !isEmergencyUnlocked && currentShield?.type == FocusType.SHIELD
     }
 
     val autoKickProgress = remember(packageName) { Animatable(0f) }
@@ -222,7 +254,7 @@ fun InterceptOverlayContent(
                 autoKickProgress.stop()
                 autoKickProgress.snapTo(0f)
             }
-        } else if (!isDelaying && !isEmergencyUnlocked && (shield?.type == FocusType.SHIELD || shield == null)) {
+        } else if (!isDelaying && !isEmergencyUnlocked && (currentShield?.type == FocusType.SHIELD || currentShield == null)) {
             autoKickProgress.snapTo(0f)
             delay(8000)
             
@@ -243,8 +275,8 @@ fun InterceptOverlayContent(
         }
     }
     
-    val refreshTimeLeftMillis = if (shield != null) {
-        val nextRefresh = shield.lastPeriodResetTimestamp + (shield.refreshPeriodMinutes * 60 * 1000L)
+    val refreshTimeLeftMillis = if (currentShield != null) {
+        val nextRefresh = currentShield.lastPeriodResetTimestamp + (currentShield.refreshPeriodMinutes * 60 * 1000L)
         (nextRefresh - System.currentTimeMillis()).coerceAtLeast(0L)
     } else 0L
 
@@ -297,7 +329,7 @@ fun InterceptOverlayContent(
                     LandscapeInterceptLayout(
                         appName = appName,
                         appIcon = appIcon,
-                        shield = shield,
+                        shield = currentShield,
                         totalUsageToday = currentTotalUsageToday,
                         totalGlobalUsageToday = currentTotalGlobalUsageToday,
                         userPrefs = userPrefs,
@@ -341,7 +373,7 @@ fun InterceptOverlayContent(
                     PortraitInterceptLayout(
                         appName = appName,
                         appIcon = appIcon,
-                        shield = shield,
+                        shield = currentShield,
                         totalUsageToday = currentTotalUsageToday,
                         totalGlobalUsageToday = currentTotalGlobalUsageToday,
                         userPrefs = userPrefs,
@@ -1398,6 +1430,57 @@ fun ScheduleOverlayContent(
 
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val app = context.applicationContext as com.etrisad.zenith.ZenithApplication
+    val shieldRepository = app.shieldRepository
+    
+    val allSchedules by shieldRepository.allSchedules.collectAsState(initial = emptyList())
+    val currentSchedule = remember(allSchedules, schedule.id) {
+        allSchedules.find { it.id == schedule.id } ?: schedule
+    }
+
+    val databaseUsage by shieldRepository.getAllUsage().collectAsState(initial = emptyList())
+    val todayDate = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date()) }
+    val dbGlobalUsage = remember(databaseUsage, todayDate) {
+        databaseUsage.find { it.date == todayDate && it.packageName == "TOTAL" }?.usageTimeMillis ?: 0L
+    }
+
+    var currentTotalGlobalUsageToday by remember { mutableLongStateOf(maxOf(totalGlobalUsageToday, dbGlobalUsage)) }
+
+    LaunchedEffect(packageName, dbGlobalUsage) {
+        val usm = context.getSystemService(android.content.Context.USAGE_STATS_SERVICE) as android.app.usage.UsageStatsManager
+        val pm = context.packageManager
+        
+        while (true) {
+            val accurateUsageMap = com.etrisad.zenith.util.ScreenUsageHelper.fetchAppUsageTodayTillNow(usm)
+
+            val todayStart = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }.timeInMillis
+            val timeSinceMidnight = System.currentTimeMillis() - todayStart
+
+            val launcherIntent = android.content.Intent(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_HOME)
+            val launcherPackage = pm.resolveActivity(launcherIntent, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY)
+                ?.activityInfo?.packageName
+            val launcherAppsSet = pm.queryIntentActivities(
+                android.content.Intent(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_LAUNCHER), 0
+            ).map { it.activityInfo.packageName }.toSet()
+            val excludePackages = setOfNotNull(context.packageName, launcherPackage)
+
+            var newGlobalTotal = 0L
+            accurateUsageMap.forEach { (pkg, time) ->
+                if (pkg !in excludePackages && pkg in launcherAppsSet) {
+                    if (time > 0) newGlobalTotal += time
+                }
+            }
+            currentTotalGlobalUsageToday = maxOf(dbGlobalUsage, newGlobalTotal).coerceAtMost(timeSinceMidnight)
+            
+            delay(10000)
+        }
+    }
+
     val userPrefsRepo = remember { UserPreferencesRepository(context) }
     val userPrefs by userPrefsRepo.userPreferencesFlow.collectAsState(initial = UserPreferences())
 
@@ -1524,9 +1607,9 @@ fun ScheduleOverlayContent(
                     LandscapeScheduleLayout(
                         appName = appName,
                         appIcon = appIcon,
-                        schedule = schedule,
+                        schedule = currentSchedule,
                         progress = progress,
-                        totalGlobalUsageToday = totalGlobalUsageToday,
+                        totalGlobalUsageToday = currentTotalGlobalUsageToday,
                         userPrefs = userPrefs,
                         isEmergencyUnlocked = isEmergencyUnlocked,
                         autoKickProgress = { autoKickProgress.value },
@@ -1551,9 +1634,9 @@ fun ScheduleOverlayContent(
                     PortraitScheduleLayout(
                         appName = appName,
                         appIcon = appIcon,
-                        schedule = schedule,
+                        schedule = currentSchedule,
                         progress = progress,
-                        totalGlobalUsageToday = totalGlobalUsageToday,
+                        totalGlobalUsageToday = currentTotalGlobalUsageToday,
                         userPrefs = userPrefs,
                         isEmergencyUnlocked = isEmergencyUnlocked,
                         autoKickProgress = { autoKickProgress.value },
