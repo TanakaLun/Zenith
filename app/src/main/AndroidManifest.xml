@@ -103,7 +103,7 @@
 
         <receiver
             android:name=".ui.widget.GlobalStreakWidgetReceiver"
-            android:label="Zenith Global Streak"
+            android:label="Global Streak"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -115,7 +115,7 @@
 
         <receiver
             android:name=".ui.widget.AppStreakWidgetReceiver"
-            android:label="Zenith App Streak"
+            android:label="App Streak"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
