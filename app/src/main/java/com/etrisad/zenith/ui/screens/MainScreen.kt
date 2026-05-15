@@ -69,13 +69,29 @@ fun MainScreen(
     homeViewModel: HomeViewModel,
     focusViewModel: FocusViewModel,
     userPreferencesRepository: UserPreferencesRepository,
-    windowSizeClass: WindowSizeClass
+    windowSizeClass: WindowSizeClass,
+    initialPackageName: String? = null,
+    onInitialPackageHandled: () -> Unit = {}
 ) {
     val bedtimeViewModel: BedtimeViewModel = androidx.lifecycle.viewmodel.compose.viewModel(
         factory = BedtimeViewModelFactory(userPreferencesRepository)
     )
     val navController = rememberNavController()
     val context = LocalContext.current
+
+    LaunchedEffect(initialPackageName) {
+        if (initialPackageName != null) {
+            navController.navigate(Screen.AppDetail.createRoute(initialPackageName)) {
+                // Pop up to the home screen if we're deep in the app
+                popUpTo(navController.graph.findStartDestination().id) {
+                    saveState = true
+                }
+                launchSingleTop = true
+                restoreState = true
+            }
+            onInitialPackageHandled()
+        }
+    }
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route

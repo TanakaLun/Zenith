@@ -27,13 +27,19 @@ import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 
 class MainActivity : ComponentActivity() {
+    private var initialPackageName by mutableStateOf<String?>(null)
+
     @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        initialPackageName = intent.getStringExtra("package_name")
 
         val database = ZenithDatabase.getDatabase(this)
         val shieldRepository = ShieldRepository(
@@ -90,9 +96,20 @@ class MainActivity : ComponentActivity() {
                     homeViewModel = homeViewModel,
                     focusViewModel = focusViewModel,
                     userPreferencesRepository = userPreferencesRepository,
-                    windowSizeClass = windowSizeClass
+                    windowSizeClass = windowSizeClass,
+                    initialPackageName = initialPackageName,
+                    onInitialPackageHandled = { initialPackageName = null }
                 )
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val pkg = intent.getStringExtra("package_name")
+        if (pkg != null) {
+            initialPackageName = pkg
         }
     }
 }
