@@ -394,6 +394,7 @@ class InterceptOverlayManager(
             
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 setFitInsetsTypes(0)
+                layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
             }
         }
 
@@ -401,6 +402,19 @@ class InterceptOverlayManager(
             requestMediaPause()
             windowManager.addView(composeView, params)
             overlayView = composeView
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                composeView.post {
+                    try {
+                        composeView.windowInsetsController?.setSystemBarsAppearance(
+                            0,
+                            android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or
+                                    android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
+                        )
+                    } catch (_: Exception) {}
+                }
+            }
+
             lOwner.handleLifecycleEvent(Lifecycle.Event.ON_START)
             lOwner.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
             Log.d(TAG, "Overlay added to window for $currentPackage")

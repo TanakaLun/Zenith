@@ -165,6 +165,7 @@ fun WindDownOverlayContent(
             ) {
                 Column(
                     modifier = Modifier
+                        .let { if (isLandscape) it.displayCutoutPadding() else it }
                         .padding(24.dp)
                         .fillMaxWidth()
                         .navigationBarsPadding(),

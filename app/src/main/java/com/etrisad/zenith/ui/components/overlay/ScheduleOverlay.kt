@@ -197,6 +197,7 @@ fun ScheduleOverlay(
             ) {
                 if (isLandscape) {
                     LandscapeScheduleLayout(
+                        modifier = Modifier.displayCutoutPadding(),
                         appName = appName,
                         appIcon = appIcon,
                         schedule = currentSchedule,
@@ -275,7 +276,8 @@ fun PortraitScheduleLayout(
         Row(
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(top = 28.dp, end = 20.dp),
+                .statusBarsPadding()
+                .padding(top = 16.dp, end = 20.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
@@ -418,6 +420,7 @@ fun PortraitScheduleLayout(
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun LandscapeScheduleLayout(
+    modifier: Modifier = Modifier,
     appName: String,
     appIcon: androidx.compose.ui.graphics.ImageBitmap?,
     schedule: ScheduleEntity,
@@ -432,7 +435,7 @@ fun LandscapeScheduleLayout(
     onCloseApp: () -> Unit
 ) {
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(modifier = Modifier.height(12.dp))

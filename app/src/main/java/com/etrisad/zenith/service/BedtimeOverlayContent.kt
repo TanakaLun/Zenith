@@ -175,6 +175,7 @@ fun BedtimeOverlayContent(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
+                        .let { if (isLandscape) it.displayCutoutPadding() else it }
                         .padding(24.dp)
                         .navigationBarsPadding(),
                     horizontalAlignment = Alignment.CenterHorizontally
