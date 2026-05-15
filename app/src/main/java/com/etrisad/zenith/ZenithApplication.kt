@@ -1,6 +1,7 @@
 package com.etrisad.zenith
 
 import android.app.Application
+import android.content.res.Configuration
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.disk.DiskCache
@@ -9,8 +10,16 @@ import coil.memory.MemoryCache
 import com.etrisad.zenith.data.local.database.ZenithDatabase
 import com.etrisad.zenith.data.repository.ShieldRepository
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
+import com.etrisad.zenith.ui.widget.AppStreakWidget
+import com.etrisad.zenith.ui.widget.GlobalStreakWidget
+import androidx.glance.appwidget.updateAll
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class ZenithApplication : Application(), ImageLoaderFactory {
+
+    private var lastUiMode: Int = 0
 
     val userPreferencesRepository: UserPreferencesRepository by lazy {
         UserPreferencesRepository(this)
@@ -28,6 +37,7 @@ class ZenithApplication : Application(), ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()
+        lastUiMode = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
         com.etrisad.zenith.service.UsageSyncWorker.enqueue(this)
     }
 
@@ -52,6 +62,21 @@ class ZenithApplication : Application(), ImageLoaderFactory {
         super.onTrimMemory(level)
         if (level >= TRIM_MEMORY_MODERATE) {
             coil.Coil.imageLoader(this).memoryCache?.clear()
+        }
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        val newUiMode = newConfig.uiMode and Configuration.UI_MODE_NIGHT_MASK
+        if (newUiMode != lastUiMode) {
+            lastUiMode = newUiMode
+            CoroutineScope(Dispatchers.Main).launch {
+                try {
+                    AppStreakWidget().updateAll(this@ZenithApplication)
+                    GlobalStreakWidget().updateAll(this@ZenithApplication)
+                } catch (_: Exception) {
+                }
+            }
         }
     }
 }
