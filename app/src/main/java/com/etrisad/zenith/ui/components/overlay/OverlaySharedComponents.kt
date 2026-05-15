@@ -4,6 +4,8 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -25,6 +27,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.etrisad.zenith.data.preferences.UserPreferences
+import com.etrisad.zenith.ui.components.ZenithButton
+import com.etrisad.zenith.ui.components.ZenithButtonSize
+import com.etrisad.zenith.ui.components.ZenithButtonType
 import kotlinx.coroutines.delay
 import java.util.Locale
 
@@ -112,134 +117,61 @@ fun TotalUsagePill(totalGlobalUsageToday: Long, userPrefs: UserPreferences, modi
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun EmergencyButton(onEmergencyUse: () -> Unit, onHoldingChange: (Boolean) -> Unit = {}) {
-    var isHolding by remember { mutableStateOf(false) }
-    var holdProgressTarget by remember { mutableFloatStateOf(0f) }
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val holdProgress = remember { Animatable(0f) }
 
-    val animatedProgressState = animateFloatAsState(
-        targetValue = holdProgressTarget,
-        animationSpec = if (isHolding) tween(5000, easing = LinearEasing) else tween(300),
-        label = "holdProgress"
-    )
-
-    LaunchedEffect(isHolding) {
-        onHoldingChange(isHolding)
-        if (isHolding) {
-            holdProgressTarget = 1f
-            delay(5000)
-            if (isHolding) {
+    LaunchedEffect(isPressed) {
+        onHoldingChange(isPressed)
+        if (isPressed) {
+            if (holdProgress.animateTo(1f, tween(5000, easing = LinearEasing)).endReason == AnimationEndReason.Finished) {
                 onEmergencyUse()
-                isHolding = false
-                holdProgressTarget = 0f
+                holdProgress.snapTo(0f)
             }
         } else {
-            holdProgressTarget = 0f
+            holdProgress.animateTo(0f, spring(stiffness = Spring.StiffnessMedium))
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(64.dp)
-            .clip(MaterialTheme.shapes.large)
-            .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f))
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onPress = {
-                        isHolding = true
-                        try {
-                            awaitRelease()
-                        } finally {
-                            isHolding = false
-                        }
-                    }
-                )
-            },
-        contentAlignment = Alignment.Center
-    ) {
-        val progressColor = MaterialTheme.colorScheme.error.copy(alpha = 0.5f)
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .drawBehind {
-                    drawRect(
-                        color = progressColor,
-                        size = size.copy(width = size.width * animatedProgressState.value)
-                    )
-                }
-        )
-
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Outlined.Bolt, contentDescription = null, tint = MaterialTheme.colorScheme.error)
-            Spacer(modifier = Modifier.width(8.dp))
-            val secondsRemaining by remember {
-                derivedStateOf { 5 - (animatedProgressState.value * 5).toInt() }
-            }
-            Text(
-                text = if (isHolding) "Hold for ${secondsRemaining}s..." else "Hold for 5s to use Emergency",
-                color = MaterialTheme.colorScheme.onErrorContainer,
-                fontWeight = FontWeight.Bold
+    ZenithButton(
+        onClick = {},
+        type = ZenithButtonType.Filled,
+        containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
+        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        backgroundProgressProvider = { holdProgress.value },
+        interactionSource = interactionSource,
+        fillMaxWidth = true,
+        size = ZenithButtonSize.ExtraLarge,
+        content = {
+            Icon(
+                imageVector = Icons.Outlined.Bolt,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error
             )
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-fun CloseAppTextButton(onCloseApp: () -> Unit, autoKickProgress: () -> Float = { 0f }) {
-    val density = LocalDensity.current
-    val infiniteTransition = rememberInfiniteTransition(label = "autoKickWavy")
-    val waveAmplitudeState = infiniteTransition.animateFloat(
-        initialValue = 0.5f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = EaseInOutSine),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "amplitude"
-    )
-
-    TextButton(
-        onClick = onCloseApp,
-        modifier = Modifier.fillMaxWidth(),
-        colors = ButtonDefaults.textButtonColors(
-            contentColor = MaterialTheme.colorScheme.error
-        )
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
+            Spacer(modifier = Modifier.width(8.dp))
+            val secondsRemaining = kotlin.math.ceil(5 * (1f - holdProgress.value)).toInt()
             Text(
-                text = "Close App",
+                text = if (isPressed) "Hold for ${secondsRemaining}s..." else "Hold for 5s to use Emergency",
                 fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.titleMedium
             )
-            val isVisible by remember { derivedStateOf { autoKickProgress() > 0.4f } }
-            AnimatedVisibility(
-                visible = isVisible,
-                enter = expandHorizontally(
-                    animationSpec = spring(dampingRatio = 0.8f, stiffness = 400f)
-                ) + fadeIn(),
-                exit = shrinkHorizontally() + fadeOut()
-            ) {
-                CircularWavyProgressIndicator(
-                    progress = autoKickProgress,
-                    modifier = Modifier
-                        .padding(start = 12.dp)
-                        .size(24.dp),
-                    color = MaterialTheme.colorScheme.error,
-                    trackColor = MaterialTheme.colorScheme.error.copy(alpha = 0.2f),
-                    stroke = with(density) { Stroke(width = 2.dp.toPx()) },
-                    trackStroke = with(density) { Stroke(width = 2.dp.toPx()) },
-                    wavelength = 8.dp,
-                    amplitude = { waveAmplitudeState.value }
-                )
-            }
         }
-    }
+    )
+}
+
+@Composable
+fun CloseAppTextButton(onCloseApp: () -> Unit, autoKickProgress: () -> Float = { 0f }) {
+    ZenithButton(
+        onClick = onCloseApp,
+        text = "Close App",
+        type = ZenithButtonType.Text,
+        contentColor = MaterialTheme.colorScheme.error,
+        backgroundProgressProvider = autoKickProgress,
+        fillMaxWidth = true,
+        size = ZenithButtonSize.ExtraLarge
+    )
 }
 
 @Composable

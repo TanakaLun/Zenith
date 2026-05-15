@@ -31,6 +31,10 @@ import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
 import com.etrisad.zenith.data.preferences.UserPreferences
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
+import com.etrisad.zenith.ui.components.ZenithButton
+import com.etrisad.zenith.ui.components.ZenithButtonSize
+import com.etrisad.zenith.ui.components.ZenithButtonType
+import com.etrisad.zenith.ui.components.overlay.CloseAppTextButton
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -67,8 +71,6 @@ fun BedtimeOverlayContent(
         animationSpec = tween(durationMillis = 5000, easing = LinearEasing),
         label = "exitProgress"
     )
-
-    val showButtonProgress = exitProgress >= 0.4f
 
     val bedtimeUiState by produceState(
         initialValue = Triple(0f, "0m", "")
@@ -128,8 +130,6 @@ fun BedtimeOverlayContent(
 
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-    val density = LocalDensity.current
-
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -277,54 +277,16 @@ fun BedtimeOverlayContent(
                         }
                     }
 
-                    Button(
-                        onClick = {
+                    CloseAppTextButton(
+                        onCloseApp = {
                             scope.launch {
                                 showContent = false
                                 delay(400)
                                 onCloseApp()
                             }
                         },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(60.dp)
-                            .clip(MaterialTheme.shapes.large),
-                        shape = MaterialTheme.shapes.large,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary
-                        )
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Text(
-                                text = "Close App",
-                                fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.titleMedium
-                            )
-                            AnimatedVisibility(
-                                visible = showButtonProgress,
-                                enter = expandHorizontally(
-                                    animationSpec = spring(dampingRatio = 0.8f, stiffness = 400f)
-                                ) + fadeIn(),
-                                exit = shrinkHorizontally() + fadeOut()
-                            ) {
-                                CircularWavyProgressIndicator(
-                                    progress = { exitProgress },
-                                    modifier = Modifier
-                                        .padding(start = 12.dp)
-                                        .size(24.dp),
-                                    color = MaterialTheme.colorScheme.onPrimary,
-                                    trackColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f),
-                                    trackStroke = with(density) { Stroke(width = 2.dp.toPx()) },
-                                    stroke = with(density) { Stroke(width = 2.dp.toPx()) },
-                                    wavelength = 8.dp,
-                                    amplitude = { 1f }
-                                )
-                            }
-                        }
-                    }
+                        autoKickProgress = { exitProgress }
+                    )
                 }
             }
         }

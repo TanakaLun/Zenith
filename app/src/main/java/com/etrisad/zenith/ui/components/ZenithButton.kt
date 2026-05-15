@@ -50,6 +50,7 @@ data class ZenithToggleOption(
     val isLoading: Boolean = false,
     val loadingProgress: Float? = null,
     val backgroundProgress: Float? = null,
+    val backgroundProgressProvider: (() -> Float)? = null,
     val containerColor: Color? = null,
     val contentColor: Color? = null,
     val enabled: Boolean = true
@@ -68,14 +69,17 @@ fun ZenithButton(
     isLoading: Boolean = false,
     loadingProgress: Float? = null,
     backgroundProgress: Float? = null,
+    backgroundProgressProvider: (() -> Float)? = null,
     fillMaxWidth: Boolean = false,
     containerColor: Color? = null,
     contentColor: Color? = null,
     pillCornerRadius: Dp? = null,
     pressedCornerRadius: Dp? = null,
     height: Dp? = null,
+    shape: Shape? = null,
     onHoldComplete: (() -> Unit)? = null,
     holdDuration: Long = 1500L,
+    enableAfterDelayMillis: Long = 0L,
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     content: @Composable (RowScope.() -> Unit)? = null
 ) {
@@ -90,6 +94,7 @@ fun ZenithButton(
         isLoading = isLoading,
         loadingProgress = loadingProgress,
         backgroundProgress = backgroundProgress,
+        backgroundProgressProvider = backgroundProgressProvider,
         fillMaxWidth = fillMaxWidth,
         containerColor = containerColor,
         contentColor = contentColor,
@@ -98,7 +103,9 @@ fun ZenithButton(
         heightOverride = height,
         onHoldComplete = onHoldComplete,
         holdDuration = holdDuration,
+        enableAfterDelayMillis = enableAfterDelayMillis,
         interactionSource = interactionSource,
+        customShape = shape,
         content = content
     )
 }
@@ -116,6 +123,7 @@ fun RowScope.ZenithButton(
     isLoading: Boolean = false,
     loadingProgress: Float? = null,
     backgroundProgress: Float? = null,
+    backgroundProgressProvider: (() -> Float)? = null,
     containerColor: Color? = null,
     contentColor: Color? = null,
     pillCornerRadius: Dp? = null,
@@ -123,6 +131,7 @@ fun RowScope.ZenithButton(
     height: Dp? = null,
     onHoldComplete: (() -> Unit)? = null,
     holdDuration: Long = 1500L,
+    enableAfterDelayMillis: Long = 0L,
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     shape: Shape? = null,
     content: @Composable (RowScope.() -> Unit)? = null
@@ -145,6 +154,7 @@ fun RowScope.ZenithButton(
         isLoading = isLoading,
         loadingProgress = loadingProgress,
         backgroundProgress = backgroundProgress,
+        backgroundProgressProvider = backgroundProgressProvider,
         fillMaxWidth = false,
         containerColor = containerColor,
         contentColor = contentColor,
@@ -153,6 +163,7 @@ fun RowScope.ZenithButton(
         heightOverride = height,
         onHoldComplete = onHoldComplete,
         holdDuration = holdDuration,
+        enableAfterDelayMillis = enableAfterDelayMillis,
         interactionSource = interactionSource,
         customShape = shape,
         content = content
@@ -172,6 +183,7 @@ private fun ZenithButtonInternal(
     isLoading: Boolean,
     loadingProgress: Float?,
     backgroundProgress: Float?,
+    backgroundProgressProvider: (() -> Float)?,
     fillMaxWidth: Boolean,
     containerColor: Color?,
     contentColor: Color?,
@@ -180,6 +192,7 @@ private fun ZenithButtonInternal(
     heightOverride: Dp?,
     onHoldComplete: (() -> Unit)?,
     holdDuration: Long,
+    enableAfterDelayMillis: Long,
     interactionSource: MutableInteractionSource,
     customShape: Shape? = null,
     content: @Composable (RowScope.() -> Unit)?
@@ -188,6 +201,24 @@ private fun ZenithButtonInternal(
     val curPressed by rememberUpdatedState(isPressed)
     val haptic = LocalHapticFeedback.current
     val density = LocalDensity.current
+
+    val delayAnim = remember(enableAfterDelayMillis) { Animatable(0f) }
+    val isDelaying = enableAfterDelayMillis > 0 && delayAnim.value < 1f
+    
+    val bounceScale = remember { Animatable(1f) }
+
+    LaunchedEffect(enableAfterDelayMillis) {
+        if (enableAfterDelayMillis > 0) {
+            delayAnim.animateTo(1f, tween(enableAfterDelayMillis.toInt(), easing = LinearEasing))
+            bounceScale.animateTo(
+                targetValue = 1f,
+                initialVelocity = 2f,
+                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)
+            )
+        } else {
+            delayAnim.snapTo(1f)
+        }
+    }
 
     val resH = heightOverride ?: when(size){ZenithButtonSize.Small->32.dp; ZenithButtonSize.Medium->40.dp; ZenithButtonSize.Large->48.dp; else->64.dp}
     val resPillR = pillCornerRadiusOverride ?: (resH / 2)
@@ -199,10 +230,10 @@ private fun ZenithButtonInternal(
     val holdAnim = remember { Animatable(0f) }
     val isHoldAction = onHoldComplete != null || type == ZenithButtonType.Hold
 
-    val targetProgress = maxOf(holdAnim.value, backgroundProgress ?: 0f)
+    val targetProgress = if (isDelaying) delayAnim.value else maxOf(holdAnim.value, backgroundProgress ?: (backgroundProgressProvider?.invoke() ?: 0f))
     val animatedProgressState = animateFloatAsState(
         targetValue = targetProgress,
-        animationSpec = if (targetProgress < 0.05f) 
+        animationSpec = if (targetProgress < 0.05f || isDelaying) 
             spring(stiffness = Spring.StiffnessLow) 
         else 
             spring(stiffness = Spring.StiffnessHigh),
@@ -215,8 +246,10 @@ private fun ZenithButtonInternal(
         label = "cScale"
     )
 
+    val finalScale = cScaleState.value * bounceScale.value
+
     val animR by animateDpAsState(
-        targetValue = if (backgroundProgress != null && !isHoldAction) {
+        targetValue = if ((backgroundProgress != null || backgroundProgressProvider != null) && !isHoldAction) {
             if (isPressed) resPillR else resPressR
         } else {
             if (isPressed) resPressR else resPillR
@@ -231,7 +264,7 @@ private fun ZenithButtonInternal(
     )
 
     LaunchedEffect(isPressed) {
-        if (isHoldAction && enabled && !isLoading) {
+        if (isHoldAction && enabled && !isLoading && !isDelaying) {
             if (isPressed) {
                 if (holdAnim.animateTo(1f, tween(holdDuration.toInt(), easing = LinearEasing)).endReason == AnimationEndReason.Finished && curPressed) {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -249,13 +282,13 @@ private fun ZenithButtonInternal(
     val fShape = customShape ?: RoundedCornerShape(animR)
     val primary = MaterialTheme.colorScheme.primary
     val fBg = containerColor ?: when (type) {
-        ZenithButtonType.Filled, ZenithButtonType.Hold -> if (isLoading) MaterialTheme.colorScheme.primaryContainer else primary
+        ZenithButtonType.Filled, ZenithButtonType.Hold -> if (isLoading || isDelaying) MaterialTheme.colorScheme.primaryContainer else primary
         ZenithButtonType.Tonal -> MaterialTheme.colorScheme.secondaryContainer
         ZenithButtonType.Elevated -> MaterialTheme.colorScheme.surfaceContainerLow
         else -> Color.Transparent
     }
     val fContent = contentColor ?: when (type) {
-        ZenithButtonType.Filled, ZenithButtonType.Hold -> if (isLoading) primary else MaterialTheme.colorScheme.onPrimary
+        ZenithButtonType.Filled, ZenithButtonType.Hold -> if (isLoading || isDelaying) primary else MaterialTheme.colorScheme.onPrimary
         ZenithButtonType.Tonal -> MaterialTheme.colorScheme.onSecondaryContainer
         else -> primary
     }
@@ -271,7 +304,7 @@ private fun ZenithButtonInternal(
         modifier = modifier
             .then(if (fillMaxWidth) Modifier.fillMaxWidth() else Modifier)
             .height(resH),
-        enabled = enabled && !isLoading,
+        enabled = enabled && !isLoading && !isDelaying,
         shape = fShape,
         color = fBg,
         contentColor = fContent,
@@ -296,31 +329,45 @@ private fun ZenithButtonInternal(
             contentAlignment = Alignment.Center
         ) {
             AnimatedContent(
-                targetState = isLoading,
+                targetState = isLoading || isDelaying,
                 transitionSpec = { fadeIn(spring(stiffness = Spring.StiffnessLow)) togetherWith fadeOut(spring(stiffness = Spring.StiffnessLow)) },
                 label = "cSwitch"
-            ) { loading ->
-                if (loading) {
-                    if (loadingProgress == null) {
+            ) { loadingOrDelay ->
+                if (loadingOrDelay) {
+                    if (loadingProgress == null && !isDelaying) {
                         LoadingIndicator(color = fContent, modifier = Modifier.size(resH * 0.6f))
                     } else {
-                        CircularWavyProgressIndicator(
-                            progress = { loadingProgress.coerceIn(0f, 1f) },
-                            color = fContent,
-                            trackColor = fContent.copy(alpha = 0.12f),
-                            stroke = Stroke(width = with(density) { (resH * 0.06f).toPx() }),
-                            trackStroke = Stroke(width = with(density) { (resH * 0.06f).toPx() }),
-                            modifier = Modifier.size(resH * 0.7f)
-                        )
+                        val prog = if (isDelaying) delayAnim.value else (loadingProgress ?: 0f)
+                        Box(contentAlignment = Alignment.Center) {
+                            CircularWavyProgressIndicator(
+                                progress = { prog.coerceIn(0f, 1f) },
+                                color = fContent,
+                                trackColor = fContent.copy(alpha = 0.12f),
+                                stroke = Stroke(width = with(density) { (resH * 0.06f).toPx() }),
+                                trackStroke = Stroke(width = with(density) { (resH * 0.06f).toPx() }),
+                                modifier = Modifier.size(resH * 0.7f)
+                            )
+                            
+                            if (isDelaying) {
+                                val secondsLeft = kotlin.math.ceil((1f - delayAnim.value) * (enableAfterDelayMillis / 1000f)).toInt()
+                                if (secondsLeft > 0) {
+                                    Text(
+                                        text = secondsLeft.toString(),
+                                        style = resTextS,
+                                        fontWeight = FontWeight.Black,
+                                        color = fContent
+                                    )
+                                }
+                            }
+                        }
                     }
                 } else {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center,
                         modifier = Modifier.graphicsLayer { 
-                            val s = cScaleState.value
-                            scaleX = s
-                            scaleY = s 
+                            scaleX = finalScale
+                            scaleY = finalScale
                         }
                     ) {
                         if (content != null) { content() } else {
