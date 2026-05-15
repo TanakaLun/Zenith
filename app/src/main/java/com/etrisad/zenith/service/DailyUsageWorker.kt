@@ -26,9 +26,14 @@ class DailyUsageWorker(context: Context, params: WorkerParameters) : CoroutineWo
         val isBackup = inputData.getBoolean("is_backup", false)
         val calendar = Calendar.getInstance()
         val currentHour = calendar.get(Calendar.HOUR_OF_DAY)
+        val currentMinute = calendar.get(Calendar.MINUTE)
 
-        if (isBackup && currentHour != 23) {
-            return Result.success()
+        if (isBackup) {
+            val isLateNight = currentHour == 23
+            val isEarlyMorning = currentHour == 0 && currentMinute <= 30
+            if (!isLateNight && !isEarlyMorning) {
+                return Result.success()
+            }
         }
 
         val database = ZenithDatabase.getDatabase(applicationContext)
@@ -39,7 +44,7 @@ class DailyUsageWorker(context: Context, params: WorkerParameters) : CoroutineWo
 
         val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
-        if (!isBackup && currentHour < 9) {
+        if ((!isBackup && currentHour < 9) || (isBackup && currentHour == 0)) {
             calendar.add(Calendar.DAY_OF_YEAR, -1)
         }
 
@@ -359,7 +364,7 @@ class DailyUsageWorker(context: Context, params: WorkerParameters) : CoroutineWo
             val now = calendar.timeInMillis
 
             calendar.set(Calendar.HOUR_OF_DAY, 23)
-            calendar.set(Calendar.MINUTE, 50)
+            calendar.set(Calendar.MINUTE, 58)
             calendar.set(Calendar.SECOND, 0)
             
             if (calendar.timeInMillis <= now) {
@@ -385,7 +390,7 @@ class DailyUsageWorker(context: Context, params: WorkerParameters) : CoroutineWo
                 .setRequiresBatteryNotLow(true)
                 .build()
 
-            val backupWorkRequest = PeriodicWorkRequestBuilder<DailyUsageWorker>(20, TimeUnit.MINUTES)
+            val backupWorkRequest = PeriodicWorkRequestBuilder<DailyUsageWorker>(15, TimeUnit.MINUTES)
                 .setConstraints(constraints)
                 .setInputData(workDataOf("is_backup" to true))
                 .build()
