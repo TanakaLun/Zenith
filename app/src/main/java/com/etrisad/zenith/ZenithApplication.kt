@@ -39,6 +39,14 @@ class ZenithApplication : Application(), ImageLoaderFactory {
         super.onCreate()
         lastUiMode = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
         com.etrisad.zenith.service.UsageSyncWorker.enqueue(this)
+        
+        // Ensure widgets are updated on startup/after update
+        CoroutineScope(Dispatchers.Main).launch {
+            try {
+                AppStreakWidget().updateAll(this@ZenithApplication)
+                GlobalStreakWidget().updateAll(this@ZenithApplication)
+            } catch (_: Exception) {}
+        }
     }
 
     override fun newImageLoader(): ImageLoader {
