@@ -64,16 +64,13 @@ class AppStreakWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val app = context.applicationContext as ZenithApplication
-        val sunnyBitmap = createShapeBitmap(context, 48, MaterialShapes.Sunny)
-        val cookieBitmap = createShapeBitmap(context, 48, MaterialShapes.Cookie12Sided)
-        val pillBitmap = createShapeBitmap(context, 200, MaterialShapes.Pill)
-        val circleBitmap = createShapeBitmap(context, 100, MaterialShapes.Circle)
 
         provideContent {
             val prefs = currentState<Preferences>()
             val selectedPackage = prefs[SELECTED_PACKAGE_KEY]
             
-            val shields by remember {
+            // Optimization: Use a shared flow of shields and filter it to minimize re-renders
+            val shields by remember(app) {
                 app.shieldRepository.allShields
                     .distinctUntilChanged { old, new ->
                         if (old.size != new.size) return@distinctUntilChanged false
@@ -82,35 +79,48 @@ class AppStreakWidget : GlanceAppWidget() {
                             o.currentStreak == n.currentStreak &&
                             o.bestStreak == n.bestStreak &&
                             o.lastStreakUpdateTimestamp == n.lastStreakUpdateTimestamp &&
-                            (o.remainingTimeMillis == 0L) == (n.remainingTimeMillis == 0L)
+                            (o.remainingTimeMillis <= 0) == (n.remainingTimeMillis <= 0)
                         }
                     }
             }.collectAsState(initial = emptyList())
 
-            val packageToDisplay = if (!selectedPackage.isNullOrEmpty()) {
-                selectedPackage
-            } else {
-                shields.filter { it.currentStreak > 0 }.maxByOrNull { it.currentStreak }?.packageName
+            val packageToDisplay = remember(selectedPackage, shields) {
+                if (!selectedPackage.isNullOrEmpty()) {
+                    selectedPackage
+                } else {
+                    shields.filter { it.currentStreak > 0 }.maxByOrNull { it.currentStreak }?.packageName
+                }
             }
             
-            val targetShield = shields.find { it.packageName == packageToDisplay }
+            val targetShield = remember(packageToDisplay, shields) {
+                shields.find { it.packageName == packageToDisplay }
+            }
             
-            val iconBitmap = packageToDisplay?.let {
-                try {
-                    val original = context.packageManager.getApplicationIcon(it).toBitmap()
-                    createShapeBitmap(context, 48, MaterialShapes.Cookie12Sided, sourceBitmap = original)
-                } catch (_: Exception) {
-                    null
+            val iconBitmap = remember(packageToDisplay) {
+                packageToDisplay?.let {
+                    try {
+                        val original = context.packageManager.getApplicationIcon(it).toBitmap()
+                        createShapeBitmap(context, 48, MaterialShapes.Cookie12Sided, sourceBitmap = original)
+                    } catch (_: Exception) {
+                        null
+                    }
                 }
             }
 
-            GlanceTheme {
-                val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
+            val sunnyBitmap = remember { createShapeBitmap(context, 48, MaterialShapes.Sunny) }
+            val cookieBitmap = remember { createShapeBitmap(context, 48, MaterialShapes.Cookie12Sided) }
+            val pillBitmap = remember { createShapeBitmap(context, 200, MaterialShapes.Pill) }
+            val circleBitmap = remember { createShapeBitmap(context, 100, MaterialShapes.Circle) }
 
-                val isStreakAchieved = if (targetShield?.type == FocusType.GOAL) {
-                    targetShield.remainingTimeMillis == 0L && targetShield.timeLimitMinutes > 0
-                } else {
-                    isToday(targetShield?.lastStreakUpdateTimestamp ?: 0L)
+            GlanceTheme {
+                val appWidgetId = remember { GlanceAppWidgetManager(context).getAppWidgetId(id) }
+
+                val isStreakAchieved = remember(targetShield) {
+                    if (targetShield?.type == FocusType.GOAL) {
+                        targetShield.remainingTimeMillis <= 0 && targetShield.timeLimitMinutes > 0
+                    } else {
+                        isToday(targetShield?.lastStreakUpdateTimestamp ?: 0L)
+                    }
                 }
 
                 val mainAction = if (!packageToDisplay.isNullOrEmpty()) {

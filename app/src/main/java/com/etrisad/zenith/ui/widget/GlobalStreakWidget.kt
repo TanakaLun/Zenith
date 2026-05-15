@@ -7,6 +7,9 @@ import android.os.Build
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.*
@@ -14,6 +17,8 @@ import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.provideContent
 import androidx.glance.layout.*
+import androidx.glance.state.GlanceStateDefinition
+import androidx.glance.state.PreferencesGlanceStateDefinition
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
@@ -22,28 +27,40 @@ import androidx.graphics.shapes.RoundedPolygon
 import androidx.graphics.shapes.toPath
 import com.etrisad.zenith.R
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 class GlobalStreakWidget : GlanceAppWidget() {
     override val sizeMode: SizeMode = SizeMode.Exact
+    override val stateDefinition: GlanceStateDefinition<*> = PreferencesGlanceStateDefinition
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val repository = UserPreferencesRepository(context)
-        val prefs = repository.userPreferencesFlow.first()
-
-        val sunnyBitmap = createShapeBitmap(context, 64, MaterialShapes.Sunny)
-        val backgroundBitmap = createShapeBitmap(context, 200, MaterialShapes.Cookie12Sided)
-        val circleBitmap = createShapeBitmap(context, 100, MaterialShapes.Circle)
 
         provideContent {
+            val prefs by remember(repository) { 
+                repository.userPreferencesFlow
+                    .distinctUntilChanged { old, new ->
+                        old.globalCurrentStreak == new.globalCurrentStreak &&
+                        old.globalBestStreak == new.globalBestStreak
+                    }
+            }.collectAsState(initial = null)
+            
+            val sunnyBitmap = remember { createShapeBitmap(context, 64, MaterialShapes.Sunny) }
+            val backgroundBitmap = remember { createShapeBitmap(context, 200, MaterialShapes.Cookie12Sided) }
+            val circleBitmap = remember { createShapeBitmap(context, 100, MaterialShapes.Circle) }
+
             GlanceTheme {
-                GlobalStreakContent(
-                    currentStreak = prefs.globalCurrentStreak,
-                    bestStreak = prefs.globalBestStreak,
-                    sunnyBitmap = sunnyBitmap,
-                    backgroundBitmap = backgroundBitmap,
-                    circleBitmap = circleBitmap
-                )
+                if (prefs != null) {
+                    GlobalStreakContent(
+                        currentStreak = prefs!!.globalCurrentStreak,
+                        bestStreak = prefs!!.globalBestStreak,
+                        sunnyBitmap = sunnyBitmap,
+                        backgroundBitmap = backgroundBitmap,
+                        circleBitmap = circleBitmap
+                    )
+                } else {
+                    Box(modifier = GlanceModifier.fillMaxSize()) {}
+                }
             }
         }
     }
