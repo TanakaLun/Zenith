@@ -103,57 +103,63 @@ fun AllowedBedAppsBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface,
-        tonalElevation = 0.dp
+        tonalElevation = 0.dp,
+        dragHandle = null,
+        contentWindowInsets = { WindowInsets(0, 0, 0, 0) }
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(max = screenHeight * 0.9f)
-                .navigationBarsPadding()
+                .windowInsetsPadding(WindowInsets.statusBars.only(WindowInsetsSides.Top))
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .padding(top = 8.dp)
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Text(
-                    text = "Allowed Bedtime Apps",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                )
-                Text(
-                    text = "Select apps that stay accessible during bedtime. General whitelisted apps are excluded.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 12.dp)
-                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .padding(top = 24.dp)
+                ) {
+                    Text(
+                        text = "Allowed Bedtime Apps",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+                    Text(
+                        text = "Select apps that stay accessible during bedtime. General whitelisted apps are excluded.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
 
-                SearchBar(
-                    inputField = {
-                        SearchBarDefaults.InputField(
-                            query = searchQuery,
-                            onQueryChange = { searchQuery = it },
-                            onSearch = { },
-                            expanded = false,
-                            onExpandedChange = {},
-                            placeholder = { Text("Search apps...") },
-                            leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
-                            trailingIcon = {
-                                if (searchQuery.isNotEmpty()) {
-                                    IconButton(onClick = { searchQuery = "" }) {
-                                        Icon(Icons.Outlined.Close, contentDescription = "Clear search")
+                    SearchBar(
+                        inputField = {
+                            SearchBarDefaults.InputField(
+                                query = searchQuery,
+                                onQueryChange = { searchQuery = it },
+                                onSearch = { },
+                                expanded = false,
+                                onExpandedChange = {},
+                                placeholder = { Text("Search apps...") },
+                                leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
+                                trailingIcon = {
+                                    if (searchQuery.isNotEmpty()) {
+                                        IconButton(onClick = { searchQuery = "" }) {
+                                            Icon(Icons.Outlined.Close, contentDescription = "Clear search")
+                                        }
                                     }
                                 }
-                            }
-                        )
-                    },
-                    expanded = false,
-                    onExpandedChange = {},
-                    modifier = Modifier.fillMaxWidth(),
-                    content = {}
-                )
+                            )
+                        },
+                        expanded = false,
+                        onExpandedChange = {},
+                        modifier = Modifier.fillMaxWidth(),
+                        content = {}
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -169,7 +175,11 @@ fun AllowedBedAppsBottomSheet(
                 } else {
                     LazyColumn(
                         modifier = Modifier.weight(1f, fill = false),
-                        contentPadding = PaddingValues(bottom = 100.dp),
+                        contentPadding = PaddingValues(
+                            start = 16.dp,
+                            end = 16.dp,
+                            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 100.dp
+                        ),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         itemsIndexed(
@@ -224,6 +234,7 @@ fun AllowedBedAppsBottomSheet(
                 },
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
+                    .windowInsetsPadding(WindowInsets.navigationBars)
                     .padding(24.dp),
                 containerColor = MaterialTheme.colorScheme.primary
             ) {
