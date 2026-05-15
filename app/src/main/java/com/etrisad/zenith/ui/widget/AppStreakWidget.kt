@@ -18,10 +18,10 @@ import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
 import androidx.glance.layout.*
 import androidx.glance.appwidget.GlanceAppWidgetManager
-import androidx.glance.layout.*
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
+import androidx.glance.text.TextAlign
 import com.etrisad.zenith.R
 import com.etrisad.zenith.ZenithApplication
 import androidx.glance.Image
@@ -60,7 +60,9 @@ class AppStreakWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val app = context.applicationContext as ZenithApplication
         val sunnyBitmap = createShapeBitmap(context, 48, MaterialShapes.Sunny)
+        val cookieBitmap = createShapeBitmap(context, 48, MaterialShapes.Cookie12Sided)
         val pillBitmap = createShapeBitmap(context, 200, MaterialShapes.Pill)
+        val circleBitmap = createShapeBitmap(context, 100, MaterialShapes.Circle)
 
         provideContent {
             val prefs = currentState<Preferences>()
@@ -78,7 +80,8 @@ class AppStreakWidget : GlanceAppWidget() {
             
             val iconBitmap = packageToDisplay?.let {
                 try {
-                    context.packageManager.getApplicationIcon(it).toBitmap()
+                    val original = context.packageManager.getApplicationIcon(it).toBitmap()
+                    createShapeBitmap(context, 48, MaterialShapes.Cookie12Sided, sourceBitmap = original)
                 } catch (_: Exception) {
                     null
                 }
@@ -110,7 +113,9 @@ class AppStreakWidget : GlanceAppWidget() {
                             currentStreak = targetShield?.currentStreak ?: 0,
                             bestStreak = targetShield?.bestStreak ?: 0,
                             sunnyBitmap = sunnyBitmap,
-                            pillBitmap = pillBitmap
+                            cookieBitmap = cookieBitmap,
+                            pillBitmap = pillBitmap,
+                            circleBitmap = circleBitmap
                         )
                     } else {
                         Box(
@@ -138,7 +143,8 @@ class AppStreakWidget : GlanceAppWidget() {
         context: Context,
         sizeDp: Int,
         shape: RoundedPolygon,
-        alpha: Int = 255
+        alpha: Int = 255,
+        sourceBitmap: Bitmap? = null
     ): Bitmap {
         val density = context.resources.displayMetrics.density
         val sizePx = (sizeDp * density).toInt().coerceAtLeast(1)
@@ -156,6 +162,12 @@ class AppStreakWidget : GlanceAppWidget() {
             style = Paint.Style.FILL
         }
         canvas.drawPath(path, paint)
+
+        sourceBitmap?.let {
+            paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN)
+            canvas.drawBitmap(it, null, Rect(0, 0, sizePx, sizePx), paint)
+        }
+
         return bitmap
     }
 
@@ -167,17 +179,36 @@ class AppStreakWidget : GlanceAppWidget() {
         currentStreak: Int,
         bestStreak: Int,
         sunnyBitmap: Bitmap,
-        pillBitmap: Bitmap
+        cookieBitmap: Bitmap,
+        pillBitmap: Bitmap,
+        circleBitmap: Bitmap
     ) {
         val size = LocalSize.current
         val squareSize = minOf(size.width, size.height)
         
         val scaleFactor = squareSize.value / 100f
-        val containerSize = (54 * scaleFactor).dp
-        val iconSize = (32 * scaleFactor).dp
-        val mainFontSize = (22 * scaleFactor).sp
-        val fireSize = (16 * scaleFactor).dp
-        val contentPadding = (8 * scaleFactor).dp
+        val containerSize = (44 * scaleFactor).dp
+        val iconSize = (44 * scaleFactor).dp
+        
+        val currentStreakStr = currentStreak.toString()
+        val mainFontSize = when {
+            currentStreakStr.length >= 4 -> (8 * scaleFactor).sp
+            currentStreakStr.length == 3 -> (11 * scaleFactor).sp
+            currentStreakStr.length == 2 -> (14 * scaleFactor).sp
+            else -> (18 * scaleFactor).sp
+        }
+
+        val fireSize = (12 * scaleFactor).dp
+        val contentPadding = (12 * scaleFactor).dp
+
+        val bestGemSize = (28 * scaleFactor).dp
+        val bestStreakStr = bestStreak.toString()
+        val bestPillFontSize = when {
+            bestStreakStr.length >= 4 -> (7 * scaleFactor).sp
+            bestStreakStr.length == 3 -> (8 * scaleFactor).sp
+            else -> (10 * scaleFactor).sp
+        }
+        val bestIconSize = (10 * scaleFactor).dp
 
         val pillColor = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             ColorProvider(resId = android.R.color.system_accent2_50)
@@ -206,7 +237,7 @@ class AppStreakWidget : GlanceAppWidget() {
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Image(
-                            provider = ImageProvider(sunnyBitmap),
+                            provider = ImageProvider(cookieBitmap),
                             contentDescription = null,
                             modifier = GlanceModifier.size(containerSize),
                             colorFilter = ColorFilter.tint(GlanceTheme.colors.secondaryContainer)
@@ -215,7 +246,7 @@ class AppStreakWidget : GlanceAppWidget() {
                             Image(
                                 provider = ImageProvider(icon),
                                 contentDescription = null,
-                                modifier = GlanceModifier.size(iconSize).cornerRadius(iconSize / 2)
+                                modifier = GlanceModifier.size(iconSize)
                             )
                         }
                     }
@@ -230,32 +261,64 @@ class AppStreakWidget : GlanceAppWidget() {
                             provider = ImageProvider(sunnyBitmap),
                             contentDescription = null,
                             modifier = GlanceModifier.size(containerSize),
-                            colorFilter = ColorFilter.tint(GlanceTheme.colors.secondaryContainer)
+                            colorFilter = ColorFilter.tint(GlanceTheme.colors.primary)
                         )
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(
+                            modifier = GlanceModifier.size(containerSize).padding(top = (4 * scaleFactor).dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Image(
                                 provider = ImageProvider(R.drawable.ic_fire_department_outlined),
                                 contentDescription = null,
                                 modifier = GlanceModifier.size(fireSize),
-                                colorFilter = ColorFilter.tint(GlanceTheme.colors.onSecondaryContainer)
+                                colorFilter = ColorFilter.tint(GlanceTheme.colors.primaryContainer)
                             )
                             Text(
                                 text = currentStreak.toString(),
                                 style = TextStyle(
                                     fontSize = mainFontSize,
-                                    fontWeight = FontWeight.Bold,
-                                    color = GlanceTheme.colors.onSecondaryContainer
+                                    fontWeight = FontWeight.Medium,
+                                    color = GlanceTheme.colors.primaryContainer,
+                                    textAlign = TextAlign.Center
                                 )
                             )
-                            if (bestStreak > currentStreak) {
-                                Text(
-                                    text = " ($bestStreak)",
-                                    style = TextStyle(
-                                        fontSize = (mainFontSize.value * 0.6).sp,
-                                        color = GlanceTheme.colors.onSecondaryContainer
-                                    )
+                        }
+                    }
+                }
+
+                Box(
+                    modifier = GlanceModifier.fillMaxSize()
+                        .padding(bottom = contentPadding - (6 * scaleFactor).dp, end = (2 * scaleFactor).dp),
+                    contentAlignment = Alignment.BottomEnd
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Image(
+                            provider = ImageProvider(circleBitmap),
+                            contentDescription = null,
+                            modifier = GlanceModifier.size(bestGemSize),
+                            colorFilter = ColorFilter.tint(GlanceTheme.colors.tertiary)
+                        )
+                        Column(
+                            modifier = GlanceModifier.size(bestGemSize).padding(top = (2 * scaleFactor).dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Image(
+                                provider = ImageProvider(R.drawable.ic_crown),
+                                contentDescription = null,
+                                modifier = GlanceModifier.size(bestIconSize),
+                                colorFilter = ColorFilter.tint(GlanceTheme.colors.onTertiary)
+                            )
+                            Text(
+                                text = bestStreak.toString(),
+                                style = TextStyle(
+                                    fontSize = bestPillFontSize,
+                                    fontWeight = FontWeight.Medium,
+                                    color = GlanceTheme.colors.onTertiary,
+                                    textAlign = TextAlign.Center
                                 )
-                            }
+                            )
                         }
                     }
                 }

@@ -176,7 +176,7 @@ class GlobalStreakWidget : GlanceAppWidget() {
                             colorFilter = ColorFilter.tint(GlanceTheme.colors.tertiary)
                         )
                         Column(
-                            modifier = GlanceModifier.padding((0 * scaleFactor).dp),
+                            modifier = GlanceModifier.size(bestGemSize).padding(top = (2 * scaleFactor).dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
@@ -191,7 +191,7 @@ class GlobalStreakWidget : GlanceAppWidget() {
                                 modifier = GlanceModifier.padding(top = (-2 * scaleFactor).dp),
                                 style = TextStyle(
                                     fontSize = bestPillFontSize,
-                                    fontWeight = FontWeight.Bold,
+                                    fontWeight = FontWeight.Medium,
                                     color = GlanceTheme.colors.onTertiary
                                 )
                             )
