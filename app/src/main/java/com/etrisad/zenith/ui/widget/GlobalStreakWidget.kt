@@ -11,7 +11,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.*
 import androidx.glance.appwidget.GlanceAppWidget
-import androidx.glance.appwidget.cornerRadius
+import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.provideContent
 import androidx.glance.layout.*
 import androidx.glance.text.FontWeight
@@ -25,13 +25,15 @@ import com.etrisad.zenith.data.preferences.UserPreferencesRepository
 import kotlinx.coroutines.flow.first
 
 class GlobalStreakWidget : GlanceAppWidget() {
+    override val sizeMode: SizeMode = SizeMode.Exact
+
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val repository = UserPreferencesRepository(context)
         val prefs = repository.userPreferencesFlow.first()
-        
-        // Generate bitmaps for custom shapes
-        val sunnyBitmap = createShapeBitmap(context, 64, MaterialShapes.Sunny, 40)
+
+        val sunnyBitmap = createShapeBitmap(context, 64, MaterialShapes.Sunny)
         val backgroundBitmap = createShapeBitmap(context, 200, MaterialShapes.Cookie12Sided)
+        val circleBitmap = createShapeBitmap(context, 100, MaterialShapes.Circle)
 
         provideContent {
             GlanceTheme {
@@ -39,7 +41,8 @@ class GlobalStreakWidget : GlanceAppWidget() {
                     currentStreak = prefs.globalCurrentStreak,
                     bestStreak = prefs.globalBestStreak,
                     sunnyBitmap = sunnyBitmap,
-                    backgroundBitmap = backgroundBitmap
+                    backgroundBitmap = backgroundBitmap,
+                    circleBitmap = circleBitmap
                 )
             }
         }
@@ -77,8 +80,34 @@ class GlobalStreakWidget : GlanceAppWidget() {
         currentStreak: Int,
         bestStreak: Int,
         sunnyBitmap: Bitmap,
-        backgroundBitmap: Bitmap
+        backgroundBitmap: Bitmap,
+        circleBitmap: Bitmap
     ) {
+        val size = LocalSize.current
+        val squareSize = minOf(size.width, size.height)
+        val scaleFactor = squareSize.value / 100f
+        
+        val contentPadding = (8 * scaleFactor).dp
+        val containerSize = (40 * scaleFactor).dp
+        val fireSize = (20 * scaleFactor).dp
+        
+        val currentStreakStr = currentStreak.toString()
+        val mainFontSize = when {
+            currentStreakStr.length >= 5 -> (16 * scaleFactor).sp
+            currentStreakStr.length == 4 -> (20 * scaleFactor).sp
+            currentStreakStr.length == 3 -> (26 * scaleFactor).sp
+            else -> (32 * scaleFactor).sp
+        }
+        
+        val bestGemSize = (28 * scaleFactor).dp
+        val bestStreakStr = bestStreak.toString()
+        val bestPillFontSize = when {
+            bestStreakStr.length >= 4 -> (7 * scaleFactor).sp
+            bestStreakStr.length == 3 -> (8 * scaleFactor).sp
+            else -> (10 * scaleFactor).sp
+        }
+        val bestIconSize = (10 * scaleFactor).dp
+
         val backgroundColor = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             ColorProvider(resId = android.R.color.system_accent2_50)
         } else {
@@ -89,62 +118,85 @@ class GlobalStreakWidget : GlanceAppWidget() {
             modifier = GlanceModifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
-            // Background Shape (Cookie12Sided)
-            Image(
-                provider = ImageProvider(backgroundBitmap),
-                contentDescription = null,
-                modifier = GlanceModifier.fillMaxSize(),
-                colorFilter = ColorFilter.tint(backgroundColor)
-            )
-
-            Column(
-                modifier = GlanceModifier.fillMaxSize().padding(20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalAlignment = Alignment.CenterVertically
+            Box(
+                modifier = GlanceModifier.size(squareSize),
+                contentAlignment = Alignment.Center
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Image(
-                        provider = ImageProvider(sunnyBitmap),
-                        contentDescription = null,
-                        modifier = GlanceModifier.size(64.dp),
-                        colorFilter = ColorFilter.tint(GlanceTheme.colors.secondary)
-                    )
-                    Image(
-                        provider = ImageProvider(R.drawable.ic_fire_department_outlined),
-                        contentDescription = null,
-                        modifier = GlanceModifier.size(26.dp),
-                        colorFilter = ColorFilter.tint(GlanceTheme.colors.secondary)
-                    )
-                }
-                
-                Spacer(modifier = GlanceModifier.height(2.dp))
-                
-                Text(
-                    text = currentStreak.toString(),
-                    style = TextStyle(
-                        fontSize = 34.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = GlanceTheme.colors.secondary
-                    )
+                Image(
+                    provider = ImageProvider(backgroundBitmap),
+                    contentDescription = null,
+                    modifier = GlanceModifier.fillMaxSize(),
+                    colorFilter = ColorFilter.tint(backgroundColor)
                 )
-                
-                Spacer(modifier = GlanceModifier.height(4.dp))
-                
-                Row(
-                    modifier = GlanceModifier
-                        .background(GlanceTheme.colors.primary)
-                        .cornerRadius(100.dp)
-                        .padding(horizontal = 10.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
+
+                Box(
+                    modifier = GlanceModifier.fillMaxSize().padding(contentPadding),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "Best : $bestStreak",
-                        style = TextStyle(
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = GlanceTheme.colors.onPrimary
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Image(
+                                provider = ImageProvider(sunnyBitmap),
+                                contentDescription = null,
+                                modifier = GlanceModifier.size(containerSize),
+                                colorFilter = ColorFilter.tint(GlanceTheme.colors.primary)
+                            )
+                            Image(
+                                provider = ImageProvider(R.drawable.ic_fire_department_outlined),
+                                contentDescription = null,
+                                modifier = GlanceModifier.size(fireSize),
+                                colorFilter = ColorFilter.tint(GlanceTheme.colors.primaryContainer)
+                            )
+                        }
+                        
+                        Text(
+                            text = currentStreak.toString(),
+                            style = TextStyle(
+                                fontSize = mainFontSize,
+                                fontWeight = FontWeight.Medium,
+                                color = GlanceTheme.colors.primary
+                            )
                         )
-                    )
+                    }
+                }
+
+                Box(
+                    modifier = GlanceModifier.fillMaxSize()
+                        .padding(bottom = contentPadding, end = (2 * scaleFactor).dp),
+                    contentAlignment = Alignment.BottomEnd
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Image(
+                            provider = ImageProvider(circleBitmap),
+                            contentDescription = null,
+                            modifier = GlanceModifier.size(bestGemSize),
+                            colorFilter = ColorFilter.tint(GlanceTheme.colors.tertiary)
+                        )
+                        Column(
+                            modifier = GlanceModifier.padding((0 * scaleFactor).dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Image(
+                                provider = ImageProvider(R.drawable.ic_crown),
+                                contentDescription = null,
+                                modifier = GlanceModifier.size(bestIconSize),
+                                colorFilter = ColorFilter.tint(GlanceTheme.colors.onTertiary)
+                            )
+                            Text(
+                                text = bestStreak.toString(),
+                                modifier = GlanceModifier.padding(top = (-2 * scaleFactor).dp),
+                                style = TextStyle(
+                                    fontSize = bestPillFontSize,
+                                    fontWeight = FontWeight.Bold,
+                                    color = GlanceTheme.colors.onTertiary
+                                )
+                            )
+                        }
+                    }
                 }
             }
         }
