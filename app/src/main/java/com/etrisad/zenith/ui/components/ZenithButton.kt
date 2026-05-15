@@ -77,6 +77,7 @@ fun ZenithButton(
     pressedCornerRadius: Dp? = null,
     height: Dp? = null,
     shape: Shape? = null,
+    selected: Boolean = false,
     onHoldComplete: (() -> Unit)? = null,
     holdDuration: Long = 1500L,
     enableAfterDelayMillis: Long = 0L,
@@ -101,6 +102,7 @@ fun ZenithButton(
         pillCornerRadiusOverride = pillCornerRadius,
         pressedCornerRadiusOverride = pressedCornerRadius,
         heightOverride = height,
+        selected = selected,
         onHoldComplete = onHoldComplete,
         holdDuration = holdDuration,
         enableAfterDelayMillis = enableAfterDelayMillis,
@@ -129,6 +131,7 @@ fun RowScope.ZenithButton(
     pillCornerRadius: Dp? = null,
     pressedCornerRadius: Dp? = null,
     height: Dp? = null,
+    selected: Boolean = false,
     onHoldComplete: (() -> Unit)? = null,
     holdDuration: Long = 1500L,
     enableAfterDelayMillis: Long = 0L,
@@ -138,7 +141,11 @@ fun RowScope.ZenithButton(
 ) {
     val isPressed by interactionSource.collectIsPressedAsState()
     val animatedWeight by animateFloatAsState(
-        targetValue = if (isPressed) weight * 1.6f else weight,
+        targetValue = when {
+            isPressed -> weight * 2.2f
+            selected -> weight * 1.4f
+            else -> weight
+        },
         animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow),
         label = "wAnim"
     )
@@ -161,6 +168,7 @@ fun RowScope.ZenithButton(
         pillCornerRadiusOverride = pillCornerRadius,
         pressedCornerRadiusOverride = pressedCornerRadius,
         heightOverride = height,
+        selected = selected,
         onHoldComplete = onHoldComplete,
         holdDuration = holdDuration,
         enableAfterDelayMillis = enableAfterDelayMillis,
@@ -190,6 +198,7 @@ private fun ZenithButtonInternal(
     pillCornerRadiusOverride: Dp?,
     pressedCornerRadiusOverride: Dp?,
     heightOverride: Dp?,
+    selected: Boolean = false,
     onHoldComplete: (() -> Unit)?,
     holdDuration: Long,
     enableAfterDelayMillis: Long,
@@ -222,7 +231,7 @@ private fun ZenithButtonInternal(
 
     val resH = heightOverride ?: when(size){ZenithButtonSize.Small->32.dp; ZenithButtonSize.Medium->40.dp; ZenithButtonSize.Large->48.dp; else->64.dp}
     val resPillR = pillCornerRadiusOverride ?: (resH / 2)
-    val resPressR = pressedCornerRadiusOverride ?: when(size){ZenithButtonSize.Small->4.dp; ZenithButtonSize.Medium->8.dp; ZenithButtonSize.Large->12.dp; else->16.dp}
+    val resPressR = pressedCornerRadiusOverride ?: when(size){ZenithButtonSize.Small->8.dp; ZenithButtonSize.Medium->12.dp; ZenithButtonSize.Large->16.dp; else->24.dp}
     val resTextS = when(size){ZenithButtonSize.Small->MaterialTheme.typography.labelSmall; ZenithButtonSize.Medium->MaterialTheme.typography.labelMedium; ZenithButtonSize.Large->MaterialTheme.typography.labelLarge; else->MaterialTheme.typography.titleMedium}
     val resIconS = when(size){ZenithButtonSize.Small->16.dp; ZenithButtonSize.Medium->18.dp; ZenithButtonSize.Large->20.dp; else->24.dp}
     val resPadH = when(size){ZenithButtonSize.Small->12.dp; ZenithButtonSize.Medium->16.dp; ZenithButtonSize.Large->24.dp; else->32.dp}
@@ -252,14 +261,18 @@ private fun ZenithButtonInternal(
         targetValue = if ((backgroundProgress != null || backgroundProgressProvider != null) && !isHoldAction) {
             if (isPressed) resPillR else resPressR
         } else {
-            if (isPressed) resPressR else resPillR
+            if (isPressed || selected) resPressR else resPillR
         },
         animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
         label = "animR"
     )
     
     val exPad by animateDpAsState(
-        targetValue = if (isPressed) 8.dp else 0.dp,
+        targetValue = when {
+            isPressed -> 16.dp
+            selected -> 8.dp
+            else -> 0.dp
+        },
         label = "exPad"
     )
 
@@ -417,6 +430,7 @@ fun ZenithToggleButtonGroup(
                 containerColor = option.containerColor,
                 contentColor = option.contentColor,
                 enabled = option.enabled,
+                selected = isSelected,
                 interactionSource = interactionSource,
                 shape = RoundedCornerShape(topStart = startR, bottomStart = startR, topEnd = endR, bottomEnd = endR)
             )
