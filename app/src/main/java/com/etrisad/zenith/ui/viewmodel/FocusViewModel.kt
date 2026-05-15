@@ -18,7 +18,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -64,6 +66,7 @@ class FocusViewModel(
 
     private val _allInstalledApps = MutableStateFlow<List<AppInfo>>(emptyList())
     private var allShields: List<ShieldEntity> = emptyList()
+    private var loadAppsJob: kotlinx.coroutines.Job? = null
 
     init {
         viewModelScope.launch {
@@ -81,9 +84,12 @@ class FocusViewModel(
             }
         }
         viewModelScope.launch {
-            preferencesRepository.userPreferencesFlow.collect {
-                loadInstalledApps()
-            }
+            preferencesRepository.userPreferencesFlow
+                .map { it.whitelistedPackages }
+                .distinctUntilChanged()
+                .collect {
+                    loadInstalledApps()
+                }
         }
         startRealTimeUpdates()
     }
@@ -138,34 +144,43 @@ class FocusViewModel(
     }
 
     private fun loadInstalledApps() {
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoadingApps = true)
-            val apps = withContext(Dispatchers.IO) {
-                val pm = context.packageManager
-                val installedApps = pm.getInstalledApplications(PackageManager.GET_META_DATA)
-                val whitelist = try {
-                    preferencesRepository.userPreferencesFlow.first().whitelistedPackages
-                } catch (e: Exception) {
-                    emptySet()
-                }
-
-                installedApps
-                    .filter { app ->
-                        val isSystem = (app.flags and ApplicationInfo.FLAG_SYSTEM) != 0
-                        !isSystem || app.packageName !in whitelist
-                    }
-                    .filter { it.packageName != context.packageName }
-                    .map {
-                        AppInfo(
-                            packageName = it.packageName,
-                            appName = pm.getApplicationLabel(it).toString(),
-                            icon = pm.getApplicationIcon(it)
-                        )
-                    }
-                    .sortedBy { it.appName.lowercase() }
+        loadAppsJob?.cancel()
+        loadAppsJob = viewModelScope.launch {
+            // Only show loading if we haven't loaded apps before
+            if (_allInstalledApps.value.isEmpty()) {
+                _uiState.value = _uiState.value.copy(isLoadingApps = true)
             }
-            _allInstalledApps.value = apps
-            updateInstalledAppsFilter()
+
+            try {
+                val apps = withContext(Dispatchers.IO) {
+                    val pm = context.packageManager
+                    val installedApps = pm.getInstalledApplications(PackageManager.GET_META_DATA)
+                    val whitelist = try {
+                        preferencesRepository.userPreferencesFlow.first().whitelistedPackages
+                    } catch (e: Exception) {
+                        emptySet()
+                    }
+
+                    installedApps
+                        .filter { app ->
+                            val isSystem = (app.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+                            !isSystem || app.packageName !in whitelist
+                        }
+                        .filter { it.packageName != context.packageName }
+                        .map {
+                            AppInfo(
+                                packageName = it.packageName,
+                                appName = pm.getApplicationLabel(it).toString(),
+                                icon = pm.getApplicationIcon(it)
+                            )
+                        }
+                        .sortedBy { it.appName.lowercase() }
+                }
+                _allInstalledApps.value = apps
+                updateInstalledAppsFilter()
+            } finally {
+                _uiState.value = _uiState.value.copy(isLoadingApps = false)
+            }
         }
     }
 
