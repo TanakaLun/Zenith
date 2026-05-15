@@ -6,6 +6,9 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.etrisad.zenith.util.AlarmTasksSchedulingHelper
 import com.etrisad.zenith.util.SharedPrefsHelper
+import androidx.glance.appwidget.updateAll
+import com.etrisad.zenith.ui.widget.GlobalStreakWidget
+import com.etrisad.zenith.ui.widget.AppStreakWidget
 
 class MidnightResetWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
@@ -17,6 +20,9 @@ class MidnightResetWorker(context: Context, params: WorkerParameters) : Coroutin
         applicationContext.startService(serviceIntent)
 
         AlarmTasksSchedulingHelper.scheduleMidnightResetTask(applicationContext)
+        
+        GlobalStreakWidget().updateAll(applicationContext)
+        AppStreakWidget().updateAll(applicationContext)
         
         return Result.success()
     }
