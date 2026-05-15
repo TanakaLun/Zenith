@@ -24,6 +24,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun AppPickerBottomSheet(
     uiState: FocusUiState,
+    title: String? = null,
     onDismiss: () -> Unit,
     onAppSelected: (AppInfo) -> Unit,
     onSearchQueryChange: (String) -> Unit
@@ -52,8 +53,9 @@ fun AppPickerBottomSheet(
                     .padding(horizontal = 16.dp)
                     .padding(top = 24.dp)
             ) {
+                val defaultTitle = if (uiState.selectedFocusType == FocusType.GOAL) "Select Productive App" else "Select App to Shield"
                 Text(
-                    text = if (uiState.selectedFocusType == FocusType.GOAL) "Select Productive App" else "Select App to Shield",
+                    text = title ?: defaultTitle,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(bottom = 16.dp)

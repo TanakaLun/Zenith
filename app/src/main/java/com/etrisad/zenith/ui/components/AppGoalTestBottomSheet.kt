@@ -137,6 +137,7 @@ fun AppGoalTestBottomSheet(
     if (showAppPicker) {
         AppPickerBottomSheet(
             uiState = focusUiState,
+            title = "Select App to Test",
             onDismiss = { showAppPicker = false },
             onAppSelected = { app ->
                 showAppPicker = false

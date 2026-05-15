@@ -71,6 +71,7 @@ class AppStreakWidgetConfigurationActivity : ComponentActivity() {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     AppPickerBottomSheet(
                         uiState = uiState,
+                        title = "Select App for Streak",
                         onDismiss = { finish() },
                         onAppSelected = { appInfo ->
                             saveWidgetSelection(appInfo.packageName)
