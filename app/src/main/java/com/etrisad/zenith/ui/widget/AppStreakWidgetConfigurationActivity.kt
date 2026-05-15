@@ -5,8 +5,12 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.lifecycle.ViewModelProvider
@@ -25,6 +29,7 @@ class AppStreakWidgetConfigurationActivity : ComponentActivity() {
     private var appWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
         setResult(RESULT_CANCELED)
@@ -63,16 +68,18 @@ class AppStreakWidgetConfigurationActivity : ComponentActivity() {
                 fontOption = userPreferences.fontOption,
                 expressiveColors = userPreferences.expressiveColors
             ) {
-                AppPickerBottomSheet(
-                    uiState = uiState,
-                    onDismiss = { finish() },
-                    onAppSelected = { appInfo ->
-                        saveWidgetSelection(appInfo.packageName)
-                    },
-                    onSearchQueryChange = { query ->
-                        focusViewModel.onSearchQueryChange(query)
-                    }
-                )
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    AppPickerBottomSheet(
+                        uiState = uiState,
+                        onDismiss = { finish() },
+                        onAppSelected = { appInfo ->
+                            saveWidgetSelection(appInfo.packageName)
+                        },
+                        onSearchQueryChange = { query ->
+                            focusViewModel.onSearchQueryChange(query)
+                        }
+                    )
+                }
             }
         }
     }
