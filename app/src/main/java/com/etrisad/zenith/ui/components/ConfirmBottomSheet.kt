@@ -119,19 +119,18 @@ fun ConfirmBottomSheet(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            TextButton(
+            ZenithButton(
                 onClick = {
                     scope.launch {
                         sheetState.hide()
                         onDismiss()
                     }
                 },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-            ) {
-                Text("Nevermind", color = MaterialTheme.colorScheme.outline)
-            }
+                modifier = Modifier.fillMaxWidth(),
+                text = "Nevermind",
+                type = ZenithButtonType.Text,
+                contentColor = MaterialTheme.colorScheme.outline
+            )
         }
     }
 }

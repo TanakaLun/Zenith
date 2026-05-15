@@ -33,6 +33,7 @@ import com.etrisad.zenith.data.local.entity.ScheduleEntity
 import com.etrisad.zenith.data.local.entity.ScheduleMode
 import com.etrisad.zenith.data.preferences.UserPreferences
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
+import com.etrisad.zenith.ui.components.ZenithButton
 import com.etrisad.zenith.ui.viewmodel.FocusUiState
 import kotlinx.coroutines.launch
 
@@ -333,7 +334,7 @@ fun ScheduleSettingsBottomSheet(
                     .padding(16.dp)
                     .navigationBarsPadding()
             ) {
-                Button(
+                ZenithButton(
                     onClick = {
                         scope.launch {
                             val startStr = String.format(
@@ -353,13 +354,8 @@ fun ScheduleSettingsBottomSheet(
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.large
-                ) {
-                    Text(
-                        text = if (editingSchedule != null) "Update Schedule" else "Save Schedule",
-                        modifier = Modifier.padding(8.dp)
-                    )
-                }
+                    text = if (editingSchedule != null) "Update Schedule" else "Save Schedule"
+                )
             }
         }
     }

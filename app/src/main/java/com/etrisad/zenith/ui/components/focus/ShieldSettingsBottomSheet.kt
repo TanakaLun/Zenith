@@ -27,6 +27,7 @@ import androidx.core.graphics.drawable.toBitmap
 import com.etrisad.zenith.data.local.entity.ShieldEntity
 import com.etrisad.zenith.data.preferences.UserPreferences
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
+import com.etrisad.zenith.ui.components.ZenithButton
 import com.etrisad.zenith.ui.viewmodel.AppInfo
 import kotlinx.coroutines.launch
 
@@ -389,7 +390,7 @@ fun ShieldSettingsBottomSheet(
                     .padding(16.dp)
                     .navigationBarsPadding()
             ) {
-                Button(
+                ZenithButton(
                     onClick = {
                         scope.launch {
                             sheetState.hide()
@@ -406,14 +407,9 @@ fun ShieldSettingsBottomSheet(
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.large,
+                    text = "Save Shield",
                     enabled = canSave
-                ) {
-                    Text(
-                        text = "Save Shield",
-                        modifier = Modifier.padding(8.dp)
-                    )
-                }
+                )
             }
         }
     }

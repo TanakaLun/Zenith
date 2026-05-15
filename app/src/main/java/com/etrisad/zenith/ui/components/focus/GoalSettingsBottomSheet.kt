@@ -28,6 +28,7 @@ import androidx.compose.animation.core.spring
 import com.etrisad.zenith.data.local.entity.ShieldEntity
 import com.etrisad.zenith.data.preferences.UserPreferences
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
+import com.etrisad.zenith.ui.components.ZenithButton
 import com.etrisad.zenith.ui.viewmodel.AppInfo
 import kotlinx.coroutines.launch
 
@@ -400,7 +401,7 @@ fun GoalSettingsBottomSheet(
                     .padding(16.dp)
                     .navigationBarsPadding()
             ) {
-                Button(
+                ZenithButton(
                     onClick = {
                         scope.launch {
                             sheetState.hide()
@@ -415,13 +416,8 @@ fun GoalSettingsBottomSheet(
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.large
-                ) {
-                    Text(
-                        text = "Set Goal",
-                        modifier = Modifier.padding(8.dp)
-                    )
-                }
+                    text = "Set Goal"
+                )
             }
         }
     }

@@ -48,6 +48,8 @@ import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
 import androidx.graphics.shapes.toPath
 import com.etrisad.zenith.data.local.entity.FocusType
+import com.etrisad.zenith.ui.components.ZenithButton
+import com.etrisad.zenith.ui.components.ZenithButtonType
 import com.etrisad.zenith.data.local.entity.ShieldEntity
 import com.etrisad.zenith.ui.components.ShieldSortHeader
 import com.etrisad.zenith.ui.components.UsageHistoryCard
@@ -553,7 +555,7 @@ fun ScreenTimeTargetBottomSheet(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            Button(
+            ZenithButton(
                 onClick = {
                     scope.launch {
                         sheetState.hide()
@@ -561,23 +563,22 @@ fun ScreenTimeTargetBottomSheet(
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Text("Save Target")
-            }
+                text = "Save Target"
+            )
 
             if (initialMinutes > 0) {
-                TextButton(
+                ZenithButton(
                     onClick = {
                         scope.launch {
                             sheetState.hide()
                             onSave(0)
                         }
                     },
-                    modifier = Modifier.padding(top = 8.dp)
-                ) {
-                    Text("Remove Target", color = MaterialTheme.colorScheme.error)
-                }
+                    modifier = Modifier.padding(top = 8.dp).fillMaxWidth(),
+                    text = "Remove Target",
+                    type = ZenithButtonType.Text,
+                    contentColor = MaterialTheme.colorScheme.error
+                )
             }
         }
     }

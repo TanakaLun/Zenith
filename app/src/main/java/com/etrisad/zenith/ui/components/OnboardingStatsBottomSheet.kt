@@ -126,7 +126,14 @@ fun OnboardingStatsContent(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        HoldToSkipButton(onSkip = onSkip)
+        ZenithButton(
+            onClick = {},
+            onHoldComplete = onSkip,
+            text = "Hold to Skip",
+            type = ZenithButtonType.Hold,
+            fillMaxWidth = true,
+            holdDuration = 2000L
+        )
     }
 }
 
@@ -241,93 +248,4 @@ fun OptionCard(
     }
 }
 
-@Composable
-fun HoldToSkipButton(onSkip: () -> Unit) {
-    var isHolding by remember { mutableStateOf(false) }
-    var holdProgressTarget by remember { mutableFloatStateOf(0f) }
-    val durationMillis = 2000
 
-    val animatedProgressState = animateFloatAsState(
-        targetValue = holdProgressTarget,
-        animationSpec = if (isHolding) tween(durationMillis, easing = LinearEasing) else tween(300),
-        label = "holdProgress"
-    )
-
-    LaunchedEffect(isHolding) {
-        if (isHolding) {
-            holdProgressTarget = 1f
-            delay(durationMillis.toLong())
-            if (isHolding) {
-                onSkip()
-                isHolding = false
-                holdProgressTarget = 0f
-            }
-        } else {
-            holdProgressTarget = 0f
-        }
-    }
-
-    val scale by animateFloatAsState(
-        targetValue = if (isHolding) 0.96f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy),
-        label = "scale"
-    )
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(64.dp)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
-            .clip(MaterialTheme.shapes.large)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onPress = {
-                        isHolding = true
-                        try {
-                            awaitRelease()
-                        } finally {
-                            isHolding = false
-                        }
-                    }
-                )
-            },
-        contentAlignment = Alignment.Center
-    ) {
-        val progressColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .drawBehind {
-                    drawRect(
-                        color = progressColor,
-                        size = size.copy(width = size.width * animatedProgressState.value)
-                    )
-                }
-        )
-        
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (isHolding) {
-                val secondsLeft = ((1f - animatedProgressState.value) * (durationMillis / 1000f)).let { 
-                    if (it < 0.1f) 0 else kotlin.math.ceil(it).toInt()
-                }
-                Text(
-                    text = "Hold for ${secondsLeft}s...",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            } else {
-                Text(
-                    text = "Hold to Skip",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}

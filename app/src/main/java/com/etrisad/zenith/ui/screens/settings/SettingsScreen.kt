@@ -43,6 +43,8 @@ import com.etrisad.zenith.data.preferences.FontOption
 import com.etrisad.zenith.data.preferences.ThemeConfig
 import com.etrisad.zenith.data.preferences.UserPreferences
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
+import com.etrisad.zenith.ui.components.ZenithButton
+import com.etrisad.zenith.ui.components.ZenithButtonType
 import com.etrisad.zenith.service.AppGoalOverlayActivity
 import com.etrisad.zenith.ui.navigation.Screen
 import com.etrisad.zenith.ui.viewmodel.FocusViewModel
@@ -1065,7 +1067,7 @@ fun DelayAppBottomSheet(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            Button(
+            ZenithButton(
                 onClick = {
                     scope.launch {
                         sheetState.hide()
@@ -1073,10 +1075,8 @@ fun DelayAppBottomSheet(
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Text("Save Delay", modifier = Modifier.padding(8.dp))
-            }
+                text = "Save Delay"
+            )
         }
     }
 }
@@ -1170,7 +1170,7 @@ fun EmergencyRechargeBottomSheet(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            Button(
+            ZenithButton(
                 onClick = {
                     scope.launch {
                         sheetState.hide()
@@ -1178,10 +1178,8 @@ fun EmergencyRechargeBottomSheet(
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Text("Save Duration", modifier = Modifier.padding(8.dp))
-            }
+                text = "Save Duration"
+            )
         }
     }
 }

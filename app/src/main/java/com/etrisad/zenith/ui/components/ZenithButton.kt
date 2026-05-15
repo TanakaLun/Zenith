@@ -1,6 +1,6 @@
 package com.etrisad.zenith.ui.components
 
-import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -32,6 +32,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 enum class ZenithButtonType {
     Filled, Tonal, Elevated, Outlined, Text, Hold
@@ -210,6 +211,8 @@ private fun ZenithButtonInternal(
     val curPressed by rememberUpdatedState(isPressed)
     val haptic = LocalHapticFeedback.current
     val density = LocalDensity.current
+    val scope = rememberCoroutineScope()
+    val shakeOffset = remember { Animatable(0f) }
 
     val delayAnim = remember(enableAfterDelayMillis) { Animatable(0f) }
     val isDelaying = enableAfterDelayMillis > 0 && delayAnim.value < 1f
@@ -250,7 +253,7 @@ private fun ZenithButtonInternal(
     )
     
     val cScaleState = animateFloatAsState(
-        targetValue = if (isPressed) 0.94f else 1f, 
+        targetValue = if (isPressed && enabled) 0.94f else 1f, 
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
         label = "cScale"
     )
@@ -258,10 +261,14 @@ private fun ZenithButtonInternal(
     val finalScale = cScaleState.value * bounceScale.value
 
     val animR by animateDpAsState(
-        targetValue = if ((backgroundProgress != null || backgroundProgressProvider != null) && !isHoldAction) {
-            if (isPressed) resPillR else resPressR
-        } else {
-            if (isPressed || selected) resPressR else resPillR
+        targetValue = when {
+            !enabled -> resPressR
+            (backgroundProgress != null || backgroundProgressProvider != null) && !isHoldAction -> {
+                if (isPressed) resPillR else resPressR
+            }
+            else -> {
+                if (isPressed || selected) resPressR else resPillR
+            }
         },
         animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
         label = "animR"
@@ -294,33 +301,53 @@ private fun ZenithButtonInternal(
 
     val fShape = customShape ?: RoundedCornerShape(animR)
     val primary = MaterialTheme.colorScheme.primary
-    val fBg = containerColor ?: when (type) {
-        ZenithButtonType.Filled, ZenithButtonType.Hold -> if (isLoading || isDelaying) MaterialTheme.colorScheme.primaryContainer else primary
-        ZenithButtonType.Tonal -> MaterialTheme.colorScheme.secondaryContainer
-        ZenithButtonType.Elevated -> MaterialTheme.colorScheme.surfaceContainerLow
+    
+    val targetBg = containerColor ?: when {
+        !enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.16f)
+        type == ZenithButtonType.Filled || type == ZenithButtonType.Hold -> if (isLoading || isDelaying) MaterialTheme.colorScheme.primaryContainer else primary
+        type == ZenithButtonType.Tonal -> MaterialTheme.colorScheme.secondaryContainer
+        type == ZenithButtonType.Elevated -> MaterialTheme.colorScheme.surfaceContainerLow
         else -> Color.Transparent
     }
-    val fContent = contentColor ?: when (type) {
-        ZenithButtonType.Filled, ZenithButtonType.Hold -> if (isLoading || isDelaying) primary else MaterialTheme.colorScheme.onPrimary
-        ZenithButtonType.Tonal -> MaterialTheme.colorScheme.onSecondaryContainer
+    val animatedBg by animateColorAsState(targetValue = targetBg, label = "bgAnim")
+
+    val targetContent = contentColor ?: when {
+        !enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+        type == ZenithButtonType.Filled || type == ZenithButtonType.Hold -> if (isLoading || isDelaying) primary else MaterialTheme.colorScheme.onPrimary
+        type == ZenithButtonType.Tonal -> MaterialTheme.colorScheme.onSecondaryContainer
         else -> primary
     }
+    val animatedContentColor by animateColorAsState(targetValue = targetContent, label = "contentAnim")
 
-    val progressBrush = remember(fContent) {
+    val progressBrush = remember(animatedContentColor) {
         Brush.horizontalGradient(
-            listOf(fContent.copy(alpha = 0.12f), fContent.copy(alpha = 0.24f))
+            listOf(animatedContentColor.copy(alpha = 0.12f), animatedContentColor.copy(alpha = 0.24f))
         )
     }
 
     Surface(
-        onClick = onClick,
+        onClick = {
+            if (!enabled) {
+                scope.launch {
+                    val intensity = with(density) { 6.dp.toPx() }
+                    shakeOffset.animateTo(intensity, spring(stiffness = 10000f))
+                    shakeOffset.animateTo(-intensity, spring(stiffness = 10000f))
+                    shakeOffset.animateTo(intensity / 2, spring(stiffness = 10000f))
+                    shakeOffset.animateTo(-intensity / 2, spring(stiffness = 10000f))
+                    shakeOffset.animateTo(0f, spring(stiffness = 10000f))
+                }
+            } else {
+                onClick()
+            }
+        },
         modifier = modifier
             .then(if (fillMaxWidth) Modifier.fillMaxWidth() else Modifier)
-            .height(resH),
-        enabled = enabled && !isLoading && !isDelaying,
+            .height(resH)
+            .graphicsLayer { translationX = shakeOffset.value },
+        enabled = (enabled && !isLoading && !isDelaying) || !enabled,
         shape = fShape,
-        color = fBg,
-        contentColor = fContent,
+        color = animatedBg,
+        contentColor = animatedContentColor,
         tonalElevation = if (type == ZenithButtonType.Elevated) 2.dp else 0.dp,
         shadowElevation = if (type == ZenithButtonType.Elevated) 2.dp else 0.dp,
         border = if (type == ZenithButtonType.Outlined) BorderStroke(1.dp, MaterialTheme.colorScheme.outline) else null,
@@ -348,14 +375,14 @@ private fun ZenithButtonInternal(
             ) { loadingOrDelay ->
                 if (loadingOrDelay) {
                     if (loadingProgress == null && !isDelaying) {
-                        LoadingIndicator(color = fContent, modifier = Modifier.size(resH * 0.6f))
+                        LoadingIndicator(color = animatedContentColor, modifier = Modifier.size(resH * 0.6f))
                     } else {
                         val prog = if (isDelaying) delayAnim.value else (loadingProgress ?: 0f)
                         Box(contentAlignment = Alignment.Center) {
                             CircularWavyProgressIndicator(
                                 progress = { prog.coerceIn(0f, 1f) },
-                                color = fContent,
-                                trackColor = fContent.copy(alpha = 0.12f),
+                                color = animatedContentColor,
+                                trackColor = animatedContentColor.copy(alpha = 0.12f),
                                 stroke = Stroke(width = with(density) { (resH * 0.06f).toPx() }),
                                 trackStroke = Stroke(width = with(density) { (resH * 0.06f).toPx() }),
                                 modifier = Modifier.size(resH * 0.7f)
@@ -368,7 +395,7 @@ private fun ZenithButtonInternal(
                                         text = secondsLeft.toString(),
                                         style = resTextS,
                                         fontWeight = FontWeight.Black,
-                                        color = fContent
+                                        color = animatedContentColor
                                     )
                                 }
                             }
@@ -485,6 +512,17 @@ fun ZenithButtonPreview() {
 
             ZenithToggleButtonGroup(options = listOf(ZenithToggleOption("Option 1"), ZenithToggleOption("Option 2"), ZenithToggleOption("Option 3")), selectedIndices = selected, onToggle = { selected = setOf(it) })
             ZenithButton(type = ZenithButtonType.Hold, onClick = {}, text = "Hold Action (Fluid)", fillMaxWidth = true)
+            
+            var isEnabled by remember { mutableStateOf(true) }
+            ZenithButton(
+                onClick = { isEnabled = false }, 
+                enabled = isEnabled,
+                text = if (isEnabled) "Click to Disable" else "Disabled (Shake)", 
+                fillMaxWidth = true
+            )
+            if (!isEnabled) {
+                TextButton(onClick = { isEnabled = true }) { Text("Reset State") }
+            }
             
             Text("Testing Text & Progress", style = MaterialTheme.typography.labelLarge)
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

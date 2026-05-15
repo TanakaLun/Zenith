@@ -224,7 +224,7 @@ fun PermissionBottomSheet(
             
             if (allGranted) {
                 Spacer(modifier = Modifier.height(24.dp))
-                Button(
+                ZenithButton(
                     onClick = {
                         scope.launch {
                             sheetState.hide()
@@ -232,10 +232,8 @@ fun PermissionBottomSheet(
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Text("Everything is Ready!")
-                }
+                    text = "Everything is Ready!"
+                )
             }
         }
     }
