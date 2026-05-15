@@ -68,8 +68,7 @@ class AppStreakWidget : GlanceAppWidget() {
         provideContent {
             val prefs = currentState<Preferences>()
             val selectedPackage = prefs[SELECTED_PACKAGE_KEY]
-            
-            // Optimization: Use a shared flow of shields and filter it to minimize re-renders
+
             val shields by remember(app) {
                 app.shieldRepository.allShields
                     .distinctUntilChanged { old, new ->

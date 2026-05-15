@@ -83,7 +83,6 @@ fun ShieldOverlay(
     val combinedState by produceState<Triple<ShieldEntity?, Long, Long>>(
         initialValue = Triple(shield, totalUsageToday, totalGlobalUsageToday)
     ) {
-        // Ambil data terbaru dari DB secara sekaligus (hanya satu kali)
         val s = shieldRepository.getShieldByPackageNameFlow(packageName).first()
         val appUsage = shieldRepository.getUsageByDateAndPackageFlow(todayDate, packageName).first()
         val globalUsage = shieldRepository.getUsageByDateAndPackageFlow(todayDate, "TOTAL").first()
@@ -91,7 +90,6 @@ fun ShieldOverlay(
         val dbAppUsage = appUsage?.usageTimeMillis ?: 0L
         val dbGlobalUsage = globalUsage?.usageTimeMillis ?: 0L
 
-        // Nilai ini akan menjadi final dan tidak akan berubah lagi selama overlay terbuka
         value = Triple(
             s ?: shield, 
             maxOf(totalUsageToday, dbAppUsage), 

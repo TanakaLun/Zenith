@@ -828,8 +828,7 @@ class HomeViewModel(
             }
 
             val targetMillis = currentTargetMinutes * 60 * 1000L
-            
-            // Panggil fungsi terpusat di repository agar tidak menghitung 2 kali
+
             val (liveStreak, finalBestStreak) = userPreferencesRepository.refreshGlobalStreak(shieldRepository)
             
             _uiState.update { state -> state.copy(

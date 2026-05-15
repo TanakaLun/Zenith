@@ -16,8 +16,8 @@ android {
         applicationId = "com.etrisad.zenith"
         minSdk = 30
         targetSdk = 36
-        versionCode = 4
-        versionName = "1.4.3"
+        versionCode = 5
+        versionName = "1.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

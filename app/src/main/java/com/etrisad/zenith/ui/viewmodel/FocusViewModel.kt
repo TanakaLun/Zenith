@@ -70,7 +70,6 @@ class FocusViewModel(
 
     init {
         viewModelScope.launch {
-            // Use a shorter debounce for the first load, then it will throttle subsequent rapid updates
             shieldRepository.allShields
                 .collect { shields ->
                     allShields = shields
@@ -106,8 +105,7 @@ class FocusViewModel(
 
     private fun updateShieldedLists() {
         val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as android.app.usage.UsageStatsManager
-        
-        // Use the accurate helper for today's usage to avoid "sticky" cross-day stats
+
         val accurateUsageMap = com.etrisad.zenith.util.ScreenUsageHelper.fetchAppUsageTodayTillNow(usm)
 
         val liveShields = allShields.map { shield ->
@@ -129,7 +127,7 @@ class FocusViewModel(
         viewModelScope.launch {
             while (true) {
                 updateShieldedLists()
-                kotlinx.coroutines.delay(15000) // Wait 15 seconds AFTER update
+                kotlinx.coroutines.delay(15000)
             }
         }
     }
@@ -146,7 +144,6 @@ class FocusViewModel(
     private fun loadInstalledApps() {
         loadAppsJob?.cancel()
         loadAppsJob = viewModelScope.launch {
-            // Only show loading if we haven't loaded apps before
             if (_allInstalledApps.value.isEmpty()) {
                 _uiState.value = _uiState.value.copy(isLoadingApps = true)
             }
@@ -208,8 +205,7 @@ class FocusViewModel(
     private fun getTopUsedApps(limit: Int): List<AppInfo> {
         val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as android.app.usage.UsageStatsManager
         val pm = context.packageManager
-        
-        // Use accurate usage map to ensure correct ordering especially near midnight
+
         val accurateUsageMap = com.etrisad.zenith.util.ScreenUsageHelper.fetchAppUsageTodayTillNow(usm)
         
         return accurateUsageMap.entries

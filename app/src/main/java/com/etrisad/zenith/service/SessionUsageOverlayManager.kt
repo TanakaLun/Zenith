@@ -382,7 +382,7 @@ fun SessionUsageHUD(
             if (userPrefs?.hudHideFeatureLearned == false) {
                 delay(3000)
                 tooltipState.show()
-                delay(8000) // Show for 8 seconds
+                delay(8000)
                 tooltipState.dismiss()
             }
         }

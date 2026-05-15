@@ -422,8 +422,7 @@ class ZenithAccessibilityService : AccessibilityService() {
         val remainingMillis = (limitMillis - cachedTotalUsage).coerceAtLeast(0L)
 
         val timeSinceLastUsed = currentTime - shield.lastUsedTimestamp
-        val isNearLimit = remainingMillis < 60000 
-        // Optimisasi: Update DB tidak terlalu sering
+        val isNearLimit = remainingMillis < 60000
         val shouldUpdateDB = timeSinceLastUsed > 15000 || (isNearLimit && timeSinceLastUsed > 5000)
 
         if (shouldUpdateDB) {
@@ -607,7 +606,6 @@ class ZenithAccessibilityService : AccessibilityService() {
 
     private fun getTotalGlobalUsageToday(): Long {
         val currentTime = System.currentTimeMillis()
-        // Optimisasi: Cache lebih lama (5 detik)
         if (currentTime - lastGlobalUsageCacheTime < 5000) {
             return cachedTotalGlobalUsage
         }
@@ -618,7 +616,6 @@ class ZenithAccessibilityService : AccessibilityService() {
 
         val excludePackages = setOfNotNull(packageName, defaultLauncherPackage)
 
-        // Use accurate helper to ensure consistency with Home screen
         val detailedUsage = com.etrisad.zenith.util.ScreenUsageHelper.fetchDetailedUsageToday(usageStatsManager)
         val accurateUsageMap = detailedUsage.appUsageMap
 
@@ -646,7 +643,6 @@ class ZenithAccessibilityService : AccessibilityService() {
     private fun getTotalUsageToday(packageName: String): Long {
         val currentTime = System.currentTimeMillis()
 
-        // Optimisasi: Cache lebih lama (10 detik)
         if (currentTime - lastUsageCacheTime > 10000) {
             val detailedUsage = com.etrisad.zenith.util.ScreenUsageHelper.fetchDetailedUsageToday(usageStatsManager)
             val tempMap = detailedUsage.appUsageMap

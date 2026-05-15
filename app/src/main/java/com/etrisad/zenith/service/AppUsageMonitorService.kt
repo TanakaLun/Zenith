@@ -736,8 +736,7 @@ class AppUsageMonitorService : Service() {
         val remainingMillis = (limitMillis - cachedTotalUsage).coerceAtLeast(0L)
 
         val timeSinceLastUsed = currentTime - shield.lastUsedTimestamp
-        val isNearLimit = remainingMillis < 60000 
-        // Optimisasi: Update DB tidak terlalu sering (minimal 5 detik, atau 2 detik jika mendekati limit)
+        val isNearLimit = remainingMillis < 60000
         val shouldUpdateDB = force || timeSinceLastUsed > 10000 || (isNearLimit && timeSinceLastUsed > 5000) || updatedShield != shield
 
         if (shouldUpdateDB) {
@@ -1135,7 +1134,6 @@ class AppUsageMonitorService : Service() {
 
     private fun getUsageStatsList(): List<android.app.usage.UsageStats>? {
         val currentTime = System.currentTimeMillis()
-        // Optimisasi: Cache lebih lama (5 detik) untuk mengurangi frekuensi query yang berat
         if (usageStatsCache != null && currentTime - lastUsageCacheTime < 5000) {
             return usageStatsCache
         }
@@ -1506,7 +1504,6 @@ class AppUsageMonitorService : Service() {
 
     private fun getForegroundApp(): String? {
         val time = System.currentTimeMillis()
-        // Optimisasi: Gunakan window waktu yang lebih kecil dan simpan lastEventQueryTime
         val queryStart = if (lastEventQueryTime == 0L) time - 10000 else lastEventQueryTime
         val usageEvents = try {
             usageStatsManager.queryEvents(queryStart, time)
@@ -1529,12 +1526,10 @@ class AppUsageMonitorService : Service() {
             }
         }
 
-        // Pastikan lastEventQueryTime selalu maju
         if (lastEventQueryTime < time) {
             lastEventQueryTime = time
         }
 
-        // Jika tidak ada event baru, kemungkinan besar masih di app yang sama
         if (foundPackage == null) {
             return lastForegroundApp
         }

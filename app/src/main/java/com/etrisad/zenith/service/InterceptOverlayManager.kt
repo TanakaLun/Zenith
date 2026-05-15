@@ -125,8 +125,6 @@ class InterceptOverlayManager(
             return
         }
 
-        // Optimisasi: Jika sudah ada overlay yang tampil (misal untuk paket lain), 
-        // kita cukup update content-nya daripada remove dan add view baru yang berat.
         if (overlayView != null) {
             isShowing = true
             currentPackage = packageName
