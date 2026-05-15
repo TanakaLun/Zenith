@@ -67,10 +67,7 @@ class AppStreakWidget : GlanceAppWidget() {
             val selectedPackage = prefs[SELECTED_PACKAGE_KEY]
             
             val shields by app.shieldRepository.allShields.collectAsState(initial = emptyList())
-            
-            // Priority selection:
-            // 1. If we have a selected package from configuration, use it.
-            // 2. Otherwise, use the app with the highest streak as a default.
+
             val packageToDisplay = if (!selectedPackage.isNullOrEmpty()) {
                 selectedPackage
             } else {
@@ -91,19 +88,21 @@ class AppStreakWidget : GlanceAppWidget() {
                 val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
 
                 Box(
-                    modifier = GlanceModifier.fillMaxSize().clickable(
-                        if (!packageToDisplay.isNullOrEmpty()) {
-                            actionStartActivity<MainActivity>(
-                                actionParametersOf(PACKAGE_NAME_KEY.to(packageToDisplay))
-                            )
-                        } else {
-                            actionStartActivity<AppStreakWidgetConfigurationActivity>(
-                                if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
-                                    actionParametersOf(EXTRA_WIDGET_ID_KEY.to(appWidgetId))
-                                } else actionParametersOf()
-                            )
-                        }
-                    )
+                    modifier = GlanceModifier.fillMaxSize()
+                        .cornerRadius(24.dp)
+                        .clickable(
+                            if (!packageToDisplay.isNullOrEmpty()) {
+                                actionStartActivity<MainActivity>(
+                                    actionParametersOf(PACKAGE_NAME_KEY.to(packageToDisplay))
+                                )
+                            } else {
+                                actionStartActivity<AppStreakWidgetConfigurationActivity>(
+                                    if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+                                        actionParametersOf(EXTRA_WIDGET_ID_KEY.to(appWidgetId))
+                                    } else actionParametersOf()
+                                )
+                            }
+                        )
                 ) {
                     if (!packageToDisplay.isNullOrEmpty()) {
                         AppStreakContent(
@@ -194,7 +193,6 @@ class AppStreakWidget : GlanceAppWidget() {
                 modifier = GlanceModifier.size(squareSize),
                 contentAlignment = Alignment.Center
             ) {
-                // Background Pill utama
                 Image(
                     provider = ImageProvider(pillBitmap),
                     contentDescription = null,
@@ -202,7 +200,6 @@ class AppStreakWidget : GlanceAppWidget() {
                     colorFilter = ColorFilter.tint(pillColor)
                 )
 
-                // 1. Pojok Kiri Bawah: Bundar (Sunny) + Ikon Aplikasi
                 Box(
                     modifier = GlanceModifier.fillMaxSize().padding(contentPadding),
                     contentAlignment = Alignment.BottomStart
@@ -224,7 +221,6 @@ class AppStreakWidget : GlanceAppWidget() {
                     }
                 }
 
-                // 2. Pojok Kanan Atas: Bundar (Sunny) + Info Streak
                 Box(
                     modifier = GlanceModifier.fillMaxSize().padding(contentPadding),
                     contentAlignment = Alignment.TopEnd

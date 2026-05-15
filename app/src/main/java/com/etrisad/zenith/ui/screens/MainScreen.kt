@@ -79,22 +79,30 @@ fun MainScreen(
     val navController = rememberNavController()
     val context = LocalContext.current
 
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+
     LaunchedEffect(initialPackageName) {
         if (initialPackageName != null) {
-            navController.navigate(Screen.AppDetail.createRoute(initialPackageName)) {
-                // Pop up to the home screen if we're deep in the app
-                popUpTo(navController.graph.findStartDestination().id) {
-                    saveState = true
+            val currentDetailRoute = Screen.AppDetail.createRoute(initialPackageName)
+            if (currentRoute != currentDetailRoute) {
+                navController.navigate(currentDetailRoute) {
+                    val homeRoute = Screen.Home.route
+                    if (currentRoute != null &&
+                        currentRoute != homeRoute && 
+                        !currentRoute.startsWith("app_detail")) {
+                        popUpTo(navController.graph.findStartDestination().id) {
+                            saveState = true
+                        }
+                    }
+                    launchSingleTop = true
+                    restoreState = true
                 }
-                launchSingleTop = true
-                restoreState = true
             }
             onInitialPackageHandled()
         }
     }
 
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = navBackStackEntry?.destination?.route
     val isDeepScreen =
         currentRoute == Screen.UsageStats.route ||
                 currentRoute == Screen.Bedtime.route ||
