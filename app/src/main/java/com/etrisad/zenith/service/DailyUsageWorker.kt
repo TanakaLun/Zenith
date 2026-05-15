@@ -286,6 +286,9 @@ class DailyUsageWorker(context: Context, params: WorkerParameters) : CoroutineWo
 
         dailyUsageDao.insertAll(usages)
 
+        val shieldRepository = (applicationContext as com.etrisad.zenith.ZenithApplication).shieldRepository
+        userPrefsRepo.refreshGlobalStreak(shieldRepository)
+
         val hourlyUsages = mutableListOf<HourlyUsageEntity>()
         
         hourlyMap.forEach { (hour, time) ->

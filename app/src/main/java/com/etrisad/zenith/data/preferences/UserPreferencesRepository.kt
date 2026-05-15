@@ -1,6 +1,9 @@
 package com.etrisad.zenith.data.preferences
 
+import android.app.usage.UsageStatsManager
 import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -10,10 +13,15 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.etrisad.zenith.data.local.entity.DailyUsageEntity
+import com.etrisad.zenith.data.repository.ShieldRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.io.IOException
+import java.text.SimpleDateFormat
+import java.util.*
 
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
@@ -274,6 +282,93 @@ class UserPreferencesRepository(private val context: Context) {
             preferences[PreferencesKeys.GLOBAL_BEST_STREAK] = best
             preferences[PreferencesKeys.GLOBAL_LAST_STREAK_UPDATE_TIMESTAMP] = timestamp
         }
+    }
+
+    suspend fun refreshGlobalStreak(shieldRepository: ShieldRepository): Pair<Int, Int> {
+        val prefs = userPreferencesFlow.first()
+        val targetMillis = prefs.screenTimeTargetMinutes * 60 * 1000L
+        if (targetMillis <= 0) return Pair(0, 0)
+
+        val dbUsage = shieldRepository.getAllUsage().first()
+        val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+        val now = System.currentTimeMillis()
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+
+        // 1. Calculate Today's usage
+        val launcherApps = try {
+            context.packageManager.queryIntentActivities(
+                Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0
+            ).map { it.activityInfo.packageName }.toSet()
+        } catch (_: Exception) { emptySet<String>() }
+
+        val launcherIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+        val launcherPackage = try {
+            context.packageManager.resolveActivity(launcherIntent, PackageManager.MATCH_DEFAULT_ONLY)
+                ?.activityInfo?.packageName
+        } catch (_: Exception) { null }
+
+        val excludePackages = setOfNotNull(context.packageName, launcherPackage)
+
+        val calendar = Calendar.getInstance()
+        calendar.set(Calendar.HOUR_OF_DAY, 0)
+        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.SECOND, 0)
+        calendar.set(Calendar.MILLISECOND, 0)
+        val todayStart = calendar.timeInMillis
+
+        val stats = usageStatsManager.queryAndAggregateUsageStats(todayStart, now)
+        var totalToday = 0L
+        stats.forEach { (pkg, stat) ->
+            if (pkg !in excludePackages && pkg in launcherApps) {
+                totalToday += stat.totalTimeVisible.coerceAtLeast(stat.totalTimeInForeground)
+            }
+        }
+
+        val globalHistory = dbUsage.filter { it.packageName == "TOTAL" }
+
+        // 2. Calculate Live Streak
+        var liveStreak = 0
+        if (totalToday <= targetMillis) {
+            liveStreak = 1
+            val c = Calendar.getInstance()
+            for (i in 1..60) {
+                c.timeInMillis = now
+                c.add(Calendar.DAY_OF_YEAR, -i)
+                val dStr = dateFormat.format(c.time)
+                val usage = globalHistory.find { it.date == dStr }?.usageTimeMillis
+
+                if (usage != null && usage <= targetMillis) {
+                    liveStreak++
+                } else if (usage != null) {
+                    break
+                } else {
+                    break
+                }
+            }
+        }
+
+        // 3. Calculate Best Streak
+        var bestStreak = prefs.globalBestStreak
+        var currentTempStreak = 0
+        for (i in 60 downTo 0) {
+            val checkCal = Calendar.getInstance().apply {
+                timeInMillis = now
+                add(Calendar.DAY_OF_YEAR, -i)
+            }
+            val dStr = dateFormat.format(checkCal.time)
+            val usage = if (i == 0) totalToday else globalHistory.find { it.date == dStr }?.usageTimeMillis
+
+            if (usage != null && usage <= targetMillis) {
+                currentTempStreak++
+            } else {
+                bestStreak = maxOf(bestStreak, currentTempStreak)
+                currentTempStreak = 0
+            }
+        }
+        bestStreak = maxOf(bestStreak, currentTempStreak)
+
+        updateGlobalStreak(liveStreak, bestStreak, now)
+        return Pair(liveStreak, bestStreak)
     }
 
     suspend fun setAutoBackupEnabled(enabled: Boolean) {

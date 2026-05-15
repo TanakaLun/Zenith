@@ -136,6 +136,7 @@ class AppUsageMonitorService : Service() {
     private fun onMidnightReset() {
         serviceScope.launch {
             updateStreaks()
+            preferencesRepository.refreshGlobalStreak(shieldRepository)
             shieldRepository.resetAllRemainingTimes()
             notifiedGoals.clear()
             earlyKickManager.reset()

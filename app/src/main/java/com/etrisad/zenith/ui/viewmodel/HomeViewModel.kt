@@ -291,6 +291,7 @@ class HomeViewModel(
                 shieldRepository.insertDailyUsage(DailyUsageEntity(date = date, packageName = "SHIELD_TOTAL", usageTimeMillis = sUsage))
                 shieldRepository.insertDailyUsage(DailyUsageEntity(date = date, packageName = "GOAL_TOTAL", usageTimeMillis = gUsage))
                 shieldRepository.insertDailyUsage(DailyUsageEntity(date = date, packageName = "OTHER_TOTAL", usageTimeMillis = oUsage))
+                userPreferencesRepository.refreshGlobalStreak(shieldRepository)
             } finally {
                 delay(500)
                 _isRepairing.value = false
@@ -827,51 +828,10 @@ class HomeViewModel(
             }
 
             val targetMillis = currentTargetMinutes * 60 * 1000L
-            var liveStreak = 0
-            var bestStreakFromHistory = 0
-
-            if (targetMillis > 0) {
-                if (totalToday <= targetMillis) {
-                    liveStreak = 1
-                    val c = Calendar.getInstance()
-                    for (i in 1..60) {
-                        c.time = Date()
-                        c.add(Calendar.DAY_OF_YEAR, -i)
-                        val dStr = dateFormat.format(c.time)
-                        val usage = globalHistory.find { it.date == dStr }?.usageTimeMillis 
-                            ?: if (preferSystemUsageHistory) {
-                                globalFallbackMap[dStr]?.find { it.packageName == "TOTAL" }?.usageTimeMillis
-                            } else null
-                        if (usage != null && usage <= targetMillis) {
-                            liveStreak++
-                        } else if (usage != null) {
-                            break
-                        } else {
-                            break
-                        }
-                    }
-                }
-
-                var currentTempStreak = 0
-                for (i in 60 downTo 0) {
-                    val dStart = getMidnight(i)
-                    val dStr = dateFormat.format(Date(dStart))
-                    val usage = if (i == 0) totalToday else {
-                        globalHistory.find { it.date == dStr }?.usageTimeMillis 
-                            ?: if (preferSystemUsageHistory) {
-                                globalFallbackMap[dStr]?.find { it.packageName == "TOTAL" }?.usageTimeMillis
-                            } else null
-                    }
-                    if (usage != null && usage <= targetMillis) {
-                        currentTempStreak++
-                    } else {
-                        bestStreakFromHistory = maxOf(bestStreakFromHistory, currentTempStreak)
-                        currentTempStreak = 0
-                    }
-                }
-                bestStreakFromHistory = maxOf(bestStreakFromHistory, currentTempStreak)
-            }
-
+            
+            // Panggil fungsi terpusat di repository agar tidak menghitung 2 kali
+            val (liveStreak, finalBestStreak) = userPreferencesRepository.refreshGlobalStreak(shieldRepository)
+            
             _uiState.update { state -> state.copy(
                 totalScreenTime      = selectedDayTotal,
                 yesterdayScreenTime  = totalYesterday,
@@ -887,7 +847,7 @@ class HomeViewModel(
                 activeShields = sortShields(liveShields.filter { it.type == com.etrisad.zenith.data.local.entity.FocusType.SHIELD }, state.shieldSortType),
                 activeGoals   = sortShields(liveShields.filter { it.type == com.etrisad.zenith.data.local.entity.FocusType.GOAL }, state.goalSortType),
                 globalCurrentStreak = liveStreak,
-                globalBestStreak = maxOf(prefGlobalBestStreak, bestStreakFromHistory),
+                globalBestStreak = finalBestStreak,
                 targetMillis = targetMillis,
                 isLoading = false
             ) }
