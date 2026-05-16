@@ -1078,46 +1078,19 @@ class HomeViewModel(
         val currentState = _appDetailUiState.value
         val packageName = currentState.packageName
 
-        if (packageName.isEmpty() || currentState.appName == packageName) return
+        if (packageName.isEmpty()) return
 
         viewModelScope.launch {
             val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
             val todayStart = getMidnight(0)
-            val currentNow = System.currentTimeMillis()
             
-            val events = usm.queryEvents(todayStart, currentNow)
-            val event = android.app.usage.UsageEvents.Event()
-            val lastEventTime = mutableMapOf<String, Long>()
-            var totalTime = 0L
-
-            while (events.hasNextEvent()) {
-                events.getNextEvent(event)
-                if (event.packageName != packageName) continue
-                
-                val time = event.timeStamp
-                if (event.eventType == android.app.usage.UsageEvents.Event.MOVE_TO_FOREGROUND || 
-                    event.eventType == android.app.usage.UsageEvents.Event.ACTIVITY_RESUMED) {
-                    lastEventTime[packageName] = time
-                } else if (event.eventType == android.app.usage.UsageEvents.Event.MOVE_TO_BACKGROUND ||
-                           event.eventType == android.app.usage.UsageEvents.Event.ACTIVITY_PAUSED) {
-                    val startTime = lastEventTime.remove(packageName) ?: continue
-                    val segmentStart = maxOf(startTime, todayStart)
-                    val segmentEnd = minOf(time, currentNow)
-                    if (segmentStart < segmentEnd) {
-                        totalTime += (segmentEnd - segmentStart)
-                    }
-                }
-            }
+            val detailedUsage = com.etrisad.zenith.util.ScreenUsageHelper.fetchDetailedUsageToday(usm, includeHourly = true)
+            val currentTodayUsage = detailedUsage.appUsageMap[packageName] ?: 0L
             
-            lastEventTime[packageName]?.let { startTime ->
-                val segmentStart = maxOf(startTime, todayStart)
-                val segmentEnd = currentNow
-                if (segmentStart < segmentEnd) {
-                    totalTime += (segmentEnd - segmentStart)
-                }
+            val appHourlyUsage = MutableList(24) { hour -> 
+                detailedUsage.hourlyUsageMap[hour]?.get(packageName) ?: 0L 
             }
-
-            val currentTodayUsage = totalTime.coerceAtMost(currentNow - todayStart)
+            val peakHour = appHourlyUsage.indices.maxByOrNull { appHourlyUsage[it] } ?: -1
 
             val yesterdayUsage = currentState.yesterdayUsage
             val percentageChange = when {
@@ -1128,7 +1101,10 @@ class HomeViewModel(
 
             _appDetailUiState.update { it.copy(
                 todayUsage = currentTodayUsage,
-                percentageChange = percentageChange
+                percentageChange = percentageChange,
+                totalSessions = detailedUsage.sessionCounts[packageName]?.coerceAtLeast(if (currentTodayUsage > 0) 1 else 0) ?: it.totalSessions,
+                hourlyUsage = appHourlyUsage,
+                peakHour = peakHour
             ) }
         }
     }
