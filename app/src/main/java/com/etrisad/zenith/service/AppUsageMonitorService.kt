@@ -608,30 +608,59 @@ class AppUsageMonitorService : Service() {
                     Log.e("ZenithAUMS", "Error in monitoring loop", e)
                 }
 
-                val delayTime = when {
-                    isPowerSaveMode -> 5000L
-                    InterceptOverlayManager.isShowing -> 8000L
-                    currentShieldCache != null -> {
-                        val shield = currentShieldCache!!
-                        val limitMillis = shield.timeLimitMinutes * 60 * 1000L
-                        val remaining = (limitMillis - cachedTotalUsage).coerceAtLeast(0L)
+                val delayTime = if (currentPreferences?.customDelayEnabled == true) {
+                    val prefs = currentPreferences!!
+                    when {
+                        isPowerSaveMode -> prefs.delayPowerSave
+                        InterceptOverlayManager.isShowing -> prefs.delayOverlayShowing
+                        currentShieldCache != null -> {
+                            val shield = currentShieldCache!!
+                            val limitMillis = shield.timeLimitMinutes * 60 * 1000L
+                            val remaining = (limitMillis - cachedTotalUsage).coerceAtLeast(0L)
 
-                        if (shield.type == FocusType.GOAL) {
-                            when {
-                                remaining < 60000 -> 600L
-                                remaining < 300000 -> 1200L
-                                else -> 1800L
-                            }
-                        } else {
-                            when {
-                                remaining > 3600000 -> 5000L
-                                remaining > 600000 -> 3000L
-                                remaining > 60000 -> 1500L
-                                else -> 600L
+                            if (shield.type == FocusType.GOAL) {
+                                when {
+                                    remaining < 60000 -> prefs.delayGoalNear
+                                    remaining < 300000 -> prefs.delayGoalMid
+                                    else -> prefs.delayGoalFar
+                                }
+                            } else {
+                                when {
+                                    remaining > 3600000 -> prefs.delayShieldVeryFar
+                                    remaining > 600000 -> prefs.delayShieldFar
+                                    remaining > 60000 -> prefs.delayShieldMid
+                                    else -> prefs.delayShieldNear
+                                }
                             }
                         }
+                        else -> prefs.delayDefault
                     }
-                    else -> 1200L
+                } else {
+                    when {
+                        isPowerSaveMode -> 5000L
+                        InterceptOverlayManager.isShowing -> 8000L
+                        currentShieldCache != null -> {
+                            val shield = currentShieldCache!!
+                            val limitMillis = shield.timeLimitMinutes * 60 * 1000L
+                            val remaining = (limitMillis - cachedTotalUsage).coerceAtLeast(0L)
+
+                            if (shield.type == FocusType.GOAL) {
+                                when {
+                                    remaining < 60000 -> 600L
+                                    remaining < 300000 -> 1200L
+                                    else -> 1800L
+                                }
+                            } else {
+                                when {
+                                    remaining > 3600000 -> 5000L
+                                    remaining > 600000 -> 3000L
+                                    remaining > 60000 -> 1500L
+                                    else -> 600L
+                                }
+                            }
+                        }
+                        else -> 1200L
+                    }
                 }
                 delay(delayTime)
             }

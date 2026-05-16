@@ -80,6 +80,17 @@ class UserPreferencesRepository(private val context: Context) {
         val ONBOARDING_STATS_COMPLETED = booleanPreferencesKey("onboarding_stats_completed")
         val HUD_HIDE_FEATURE_LEARNED = booleanPreferencesKey("hud_hide_feature_learned")
         val SHORTS_SCREEN_TIME_MS = longPreferencesKey("shorts_screen_time_ms")
+        val CUSTOM_DELAY_ENABLED = booleanPreferencesKey("custom_delay_enabled")
+        val DELAY_POWER_SAVE = longPreferencesKey("delay_power_save")
+        val DELAY_OVERLAY_SHOWING = longPreferencesKey("delay_overlay_showing")
+        val DELAY_GOAL_NEAR = longPreferencesKey("delay_goal_near")
+        val DELAY_GOAL_MID = longPreferencesKey("delay_goal_mid")
+        val DELAY_GOAL_FAR = longPreferencesKey("delay_goal_far")
+        val DELAY_SHIELD_VERY_FAR = longPreferencesKey("delay_shield_very_far")
+        val DELAY_SHIELD_FAR = longPreferencesKey("delay_shield_far")
+        val DELAY_SHIELD_MID = longPreferencesKey("delay_shield_mid")
+        val DELAY_SHIELD_NEAR = longPreferencesKey("delay_shield_near")
+        val DELAY_DEFAULT = longPreferencesKey("delay_default")
     }
 
     val userPreferencesFlow: Flow<UserPreferences> = context.dataStore.data
@@ -139,6 +150,17 @@ class UserPreferencesRepository(private val context: Context) {
             val onboardingStatsCompleted = preferences[PreferencesKeys.ONBOARDING_STATS_COMPLETED] ?: false
             val hudHideFeatureLearned = preferences[PreferencesKeys.HUD_HIDE_FEATURE_LEARNED] ?: false
             val shortsScreenTimeMs = preferences[PreferencesKeys.SHORTS_SCREEN_TIME_MS] ?: 0L
+            val customDelayEnabled = preferences[PreferencesKeys.CUSTOM_DELAY_ENABLED] ?: false
+            val delayPowerSave = preferences[PreferencesKeys.DELAY_POWER_SAVE] ?: 5000L
+            val delayOverlayShowing = preferences[PreferencesKeys.DELAY_OVERLAY_SHOWING] ?: 8000L
+            val delayGoalNear = preferences[PreferencesKeys.DELAY_GOAL_NEAR] ?: 600L
+            val delayGoalMid = preferences[PreferencesKeys.DELAY_GOAL_MID] ?: 1200L
+            val delayGoalFar = preferences[PreferencesKeys.DELAY_GOAL_FAR] ?: 1800L
+            val delayShieldVeryFar = preferences[PreferencesKeys.DELAY_SHIELD_VERY_FAR] ?: 5000L
+            val delayShieldFar = preferences[PreferencesKeys.DELAY_SHIELD_FAR] ?: 3000L
+            val delayShieldMid = preferences[PreferencesKeys.DELAY_SHIELD_MID] ?: 1500L
+            val delayShieldNear = preferences[PreferencesKeys.DELAY_SHIELD_NEAR] ?: 600L
+            val delayDefault = preferences[PreferencesKeys.DELAY_DEFAULT] ?: 1200L
 
             UserPreferences(
                 themeConfig = themeConfig,
@@ -183,7 +205,18 @@ class UserPreferencesRepository(private val context: Context) {
                 preferSystemUsageHistory = preferSystemUsageHistory,
                 onboardingStatsCompleted = onboardingStatsCompleted,
                 hudHideFeatureLearned = hudHideFeatureLearned,
-                shortsScreenTimeMs = shortsScreenTimeMs
+                shortsScreenTimeMs = shortsScreenTimeMs,
+                customDelayEnabled = customDelayEnabled,
+                delayPowerSave = delayPowerSave,
+                delayOverlayShowing = delayOverlayShowing,
+                delayGoalNear = delayGoalNear,
+                delayGoalMid = delayGoalMid,
+                delayGoalFar = delayGoalFar,
+                delayShieldVeryFar = delayShieldVeryFar,
+                delayShieldFar = delayShieldFar,
+                delayShieldMid = delayShieldMid,
+                delayShieldNear = delayShieldNear,
+                delayDefault = delayDefault
             )
         }
 
@@ -521,6 +554,87 @@ class UserPreferencesRepository(private val context: Context) {
             preferences[PreferencesKeys.SHORTS_SCREEN_TIME_MS] = ms
         }
     }
+
+    suspend fun setCustomDelayEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.CUSTOM_DELAY_ENABLED] = enabled
+        }
+    }
+
+    suspend fun setDelayPowerSave(delay: Long) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.DELAY_POWER_SAVE] = delay
+        }
+    }
+
+    suspend fun setDelayOverlayShowing(delay: Long) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.DELAY_OVERLAY_SHOWING] = delay
+        }
+    }
+
+    suspend fun setDelayGoalNear(delay: Long) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.DELAY_GOAL_NEAR] = delay
+        }
+    }
+
+    suspend fun setDelayGoalMid(delay: Long) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.DELAY_GOAL_MID] = delay
+        }
+    }
+
+    suspend fun setDelayGoalFar(delay: Long) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.DELAY_GOAL_FAR] = delay
+        }
+    }
+
+    suspend fun setDelayShieldVeryFar(delay: Long) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.DELAY_SHIELD_VERY_FAR] = delay
+        }
+    }
+
+    suspend fun setDelayShieldFar(delay: Long) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.DELAY_SHIELD_FAR] = delay
+        }
+    }
+
+    suspend fun setDelayShieldMid(delay: Long) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.DELAY_SHIELD_MID] = delay
+        }
+    }
+
+    suspend fun setDelayShieldNear(delay: Long) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.DELAY_SHIELD_NEAR] = delay
+        }
+    }
+
+    suspend fun setDelayDefault(delay: Long) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.DELAY_DEFAULT] = delay
+        }
+    }
+
+    suspend fun resetCustomDelays() {
+        context.dataStore.edit { preferences ->
+            preferences.remove(PreferencesKeys.DELAY_POWER_SAVE)
+            preferences.remove(PreferencesKeys.DELAY_OVERLAY_SHOWING)
+            preferences.remove(PreferencesKeys.DELAY_GOAL_NEAR)
+            preferences.remove(PreferencesKeys.DELAY_GOAL_MID)
+            preferences.remove(PreferencesKeys.DELAY_GOAL_FAR)
+            preferences.remove(PreferencesKeys.DELAY_SHIELD_VERY_FAR)
+            preferences.remove(PreferencesKeys.DELAY_SHIELD_FAR)
+            preferences.remove(PreferencesKeys.DELAY_SHIELD_MID)
+            preferences.remove(PreferencesKeys.DELAY_SHIELD_NEAR)
+            preferences.remove(PreferencesKeys.DELAY_DEFAULT)
+        }
+    }
 }
 
 data class UserPreferences(
@@ -566,5 +680,16 @@ data class UserPreferences(
     val preferSystemUsageHistory: Boolean = true,
     val onboardingStatsCompleted: Boolean = false,
     val hudHideFeatureLearned: Boolean = false,
-    val shortsScreenTimeMs: Long = 0L
+    val shortsScreenTimeMs: Long = 0L,
+    val customDelayEnabled: Boolean = false,
+    val delayPowerSave: Long = 5000L,
+    val delayOverlayShowing: Long = 8000L,
+    val delayGoalNear: Long = 600L,
+    val delayGoalMid: Long = 1200L,
+    val delayGoalFar: Long = 1800L,
+    val delayShieldVeryFar: Long = 5000L,
+    val delayShieldFar: Long = 3000L,
+    val delayShieldMid: Long = 1500L,
+    val delayShieldNear: Long = 600L,
+    val delayDefault: Long = 1200L
 )
