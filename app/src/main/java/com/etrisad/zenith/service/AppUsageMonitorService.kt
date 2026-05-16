@@ -1447,16 +1447,16 @@ class AppUsageMonitorService : Service() {
 
     private fun shouldBypassBlocking(packageName: String): Boolean {
         if (packageName == this.packageName) return true
+        if (packageName in CRITICAL_SYSTEM_PACKAGES) return true
+        if (launcherPackages.contains(packageName)) return true
+
+        if (packageName in restrictedPackages) return false
 
         if (isBedtimeBlockingActive) {
             if (packageName in bedtimeWhitelistedPackages) return true
         } else {
             if (packageName in whitelistedPackages) return true
         }
-
-        if (packageName in CRITICAL_SYSTEM_PACKAGES) return true
-
-        if (launcherPackages.contains(packageName)) return true
 
         val isSystem = systemAppCache.getOrPut(packageName) {
             try {
