@@ -618,20 +618,20 @@ class AppUsageMonitorService : Service() {
 
                         if (shield.type == FocusType.GOAL) {
                             when {
-                                remaining < 60000 -> 2000L
-                                remaining < 300000 -> 5000L
-                                else -> 10000L
+                                remaining < 60000 -> 600L
+                                remaining < 300000 -> 1200L
+                                else -> 1800L
                             }
                         } else {
                             when {
-                                remaining > 3600000 -> 15000L
-                                remaining > 600000 -> 10000L
-                                remaining > 60000 -> 5000L
-                                else -> 2000L
+                                remaining > 3600000 -> 5000L
+                                remaining > 600000 -> 3000L
+                                remaining > 60000 -> 1500L
+                                else -> 600L
                             }
                         }
                     }
-                    else -> 5000L
+                    else -> 1200L
                 }
                 delay(delayTime)
             }
