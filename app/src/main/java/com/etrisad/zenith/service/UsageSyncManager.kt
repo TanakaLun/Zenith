@@ -69,6 +69,11 @@ class UsageSyncManager(
                         val className = event.className ?: ""
                         if (!className.contains("Notification", ignoreCase = true) &&
                             !className.contains("Toast", ignoreCase = true)) {
+                            
+                            val previousStart = activeSessions[pkg]
+                            if (previousStart != null) {
+                                processSession(pkg, previousStart, time, hourlyBuckets)
+                            }
                             activeSessions[pkg] = time
                         }
                     }

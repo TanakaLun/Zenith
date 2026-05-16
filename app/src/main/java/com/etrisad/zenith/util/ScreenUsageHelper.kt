@@ -61,7 +61,7 @@ object ScreenUsageHelper {
                         val segmentEnd = minOf(time, end)
                         if (segmentStart < segmentEnd) {
                             val duration = segmentEnd - segmentStart
-                            if (duration > 1500) {
+                            if (duration > 100) {
                                 usageMap[p] = (usageMap[p] ?: 0L) + duration
                                 if (duration > 4000) {
                                     sessionCounts[p] = (sessionCounts[p] ?: 0) + 1
@@ -85,12 +85,12 @@ object ScreenUsageHelper {
                             continue
                         }
 
-                        if (activePkg != null && activePkg != pkg) {
+                        if (activePkg != null) {
                             val segmentStart = maxOf(activeStartTime, start)
                             val segmentEnd = minOf(time, end)
                             if (segmentStart < segmentEnd) {
                                 val duration = segmentEnd - segmentStart
-                                if (duration > 1500) {
+                                if (duration > 0) {
                                     usageMap[activePkg!!] = (usageMap[activePkg!!] ?: 0L) + duration
                                     if (duration > 4000) {
                                         sessionCounts[activePkg!!] = (sessionCounts[activePkg!!] ?: 0) + 1
@@ -112,7 +112,7 @@ object ScreenUsageHelper {
                         val segmentEnd = minOf(time, end)
                         if (segmentStart < segmentEnd) {
                             val duration = segmentEnd - segmentStart
-                            if (duration > 1500) {
+                            if (duration > 100) {
                                 usageMap[pkg] = (usageMap[pkg] ?: 0L) + duration
                                 if (duration > 4000) {
                                     sessionCounts[pkg] = (sessionCounts[pkg] ?: 0) + 1
@@ -134,7 +134,7 @@ object ScreenUsageHelper {
             val segmentEnd = end
             if (segmentStart < segmentEnd) {
                 val duration = segmentEnd - segmentStart
-                if (duration > 1500) {
+                if (duration > 100) {
                     usageMap[activePkg!!] = (usageMap[activePkg!!] ?: 0L) + duration
                     if (duration > 4000) {
                         sessionCounts[activePkg!!] = (sessionCounts[activePkg!!] ?: 0) + 1
