@@ -18,6 +18,9 @@ interface HourlyUsageDao {
     @Query("SELECT * FROM hourly_usage WHERE date = :date AND packageName = :packageName")
     fun getHourlyUsageForPackage(date: String, packageName: String): Flow<List<HourlyUsageEntity>>
 
+    @Query("SELECT * FROM hourly_usage WHERE date = :date")
+    suspend fun getHourlyUsageForDateSync(date: String): List<HourlyUsageEntity>
+
     @Query("SELECT DISTINCT date FROM hourly_usage")
     fun getDatesWithHourlyUsage(): Flow<List<String>>
 
