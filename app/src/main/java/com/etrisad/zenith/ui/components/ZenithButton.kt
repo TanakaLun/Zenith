@@ -81,12 +81,14 @@ fun ZenithButton(
     onHoldComplete: (() -> Unit)? = null,
     holdDuration: Long = 1500L,
     enableAfterDelayMillis: Long = 0L,
-    interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
+    interactionSource: MutableInteractionSource? = null,
     isFirst: Boolean = true,
     isLast: Boolean = true,
     content: @Composable (RowScope.() -> Unit)? = null
 ) {
-    ZenithButtonImpl(
+    val actualInteractionSource = interactionSource ?: remember { MutableInteractionSource() }
+
+    ZenithButtonCore(
         onClick = onClick,
         modifier = modifier,
         type = type,
@@ -108,7 +110,7 @@ fun ZenithButton(
         onHoldComplete = onHoldComplete,
         holdDuration = holdDuration,
         enableAfterDelayMillis = enableAfterDelayMillis,
-        interactionSource = interactionSource,
+        interactionSource = actualInteractionSource,
         customShape = shape,
         isFirst = isFirst,
         isLast = isLast,
@@ -139,13 +141,14 @@ fun RowScope.ZenithButtonWeighted(
     onHoldComplete: (() -> Unit)? = null,
     holdDuration: Long = 1500L,
     enableAfterDelayMillis: Long = 0L,
-    interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
+    interactionSource: MutableInteractionSource? = null,
     isFirst: Boolean = true,
     isLast: Boolean = true,
     shape: Shape? = null,
     content: @Composable (RowScope.() -> Unit)? = null
 ) {
-    val isPressed by interactionSource.collectIsPressedAsState()
+    val actualInteractionSource = interactionSource ?: remember { MutableInteractionSource() }
+    val isPressed by actualInteractionSource.collectIsPressedAsState()
     val animatedWeight by animateFloatAsState(
         targetValue = when {
             isPressed -> weight * 1.4f
@@ -156,7 +159,7 @@ fun RowScope.ZenithButtonWeighted(
         label = "wAnim"
     )
 
-    ZenithButton(
+    ZenithButtonCore(
         onClick = onClick,
         modifier = modifier.weight(animatedWeight),
         type = type,
@@ -171,15 +174,15 @@ fun RowScope.ZenithButtonWeighted(
         fillMaxWidth = false,
         containerColor = containerColor,
         contentColor = contentColor,
-        pillCornerRadius = pillCornerRadius,
-        pressedCornerRadius = pressedCornerRadius,
-        height = height,
+        pillCornerRadiusOverride = pillCornerRadius,
+        pressedCornerRadiusOverride = pressedCornerRadius,
+        heightOverride = height,
         selected = selected,
         onHoldComplete = onHoldComplete,
         holdDuration = holdDuration,
         enableAfterDelayMillis = enableAfterDelayMillis,
-        interactionSource = interactionSource,
-        shape = shape,
+        interactionSource = actualInteractionSource,
+        customShape = shape,
         isFirst = isFirst,
         isLast = isLast,
         content = content
@@ -188,7 +191,7 @@ fun RowScope.ZenithButtonWeighted(
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun ZenithButtonImpl(
+private fun ZenithButtonCore(
     onClick: () -> Unit,
     modifier: Modifier,
     type: ZenithButtonType,
