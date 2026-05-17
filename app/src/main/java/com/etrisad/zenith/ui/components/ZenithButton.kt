@@ -9,7 +9,9 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -30,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.etrisad.zenith.ui.theme.ZenithTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -84,6 +87,7 @@ fun ZenithButton(
     interactionSource: MutableInteractionSource? = null,
     isFirst: Boolean = true,
     isLast: Boolean = true,
+    contentScaleEnabled: Boolean = true,
     content: @Composable (RowScope.() -> Unit)? = null
 ) {
     val actualInteractionSource = interactionSource ?: remember { MutableInteractionSource() }
@@ -110,10 +114,11 @@ fun ZenithButton(
         onHoldComplete = onHoldComplete,
         holdDuration = holdDuration,
         enableAfterDelayMillis = enableAfterDelayMillis,
-        interactionSource = actualInteractionSource,
+        coreInteractionSource = actualInteractionSource,
         customShape = shape,
         isFirst = isFirst,
         isLast = isLast,
+        contentScaleEnabled = contentScaleEnabled,
         content = content
     )
 }
@@ -145,13 +150,19 @@ fun RowScope.ZenithButtonWeighted(
     isFirst: Boolean = true,
     isLast: Boolean = true,
     shape: Shape? = null,
+    contentScaleEnabled: Boolean = true,
     content: @Composable (RowScope.() -> Unit)? = null
 ) {
     val actualInteractionSource = interactionSource ?: remember { MutableInteractionSource() }
     val isPressed by actualInteractionSource.collectIsPressedAsState()
+    val scope = rememberCoroutineScope()
+
+    var isTapped by remember { mutableStateOf(false) }
+    val visualPressed = isPressed || isTapped
+
     val animatedWeight by animateFloatAsState(
         targetValue = when {
-            isPressed -> weight * 1.4f
+            visualPressed -> weight * 1.5f
             selected -> weight * 1.2f
             else -> weight
         },
@@ -160,7 +171,14 @@ fun RowScope.ZenithButtonWeighted(
     )
 
     ZenithButtonCore(
-        onClick = onClick,
+        onClick = {
+            scope.launch {
+                isTapped = true
+                delay(100)
+                isTapped = false
+            }
+            onClick()
+        },
         modifier = modifier.weight(animatedWeight),
         type = type,
         size = size,
@@ -181,10 +199,11 @@ fun RowScope.ZenithButtonWeighted(
         onHoldComplete = onHoldComplete,
         holdDuration = holdDuration,
         enableAfterDelayMillis = enableAfterDelayMillis,
-        interactionSource = actualInteractionSource,
+        coreInteractionSource = actualInteractionSource,
         customShape = shape,
         isFirst = isFirst,
         isLast = isLast,
+        contentScaleEnabled = contentScaleEnabled,
         content = content
     )
 }
@@ -213,13 +232,17 @@ private fun ZenithButtonCore(
     onHoldComplete: (() -> Unit)?,
     holdDuration: Long,
     enableAfterDelayMillis: Long,
-    interactionSource: MutableInteractionSource,
+    coreInteractionSource: MutableInteractionSource,
     isFirst: Boolean,
     isLast: Boolean,
     customShape: Shape?,
+    contentScaleEnabled: Boolean,
     content: @Composable (RowScope.() -> Unit)?
 ) {
-    val isPressed by interactionSource.collectIsPressedAsState()
+    val isPressed by coreInteractionSource.collectIsPressedAsState()
+    var isTapped by remember { mutableStateOf(false) }
+    val visualPressed = isPressed || isTapped
+    
     val curPressed by rememberUpdatedState(isPressed)
     val haptic = LocalHapticFeedback.current
     val density = LocalDensity.current
@@ -253,7 +276,7 @@ private fun ZenithButtonCore(
     val resInnerR = when(size){ZenithButtonSize.Small->4.dp; ZenithButtonSize.Medium->6.dp; ZenithButtonSize.Large->8.dp; else->12.dp}
 
     val animInnerR by animateDpAsState(
-        targetValue = if (isPressed || selected) resPressR else resInnerR,
+        targetValue = if (visualPressed) resPressR else resInnerR,
         animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
         label = "animInnerR"
     )
@@ -272,30 +295,22 @@ private fun ZenithButtonCore(
     )
     
     val cScaleState = animateFloatAsState(
-        targetValue = if (isPressed && enabled) 0.94f else 1f, 
+        targetValue = if (visualPressed && enabled) 0.94f else 1f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
         label = "cScale"
     )
 
-    val finalScale = cScaleState.value * bounceScale.value
+    val finalScale = if (contentScaleEnabled) cScaleState.value * bounceScale.value else 1f
 
     val animR by animateDpAsState(
-        targetValue = when {
-            !enabled -> resPressR
-            (backgroundProgress != null || backgroundProgressProvider != null) && !isHoldAction -> {
-                if (isPressed) resPillR else resPressR
-            }
-            else -> {
-                if (isPressed || selected) resPressR else resPillR
-            }
-        },
+        targetValue = if (!enabled || visualPressed) resPressR else resPillR,
         animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
         label = "animR"
     )
     
     val exPad by animateDpAsState(
         targetValue = when {
-            isPressed -> 16.dp
+            visualPressed -> 16.dp
             selected -> 8.dp
             else -> 0.dp
         },
@@ -360,6 +375,11 @@ private fun ZenithButtonCore(
                     shakeOffset.animateTo(0f, spring(stiffness = 10000f))
                 }
             } else {
+                scope.launch {
+                    isTapped = true
+                    delay(100)
+                    isTapped = false
+                }
                 onClick()
             }
         },
@@ -374,7 +394,7 @@ private fun ZenithButtonCore(
         tonalElevation = if (type == ZenithButtonType.Elevated) 2.dp else 0.dp,
         shadowElevation = if (type == ZenithButtonType.Elevated) 2.dp else 0.dp,
         border = if (type == ZenithButtonType.Outlined) BorderStroke(1.dp, MaterialTheme.colorScheme.outline) else null,
-        interactionSource = interactionSource
+        interactionSource = coreInteractionSource
     ) {
         Box(
             modifier = Modifier
@@ -454,7 +474,9 @@ fun ZenithToggleButtonGroup(
     onToggle: (Int) -> Unit,
     modifier: Modifier = Modifier,
     isMultiSelect: Boolean = false,
-    size: ZenithButtonSize = ZenithButtonSize.Medium
+    size: ZenithButtonSize = ZenithButtonSize.Medium,
+    isInsideContainer: Boolean = false,
+    showCheckmarkOnMultiSelect: Boolean = true
 ) {
     val resH = when(size){ZenithButtonSize.Small->32.dp; ZenithButtonSize.Medium->40.dp; ZenithButtonSize.Large->48.dp; else->56.dp}
     Row(modifier = modifier.height(resH).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -462,10 +484,13 @@ fun ZenithToggleButtonGroup(
             val isSelected = selectedIndices.contains(index)
             val interactionSource = remember { MutableInteractionSource() }
             val isPressed by interactionSource.collectIsPressedAsState()
+            val scope = rememberCoroutineScope()
+            
+            var isTapped by remember { mutableStateOf(false) }
             
             val animatedWeight by animateFloatAsState(
                 targetValue = when {
-                    isPressed -> option.weight * 1.4f
+                    isPressed || isTapped -> option.weight * 1.5f
                     isSelected -> option.weight * 1.2f
                     else -> option.weight
                 },
@@ -475,25 +500,45 @@ fun ZenithToggleButtonGroup(
 
             val baseR = resH / 2
             val smallR = resH * 0.2f
-            val startR by animateDpAsState(targetValue = if (isPressed) baseR * 0.6f else if (isSelected || index == 0) baseR else smallR)
-            val endR by animateDpAsState(targetValue = if (isPressed) baseR * 0.6f else if (isSelected || index == options.size - 1) baseR else smallR)
+            val startR by animateDpAsState(targetValue = if (isPressed || isTapped) baseR * 0.6f else if (isSelected || index == 0) baseR else smallR)
+            val endR by animateDpAsState(targetValue = if (isPressed || isTapped) baseR * 0.6f else if (isSelected || index == options.size - 1) baseR else smallR)
             val currentType = if (isSelected) (option.selectedType ?: ZenithButtonType.Filled) else (option.type ?: ZenithButtonType.Tonal)
+
+            val unselectedBg = if (isInsideContainer) {
+                MaterialTheme.colorScheme.surface
+            } else {
+                MaterialTheme.colorScheme.surfaceContainerLow
+            }
             
+            val unselectedContent = if (isInsideContainer) {
+                MaterialTheme.colorScheme.onSurface
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            }
+
             ZenithButton(
-                onClick = { onToggle(index) },
+                onClick = { 
+                    scope.launch {
+                        isTapped = true
+                        delay(100)
+                        isTapped = false
+                    }
+                    onToggle(index) 
+                },
                 modifier = Modifier.weight(animatedWeight),
                 type = currentType,
                 size = size,
                 text = option.text,
-                icon = if (isSelected && isMultiSelect && option.icon == null) Icons.Default.Check else option.icon,
+                icon = if (isSelected && isMultiSelect && showCheckmarkOnMultiSelect && option.icon == null) Icons.Default.Check else option.icon,
                 isLoading = option.isLoading,
                 loadingProgress = option.loadingProgress,
                 backgroundProgress = option.backgroundProgress,
-                containerColor = option.containerColor,
-                contentColor = option.contentColor,
+                containerColor = option.containerColor ?: if (isSelected) null else unselectedBg,
+                contentColor = option.contentColor ?: if (isSelected) null else unselectedContent,
                 enabled = option.enabled,
                 selected = isSelected,
                 interactionSource = interactionSource,
+                contentScaleEnabled = false,
                 shape = RoundedCornerShape(topStart = startR, bottomStart = startR, topEnd = endR, bottomEnd = endR)
             )
         }
@@ -528,67 +573,100 @@ fun ZenithGroupedButton(
     )
 }
 
-@Preview(showBackground = true)
 @Composable
-fun ZenithButtonPreview() {
-    var selected by remember { mutableStateOf(setOf(1)) }
+fun ZenithButtonGallery() {
+    val scrollState = rememberScrollState()
+    ZenithTheme {
+        Column(
+            modifier = Modifier
+                .padding(16.dp)
+                .fillMaxWidth()
+                .verticalScroll(scrollState),
+            verticalArrangement = Arrangement.spacedBy(24.dp)
+        ) {
+            Text("Zenith Button Gallery", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
 
-    val testProgress = remember { Animatable(0f) }
-    LaunchedEffect(Unit) {
-        testProgress.animateTo(
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(5000, easing = LinearEasing),
-                repeatMode = RepeatMode.Restart
-            )
-        )
-    }
-
-    MaterialTheme {
-        Column(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("Zenith Unified Buttons", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            ZenithButton(onClick = {}, text = "Filled XL", fillMaxWidth = true)
-            
-            Text("Animated Background (5s Loop)", style = MaterialTheme.typography.labelLarge)
-            ZenithButton(
-                onClick = {}, 
-                text = "${(5 * (1 - testProgress.value)).toInt()}s Remaining",
-                backgroundProgress = testProgress.value, 
-                type = ZenithButtonType.Tonal,
-                fillMaxWidth = true
-            )
-
-            ZenithToggleButtonGroup(options = listOf(ZenithToggleOption("Option 1"), ZenithToggleOption("Option 2"), ZenithToggleOption("Option 3")), selectedIndices = selected, onToggle = { selected = setOf(it) })
-            ZenithButton(type = ZenithButtonType.Hold, onClick = {}, text = "Hold Action (Fluid)", fillMaxWidth = true)
-            
-            var isEnabled by remember { mutableStateOf(true) }
-            ZenithButton(
-                onClick = { isEnabled = false }, 
-                enabled = isEnabled,
-                text = if (isEnabled) "Click to Disable" else "Disabled (Shake)", 
-                fillMaxWidth = true
-            )
-            if (!isEnabled) {
-                TextButton(onClick = { isEnabled = true }) { Text("Reset State") }
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Button Types", style = MaterialTheme.typography.titleMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ZenithButton(onClick = {}, type = ZenithButtonType.Filled, text = "Filled", modifier = Modifier.weight(1f), size = ZenithButtonSize.Medium)
+                    ZenithButton(onClick = {}, type = ZenithButtonType.Tonal, text = "Tonal", modifier = Modifier.weight(1f), size = ZenithButtonSize.Medium)
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ZenithButton(onClick = {}, type = ZenithButtonType.Elevated, text = "Elevated", modifier = Modifier.weight(1f), size = ZenithButtonSize.Medium)
+                    ZenithButton(onClick = {}, type = ZenithButtonType.Outlined, text = "Outlined", modifier = Modifier.weight(1f), size = ZenithButtonSize.Medium)
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ZenithButton(onClick = {}, type = ZenithButtonType.Text, text = "Text", modifier = Modifier.weight(1f), size = ZenithButtonSize.Medium)
+                    ZenithButton(onClick = {}, type = ZenithButtonType.Hold, text = "Hold", modifier = Modifier.weight(1f), size = ZenithButtonSize.Medium)
+                }
             }
-            
-            Text("Testing Text & Progress", style = MaterialTheme.typography.labelLarge)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Button Sizes", style = MaterialTheme.typography.titleMedium)
+                ZenithButton(onClick = {}, size = ZenithButtonSize.ExtraLarge, text = "Extra Large", fillMaxWidth = true)
+                ZenithButton(onClick = {}, size = ZenithButtonSize.Large, text = "Large", fillMaxWidth = true)
+                ZenithButton(onClick = {}, size = ZenithButtonSize.Medium, text = "Medium", fillMaxWidth = true)
+                ZenithButton(onClick = {}, size = ZenithButtonSize.Small, text = "Small", fillMaxWidth = true)
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("With Icons", style = MaterialTheme.typography.titleMedium)
+                ZenithButton(onClick = {}, icon = Icons.Default.Add, text = "Add Item", fillMaxWidth = true)
+                ZenithButton(onClick = {}, icon = Icons.Default.Settings, text = "Settings", type = ZenithButtonType.Outlined, fillMaxWidth = true)
+                ZenithButton(onClick = {}, icon = Icons.Default.Delete, type = ZenithButtonType.Tonal, contentColor = MaterialTheme.colorScheme.error)
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("States", style = MaterialTheme.typography.titleMedium)
+                ZenithButton(onClick = {}, text = "Loading Indeterminate", isLoading = true, fillMaxWidth = true)
+                ZenithButton(onClick = {}, text = "Loading Progress 60%", isLoading = true, loadingProgress = 0.6f, fillMaxWidth = true)
+                ZenithButton(onClick = {}, text = "Background Progress 40%", backgroundProgress = 0.4f, fillMaxWidth = true)
+                ZenithButton(onClick = {}, text = "Disabled", enabled = false, fillMaxWidth = true)
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Grouped Buttons", style = MaterialTheme.typography.titleMedium)
+                ZenithGroupedButton {
+                    ZenithButtonWeighted(onClick = {}, text = "Left", isLast = false)
+                    ZenithButtonWeighted(onClick = {}, text = "Center", isFirst = false, isLast = false, type = ZenithButtonType.Tonal)
+                    ZenithButtonWeighted(onClick = {}, text = "Right", isFirst = false)
+                }
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Toggle Groups", style = MaterialTheme.typography.titleMedium)
+                var selectedSingle by remember { mutableStateOf(setOf(0)) }
+                ZenithToggleButtonGroup(
+                    options = listOf(ZenithToggleOption("Morning"), ZenithToggleOption("Noon"), ZenithToggleOption("Night")),
+                    selectedIndices = selectedSingle,
+                    onToggle = { selectedSingle = setOf(it) }
+                )
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Custom Overrides", style = MaterialTheme.typography.titleMedium)
                 ZenithButton(
-                    onClick = {}, 
-                    text = "Text Hold", 
-                    type = ZenithButtonType.Text, 
-                    onHoldComplete = {},
-                    modifier = Modifier.weight(1f)
+                    onClick = {},
+                    text = "Custom Colors & Radius",
+                    containerColor = Color(0xFF6200EE),
+                    contentColor = Color.White,
+                    pillCornerRadius = 8.dp,
+                    fillMaxWidth = true
                 )
                 ZenithButton(
-                    onClick = {}, 
-                    text = "Manual 70%", 
-                    backgroundProgress = 0.7f, 
-                    type = ZenithButtonType.Text,
-                    modifier = Modifier.weight(1f)
+                    onClick = {},
+                    text = "Delayed Enable (3s)",
+                    enableAfterDelayMillis = 3000L,
+                    fillMaxWidth = true
                 )
             }
         }
     }
+}
+
+@Preview(showBackground = true, heightDp = 1200)
+@Composable
+fun ZenithButtonPreview() {
+    ZenithButtonGallery()
 }

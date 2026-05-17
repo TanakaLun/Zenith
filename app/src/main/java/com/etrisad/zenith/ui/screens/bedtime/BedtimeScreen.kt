@@ -36,6 +36,10 @@ import java.time.LocalTime
 import java.time.Duration
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
+import com.etrisad.zenith.ui.components.ZenithButton
+import com.etrisad.zenith.ui.components.ZenithButtonSize
+import com.etrisad.zenith.ui.components.ZenithToggleButtonGroup
+import com.etrisad.zenith.ui.components.ZenithToggleOption
 import com.etrisad.zenith.ui.components.ConfirmBottomSheet
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -549,115 +553,19 @@ fun DaysSelectionCard(
 @Composable
 fun DaysSelector(selectedDays: Set<Int>, onDaysChange: (Set<Int>) -> Unit) {
     val days = listOf("S", "M", "T", "W", "T", "F", "S")
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        days.forEachIndexed { index, day ->
+    ZenithToggleButtonGroup(
+        options = days.map { ZenithToggleOption(text = it) },
+        selectedIndices = selectedDays.map { it - 1 }.toSet(),
+        onToggle = { index ->
             val dayNum = index + 1
-            val isSelected = dayNum in selectedDays
-            ExpressiveDayButton(
-                label = day,
-                selected = isSelected,
-                onClick = {
-                    val newDays = if (isSelected) selectedDays - dayNum else selectedDays + dayNum
-                    onDaysChange(newDays)
-                },
-                isFirst = index == 0,
-                isLast = index == days.size - 1
-            )
-        }
-    }
-}
-
-@Composable
-internal fun RowScope.ExpressiveDayButton(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    isFirst: Boolean,
-    isLast: Boolean
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-
-    val widthScale by animateFloatAsState(
-        targetValue = when {
-            isPressed -> 1.5f
-            selected -> 1.25f
-            else -> 1.0f
+            val newDays = if (dayNum in selectedDays) selectedDays - dayNum else selectedDays + dayNum
+            onDaysChange(newDays)
         },
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMediumLow
-        ),
-        label = "WidthScale"
+        isMultiSelect = true,
+        size = ZenithButtonSize.Medium,
+        isInsideContainer = true,
+        showCheckmarkOnMultiSelect = false
     )
-
-    val backgroundColor by animateColorAsState(
-        targetValue = if (selected) MaterialTheme.colorScheme.secondaryContainer
-        else MaterialTheme.colorScheme.surface,
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-        label = "BgColor"
-    )
-
-    val contentColor by animateColorAsState(
-        targetValue = if (selected) MaterialTheme.colorScheme.onSecondaryContainer
-        else MaterialTheme.colorScheme.onSurfaceVariant,
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-        label = "ContentColor"
-    )
-
-    val innerRadius by animateDpAsState(
-        targetValue = if (selected) 24.dp else 8.dp,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMediumLow
-        ),
-        label = "InnerRadius"
-    )
-
-    val outerRadius = 24.dp
-
-    val shape = when {
-        selected -> CircleShape
-        isFirst -> RoundedCornerShape(
-            topStart = outerRadius,
-            bottomStart = outerRadius,
-            topEnd = innerRadius,
-            bottomEnd = innerRadius
-        )
-        isLast -> RoundedCornerShape(
-            topEnd = outerRadius,
-            bottomEnd = outerRadius,
-            topStart = innerRadius,
-            bottomStart = innerRadius
-        )
-        else -> RoundedCornerShape(innerRadius)
-    }
-
-    Box(
-        modifier = Modifier
-            .weight(widthScale)
-            .height(48.dp)
-            .clip(shape)
-            .background(backgroundColor)
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onClick
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = label,
-            color = contentColor,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-            maxLines = 1
-        )
-    }
 }
 
 @Composable

@@ -49,6 +49,8 @@ import com.etrisad.zenith.ui.components.ZenithButtonType
 import com.etrisad.zenith.ui.components.ZenithButtonSize
 import com.etrisad.zenith.ui.components.ZenithGroupedButton
 import com.etrisad.zenith.ui.components.ZenithButtonWeighted
+import com.etrisad.zenith.ui.components.ZenithToggleButtonGroup
+import com.etrisad.zenith.ui.components.ZenithToggleOption
 import com.etrisad.zenith.service.AppGoalOverlayActivity
 import com.etrisad.zenith.ui.navigation.Screen
 import com.etrisad.zenith.ui.viewmodel.FocusViewModel
@@ -1525,21 +1527,13 @@ fun FontSelector(
                 FontOption.NUNITO to "Nunito"
             )
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                fontOptions.forEachIndexed { index, (option, label) ->
-                    ThemeOptionButton(
-                        label = label,
-                        selected = selectedFont == option,
-                        onClick = { onFontChange(option) },
-                        isFirst = index == 0,
-                        isLast = index == fontOptions.size - 1
-                    )
-                }
-            }
+            ZenithToggleButtonGroup(
+                options = fontOptions.map { ZenithToggleOption(text = it.second) },
+                selectedIndices = setOf(fontOptions.indexOfFirst { it.first == selectedFont }),
+                onToggle = { index -> onFontChange(fontOptions[index].first) },
+                size = ZenithButtonSize.Medium,
+                isInsideContainer = true
+            )
         }
     }
 }
@@ -1595,124 +1589,12 @@ fun ThemeSelector(
                 ThemeConfig.DARK to "Dark"
             )
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                themeOptions.forEachIndexed { index, (config, label) ->
-                    ThemeOptionButton(
-                        label = label,
-                        selected = selectedTheme == config,
-                        onClick = { onThemeChange(config) },
-                        isFirst = index == 0,
-                        isLast = index == themeOptions.size - 1
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-internal fun RowScope.ThemeOptionButton(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    isFirst: Boolean,
-    isLast: Boolean
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-
-    val widthScale by animateFloatAsState(
-        targetValue = when {
-            isPressed -> 1.5f
-            selected -> 1.25f
-            else -> 1.0f
-        },
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMediumLow
-        ),
-        label = "WidthScale"
-    )
-
-    val backgroundColor by animateColorAsState(
-        targetValue = if (selected) MaterialTheme.colorScheme.secondaryContainer
-                      else MaterialTheme.colorScheme.surface,
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-        label = "BgColor"
-    )
-    
-    val contentColor by animateColorAsState(
-        targetValue = if (selected) MaterialTheme.colorScheme.onSecondaryContainer
-                      else MaterialTheme.colorScheme.onSurfaceVariant,
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-        label = "ContentColor"
-    )
-
-    val innerRadius by animateDpAsState(
-        targetValue = if (selected) 24.dp else 8.dp,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMediumLow
-        ),
-        label = "InnerRadius"
-    )
-    
-    val outerRadius = 24.dp
-    
-    val shape = when {
-        selected -> CircleShape
-        isFirst -> RoundedCornerShape(
-            topStart = outerRadius, 
-            bottomStart = outerRadius, 
-            topEnd = innerRadius, 
-            bottomEnd = innerRadius
-        )
-        isLast -> RoundedCornerShape(
-            topEnd = outerRadius, 
-            bottomEnd = outerRadius, 
-            topStart = innerRadius, 
-            bottomStart = innerRadius
-        )
-        else -> RoundedCornerShape(innerRadius)
-    }
-
-    Box(
-        modifier = Modifier
-            .weight(widthScale)
-            .height(48.dp)
-            .clip(shape)
-            .background(backgroundColor)
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onClick
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-            modifier = Modifier.padding(horizontal = 8.dp)
-        ) {
-            if (selected) {
-                Icon(
-                    imageVector = Icons.Outlined.Check,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                    tint = contentColor
-                )
-                Spacer(Modifier.width(4.dp))
-            }
-            Text(
-                text = label,
-                color = contentColor,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                maxLines = 1
+            ZenithToggleButtonGroup(
+                options = themeOptions.map { ZenithToggleOption(text = it.second) },
+                selectedIndices = setOf(themeOptions.indexOfFirst { it.first == selectedTheme }),
+                onToggle = { index -> onThemeChange(themeOptions[index].first) },
+                size = ZenithButtonSize.Medium,
+                isInsideContainer = true
             )
         }
     }
@@ -1977,21 +1859,13 @@ fun AutoBackupSettings(
             Spacer(modifier = Modifier.height(12.dp))
             
             val intervals = listOf(3, 6, 12, 24)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                intervals.forEachIndexed { index, hours ->
-                    ThemeOptionButton(
-                        label = "${hours}h",
-                        selected = intervalHours == hours,
-                        onClick = { onSetInterval(hours) },
-                        isFirst = index == 0,
-                        isLast = index == intervals.size - 1
-                    )
-                }
-            }
+            ZenithToggleButtonGroup(
+                options = intervals.map { ZenithToggleOption(text = "${it}h") },
+                selectedIndices = setOf(intervals.indexOf(intervalHours)),
+                onToggle = { index -> onSetInterval(intervals[index]) },
+                size = ZenithButtonSize.Medium,
+                isInsideContainer = true
+            )
         }
     }
 }

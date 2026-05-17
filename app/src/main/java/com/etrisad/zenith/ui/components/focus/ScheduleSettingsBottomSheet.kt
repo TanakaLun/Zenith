@@ -34,6 +34,9 @@ import com.etrisad.zenith.data.local.entity.ScheduleMode
 import com.etrisad.zenith.data.preferences.UserPreferences
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
 import com.etrisad.zenith.ui.components.ZenithButton
+import com.etrisad.zenith.ui.components.ZenithButtonSize
+import com.etrisad.zenith.ui.components.ZenithToggleButtonGroup
+import com.etrisad.zenith.ui.components.ZenithToggleOption
 import com.etrisad.zenith.ui.viewmodel.FocusUiState
 import kotlinx.coroutines.launch
 
@@ -253,30 +256,16 @@ fun ScheduleSettingsBottomSheet(
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    ScheduleModeOptionButton(
-                        label = "Block",
-                        icon = Icons.Outlined.Block,
-                        selected = mode == ScheduleMode.BLOCK,
-                        onClick = { mode = ScheduleMode.BLOCK },
-                        isFirst = true,
-                        isLast = false,
-                        containerColor = containerColor
-                    )
-                    ScheduleModeOptionButton(
-                        label = "Allow",
-                        icon = Icons.Outlined.CheckCircleOutline,
-                        selected = mode == ScheduleMode.ALLOW,
-                        onClick = { mode = ScheduleMode.ALLOW },
-                        isFirst = false,
-                        isLast = true,
-                        containerColor = containerColor
-                    )
-                }
+
+                ZenithToggleButtonGroup(
+                    options = listOf(
+                        ZenithToggleOption(text = "Block", icon = Icons.Outlined.Block),
+                        ZenithToggleOption(text = "Allow", icon = Icons.Outlined.CheckCircleOutline)
+                    ),
+                    selectedIndices = setOf(if (mode == ScheduleMode.BLOCK) 0 else 1),
+                    onToggle = { index -> mode = if (index == 0) ScheduleMode.BLOCK else ScheduleMode.ALLOW },
+                    size = ZenithButtonSize.Medium
+                )
 
                 Spacer(modifier = Modifier.height(24.dp))
                 OutlinedTextField(
@@ -376,106 +365,3 @@ fun TimePickerDialog(
     )
 }
 
-@Composable
-fun RowScope.ScheduleModeOptionButton(
-    label: String,
-    icon: ImageVector,
-    selected: Boolean,
-    onClick: () -> Unit,
-    isFirst: Boolean,
-    isLast: Boolean,
-    containerColor: Color
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-
-    val widthScale by animateFloatAsState(
-        targetValue = when {
-            isPressed -> 1.5f
-            selected -> 1.25f
-            else -> 1.0f
-        },
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMediumLow
-        ),
-        label = "WidthScale"
-    )
-
-    val backgroundColor by animateColorAsState(
-        targetValue = if (selected) MaterialTheme.colorScheme.secondaryContainer
-        else containerColor,
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-        label = "BgColor"
-    )
-
-    val contentColor by animateColorAsState(
-        targetValue = if (selected) MaterialTheme.colorScheme.onSecondaryContainer
-        else MaterialTheme.colorScheme.onSurfaceVariant,
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-        label = "ContentColor"
-    )
-
-    val innerRadius by animateDpAsState(
-        targetValue = if (selected) 24.dp else 8.dp,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMediumLow
-        ),
-        label = "InnerRadius"
-    )
-
-    val outerRadius = 24.dp
-
-    val shape = when {
-        selected -> CircleShape
-        isFirst -> RoundedCornerShape(
-            topStart = outerRadius,
-            bottomStart = outerRadius,
-            topEnd = innerRadius,
-            bottomEnd = innerRadius
-        )
-        isLast -> RoundedCornerShape(
-            topEnd = outerRadius,
-            bottomEnd = outerRadius,
-            topStart = innerRadius,
-            bottomStart = innerRadius
-        )
-        else -> RoundedCornerShape(innerRadius)
-    }
-
-    Box(
-        modifier = Modifier
-            .weight(widthScale)
-            .height(48.dp)
-            .clip(shape)
-            .background(backgroundColor)
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onClick
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-            modifier = Modifier.padding(horizontal = 8.dp)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = contentColor,
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelLarge,
-                color = contentColor,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                maxLines = 1
-            )
-        }
-    }
-}
