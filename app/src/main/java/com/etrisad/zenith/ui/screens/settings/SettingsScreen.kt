@@ -11,6 +11,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -45,14 +46,23 @@ import com.etrisad.zenith.data.preferences.UserPreferences
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
 import com.etrisad.zenith.ui.components.ZenithButton
 import com.etrisad.zenith.ui.components.ZenithButtonType
+import com.etrisad.zenith.ui.components.ZenithButtonSize
+import com.etrisad.zenith.ui.components.ZenithGroupedButton
+import com.etrisad.zenith.ui.components.ZenithButtonWeighted
 import com.etrisad.zenith.service.AppGoalOverlayActivity
 import com.etrisad.zenith.ui.navigation.Screen
 import com.etrisad.zenith.ui.viewmodel.FocusViewModel
 import com.etrisad.zenith.ui.viewmodel.FocusViewModelFactory
 import com.etrisad.zenith.util.BackupUtils
+import androidx.compose.ui.tooling.preview.Preview
+import com.etrisad.zenith.ui.theme.ZenithTheme
+import com.etrisad.zenith.data.remote.model.GitHubAsset
+import com.etrisad.zenith.ui.components.UpdateBottomSheet
+import com.etrisad.zenith.ui.components.UpdateBottomSheetContent
+import com.etrisad.zenith.data.manager.GitHubUpdateManager
+import com.etrisad.zenith.data.remote.model.GitHubRelease
 import kotlinx.coroutines.launch
 import com.etrisad.zenith.worker.BackupManager
-import kotlinx.coroutines.launch
 import androidx.navigation.NavController
 
 @Composable
@@ -93,6 +103,10 @@ fun SettingsScreen(
     )
 
     val backupManager = remember { BackupManager(context) }
+    val updateManager = remember { GitHubUpdateManager(context) }
+    var checkingForUpdate by remember { mutableStateOf(false) }
+    var showUpdateSheet by remember { mutableStateOf(false) }
+    var latestRelease by remember { mutableStateOf<GitHubRelease?>(null) }
 
     val backupLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/octet-stream"),
@@ -333,8 +347,59 @@ fun SettingsScreen(
             coroutineScope.launch {
                 preferencesRepository.resetCustomDelays()
             }
-        }
+        },
+        onTestUpdateSheet = {
+            coroutineScope.launch {
+                val release = updateManager.fetchLatestRelease()
+                if (release != null) {
+                    latestRelease = release
+                    showUpdateSheet = true
+                } else {
+                    Toast.makeText(context, "Failed to fetch latest release", Toast.LENGTH_SHORT).show()
+                }
+            }
+        },
+        onCheckForUpdate = {
+            if (!checkingForUpdate) {
+                coroutineScope.launch {
+                    checkingForUpdate = true
+                    when (val result = updateManager.checkForUpdates()) {
+                        is GitHubUpdateManager.UpdateResult.NewUpdate -> {
+                            latestRelease = result.release
+                            showUpdateSheet = true
+                        }
+                        is GitHubUpdateManager.UpdateResult.NoUpdate -> {
+                            Toast.makeText(context, "Zenith is up to date!", Toast.LENGTH_SHORT).show()
+                        }
+                        is GitHubUpdateManager.UpdateResult.Error -> {
+                            Toast.makeText(context, "Update check failed: ${result.message}", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    checkingForUpdate = false
+                }
+            }
+        },
+        isCheckingForUpdate = checkingForUpdate
     )
+
+    if (showUpdateSheet && latestRelease != null) {
+        val isDark = when (preferences.themeConfig) {
+            ThemeConfig.FOLLOW_SYSTEM -> isSystemInDarkTheme()
+            ThemeConfig.LIGHT -> false
+            ThemeConfig.DARK -> true
+        }
+        UpdateBottomSheet(
+            release = latestRelease!!,
+            useExpressiveColors = preferences.expressiveColors,
+            isDark = isDark,
+            onDismiss = { showUpdateSheet = false },
+            onUpdate = {
+                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(latestRelease!!.htmlUrl))
+                context.startActivity(intent)
+                showUpdateSheet = false
+            }
+        )
+    }
 
     if (showGoalTestSheet) {
         com.etrisad.zenith.ui.components.AppGoalTestBottomSheet(
@@ -410,7 +475,10 @@ fun SettingsScreenContent(
     onSetDelayShieldMid: (Long) -> Unit,
     onSetDelayShieldNear: (Long) -> Unit,
     onSetDelayDefault: (Long) -> Unit,
-    onResetCustomDelays: () -> Unit
+    onResetCustomDelays: () -> Unit,
+    onTestUpdateSheet: () -> Unit,
+    onCheckForUpdate: () -> Unit,
+    isCheckingForUpdate: Boolean
 ) {
     var showTargetSheet by remember { mutableStateOf(false) }
     var showEmergencyRechargeSheet by remember { mutableStateOf(false) }
@@ -749,6 +817,17 @@ fun SettingsScreenContent(
 
                 item {
                     Spacer(modifier = Modifier.height(4.dp))
+                    SettingsActionItem(
+                        title = "Test Update Sheet",
+                        summary = "Immediately trigger the new update bottom sheet",
+                        onClick = onTestUpdateSheet,
+                        icon = Icons.Outlined.NewReleases,
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(4.dp))
                     SettingsToggle(
                         title = "Custom Delay Time",
                         description = "Manually adjust monitoring intervals (Advanced)",
@@ -800,6 +879,16 @@ fun SettingsScreenContent(
                     developerModeEnabled = preferences.developerModeEnabled,
                     onDeveloperModeChange = onDeveloperModeEnabledChange,
                     shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
+                )
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(4.dp))
+                AboutActionCard(
+                    title = if (isCheckingForUpdate) "Checking for update..." else "Check for Update",
+                    icon = Icons.Outlined.Update,
+                    shape = RoundedCornerShape(8.dp),
+                    onClick = onCheckForUpdate
                 )
             }
 

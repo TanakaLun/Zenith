@@ -8,6 +8,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -37,6 +38,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.etrisad.zenith.data.preferences.ThemeConfig
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
 import kotlinx.coroutines.delay
 import androidx.lifecycle.Lifecycle
@@ -59,6 +61,9 @@ import com.etrisad.zenith.ui.viewmodel.HomeViewModel
 import com.etrisad.zenith.ui.viewmodel.BedtimeViewModel
 import com.etrisad.zenith.ui.viewmodel.BedtimeViewModelFactory
 
+import com.etrisad.zenith.data.manager.GitHubUpdateManager
+import com.etrisad.zenith.data.remote.model.GitHubRelease
+import com.etrisad.zenith.ui.components.UpdateBottomSheet
 import com.etrisad.zenith.data.preferences.UserPreferences
 import androidx.compose.material3.windowsizeclass.WindowSizeClass
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
@@ -162,6 +167,18 @@ fun MainScreen(
     var showPermissionSheet by remember { mutableStateOf(false) }
     var showOnboardingStatsSheet by remember { mutableStateOf(false) }
     var showUserSheet by remember { mutableStateOf(false) }
+    
+    val updateManager = remember { GitHubUpdateManager(context) }
+    var latestRelease by remember { mutableStateOf<GitHubRelease?>(null) }
+    var showUpdateSheet by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        val result = updateManager.checkForUpdates()
+        if (result is GitHubUpdateManager.UpdateResult.NewUpdate) {
+            latestRelease = result.release
+            showUpdateSheet = true
+        }
+    }
 
     fun checkPermissions() {
         val hasUsageStats = com.etrisad.zenith.util.hasUsageStatsPermission(context)
@@ -490,6 +507,25 @@ fun MainScreen(
                     onDismissRequest = { showUserSheet = false }
                 )
             }
+
+    if (showUpdateSheet && latestRelease != null) {
+        val isDark = when (preferences.themeConfig) {
+            ThemeConfig.FOLLOW_SYSTEM -> isSystemInDarkTheme()
+            ThemeConfig.LIGHT -> false
+            ThemeConfig.DARK -> true
+        }
+        UpdateBottomSheet(
+            release = latestRelease!!,
+            useExpressiveColors = preferences.expressiveColors,
+            isDark = isDark,
+            onDismiss = { showUpdateSheet = false },
+            onUpdate = {
+                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(latestRelease!!.htmlUrl))
+                context.startActivity(intent)
+                showUpdateSheet = false
+            }
+        )
+    }
             Box(modifier = Modifier.fillMaxSize()) {
                 NavHost(
                     navController = navController,
