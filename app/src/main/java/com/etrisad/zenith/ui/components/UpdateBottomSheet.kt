@@ -267,14 +267,14 @@ fun ChangelogVersionCard(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Surface(
-                        color = MaterialTheme.colorScheme.primary,
+                        color = MaterialTheme.colorScheme.tertiary,
                         shape = CircleShape
                     ) {
                         Text(
                             text = release.tagName,
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
                             style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onPrimary,
+                            color = MaterialTheme.colorScheme.onTertiary,
                             fontWeight = FontWeight.Bold
                         )
                     }

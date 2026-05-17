@@ -2201,14 +2201,14 @@ fun AppInfoCard(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Surface(
-                    color = MaterialTheme.colorScheme.primaryContainer,
+                    color = MaterialTheme.colorScheme.tertiary,
                     shape = CircleShape
                 ) {
                     Text(
                         text = "v$versionName",
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        color = MaterialTheme.colorScheme.onTertiary,
                         fontWeight = FontWeight.Bold
                     )
                 }
