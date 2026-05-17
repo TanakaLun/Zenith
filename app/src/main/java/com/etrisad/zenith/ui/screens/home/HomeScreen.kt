@@ -706,9 +706,12 @@ fun TopAppsSection(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         topApps.take(3).reversed().forEach { app ->
-                            if (app.icon != null) {
+                            val appIcon = remember(app.icon) {
+                                app.icon?.toBitmap()?.asImageBitmap()
+                            }
+                            if (appIcon != null) {
                                 Image(
-                                    painter = BitmapPainter(app.icon.toBitmap().asImageBitmap()),
+                                    painter = BitmapPainter(appIcon),
                                     contentDescription = null,
                                     modifier = Modifier
                                         .size(28.dp)
@@ -750,7 +753,7 @@ fun TopAppsSection(
                         val context = LocalContext.current
                         val appIcon = remember(app.packageName) {
                             try {
-                                context.packageManager.getApplicationIcon(app.packageName)
+                                context.packageManager.getApplicationIcon(app.packageName)?.toBitmap()?.asImageBitmap()
                             } catch (_: Exception) {
                                 null
                             }
@@ -785,7 +788,7 @@ fun TopAppsSection(
                                 leadingContent = {
                                     if (appIcon != null) {
                                         Image(
-                                            painter = BitmapPainter(appIcon.toBitmap().asImageBitmap()),
+                                            painter = BitmapPainter(appIcon),
                                             contentDescription = null,
                                             modifier = Modifier
                                                 .size(40.dp)
@@ -997,7 +1000,7 @@ fun ShieldItem(
     val context = LocalContext.current
     val appIcon = remember(shield.packageName) {
         try {
-            context.packageManager.getApplicationIcon(shield.packageName)
+            context.packageManager.getApplicationIcon(shield.packageName)?.toBitmap()?.asImageBitmap()
         } catch (_: Exception) {
             null
         }
@@ -1084,7 +1087,7 @@ fun ShieldItem(
                     ) {
                         if (appIcon != null) {
                             Image(
-                                painter = BitmapPainter(appIcon.toBitmap().asImageBitmap()),
+                                painter = BitmapPainter(appIcon),
                                 contentDescription = null,
                                 modifier = Modifier
                                     .size(40.dp)

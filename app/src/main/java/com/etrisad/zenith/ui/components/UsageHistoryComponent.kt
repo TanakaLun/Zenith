@@ -212,14 +212,15 @@ fun UsageGraph(
             ) { pageIndex ->
                 val pageData = if (pageIndex < pages.size) pages[pageIndex] else emptyList()
 
-                val pageMaxRaw = (pageData.maxOfOrNull { it.totalTime } ?: 0L)
-                    .coerceAtLeast(targetMillis)
-                    .coerceAtLeast(60 * 1000L)
-
-                val pageMax = if (pageMaxRaw < 3600000L) {
-                    ((pageMaxRaw / 60000L).coerceAtLeast(1) + 3) * 60000L
-                } else {
-                    ((pageMaxRaw / 3600000L).coerceAtLeast(1) + 1) * 3600000L
+                val pageMax = remember(pageData, targetMillis) {
+                    val raw = (pageData.maxOfOrNull { it.totalTime } ?: 0L)
+                        .coerceAtLeast(targetMillis)
+                        .coerceAtLeast(60 * 1000L)
+                    if (raw < 3600000L) {
+                        ((raw / 60000L).coerceAtLeast(1) + 3) * 60000L
+                    } else {
+                        ((raw / 3600000L).coerceAtLeast(1) + 1) * 3600000L
+                    }
                 }
 
                 val maxDisplay = if (pageMax < 3600000L) (pageMax / 60000L) else (pageMax / 3600000L)

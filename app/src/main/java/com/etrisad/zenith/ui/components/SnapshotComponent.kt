@@ -269,6 +269,22 @@ fun SnapshotCard(
     val pages = remember(stamps) { stamps.chunked(7) }
     val pageCount = pages.size.coerceAtLeast(1)
     val currentHour = remember { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
+
+    val streaks = remember(stamps) {
+        stamps.indices.map { i ->
+            val currentApp = stamps.getOrNull(i)
+            if (currentApp == null || currentApp.packageName.isEmpty()) 0
+            else {
+                var count = 0
+                var checkIndex = i - 1
+                while (checkIndex >= 0 && stamps.getOrNull(checkIndex)?.packageName == currentApp.packageName) {
+                    count++
+                    checkIndex--
+                }
+                count
+            }
+        }
+    }
     
     val selectedIndex = remember(stamps, selectedDateMillis) {
         val cal = Calendar.getInstance()
@@ -372,23 +388,10 @@ fun SnapshotCard(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     pageData.forEachIndexed { appIndex, app ->
-                        val isSelected = selectedAppIndex == appIndex && selectedPageIndex == pageIndex
-                        
                         val indexInStamps = pageIndex * 7 + appIndex
-                        val streak = remember(stamps, indexInStamps) {
-                            val currentApp = stamps.getOrNull(indexInStamps)
-                            if (currentApp == null || currentApp.packageName.isEmpty()) 0
-                            else {
-                                var count = 0
-                                var checkIndex = indexInStamps - 1
-                                while (checkIndex >= 0 && stamps.getOrNull(checkIndex)?.packageName == currentApp.packageName) {
-                                    count++
-                                    checkIndex--
-                                }
-                                count
-                            }
-                        }
-
+                        val isSelected = selectedAppIndex == appIndex && selectedPageIndex == pageIndex
+                        val streak = streaks.getOrElse(indexInStamps) { 0 }
+                        
                         val hasPrevConnection = remember(stamps, indexInStamps) {
                             app.packageName.isNotEmpty() && indexInStamps > 0 && 
                             stamps.getOrNull(indexInStamps - 1)?.packageName == app.packageName
@@ -514,8 +517,11 @@ fun SnapshotCard(
                                             
                                         )
                                     } else if (app.icon != null) {
+                                        val appIcon = remember(app.icon) {
+                                            app.icon.toBitmap().asImageBitmap()
+                                        }
                                         Image(
-                                            painter = BitmapPainter(app.icon.toBitmap().asImageBitmap()),
+                                            painter = BitmapPainter(appIcon),
                                             contentDescription = null,
                                             modifier = Modifier.size(28.dp).clip(CircleShape),
                                             contentScale = ContentScale.Crop

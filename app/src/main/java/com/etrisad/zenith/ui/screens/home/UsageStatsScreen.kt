@@ -81,11 +81,10 @@ fun UsageStatsScreen(
     var isOtherAppsExpanded by rememberSaveable { mutableStateOf(false) }
     var isOtherHourAppsExpanded by rememberSaveable(selectedHour) { mutableStateOf(false) }
 
-    val (regularApps, lowUsageApps) = remember(uiState.allAppsUsage) {
-        uiState.allAppsUsage.partition { it.totalTimeVisible >= 60000L }
+    val (regularApps, lowUsageApps, totalLowUsageTime) = remember(uiState.allAppsUsage) {
+        val (reg, low) = uiState.allAppsUsage.partition { it.totalTimeVisible >= 60000L }
+        Triple(reg, low, low.sumOf { it.totalTimeVisible })
     }
-    
-    val totalLowUsageTime = lowUsageApps.sumOf { it.totalTimeVisible }
 
     val hourlyAppsData = remember(uiState.hourlyUsage, selectedHour) {
         val hourData = uiState.hourlyUsage.find { it.hour == selectedHour }
@@ -1614,9 +1613,12 @@ fun WeeklyStatsDoubleCard(
                             Text("-", style = MaterialTheme.typography.bodyMedium)
                         } else {
                             targetApps.take(3).forEach { app ->
-                                if (app.icon != null) {
+                                val appIcon = remember(app.icon) {
+                                    app.icon?.toBitmap()?.asImageBitmap()
+                                }
+                                if (appIcon != null) {
                                     Image(
-                                        painter = BitmapPainter(app.icon.toBitmap().asImageBitmap()),
+                                        painter = BitmapPainter(appIcon),
                                         contentDescription = null,
                                         modifier = Modifier
                                             .size(32.dp)
@@ -1692,9 +1694,12 @@ fun UsageItem(
                 )
             },
             leadingContent = {
-                if (app.icon != null) {
+                val appIcon = remember(app.icon) {
+                    app.icon?.toBitmap()?.asImageBitmap()
+                }
+                if (appIcon != null) {
                     Image(
-                        painter = BitmapPainter(app.icon.toBitmap().asImageBitmap()),
+                        painter = BitmapPainter(appIcon),
                         contentDescription = null,
                         modifier = Modifier
                             .size(40.dp)
