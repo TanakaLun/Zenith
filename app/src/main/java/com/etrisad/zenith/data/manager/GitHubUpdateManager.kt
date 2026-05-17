@@ -33,6 +33,15 @@ class GitHubUpdateManager(private val context: Context) {
         }
     }
 
+    suspend fun fetchAllReleases(): List<GitHubRelease>? {
+        return try {
+            val response = service.getAllReleases()
+            if (response.isSuccessful) response.body() else null
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     suspend fun checkForUpdates(): UpdateResult {
         return try {
             val response = service.getLatestRelease()

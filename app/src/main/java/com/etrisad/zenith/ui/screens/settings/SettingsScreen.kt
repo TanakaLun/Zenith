@@ -106,7 +106,9 @@ fun SettingsScreen(
     val updateManager = remember { GitHubUpdateManager(context) }
     var checkingForUpdate by remember { mutableStateOf(false) }
     var showUpdateSheet by remember { mutableStateOf(false) }
+    var showChangelogSheet by remember { mutableStateOf(false) }
     var latestRelease by remember { mutableStateOf<GitHubRelease?>(null) }
+    var allReleases by remember { mutableStateOf<List<GitHubRelease>>(emptyList()) }
 
     val backupLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/octet-stream"),
@@ -379,6 +381,17 @@ fun SettingsScreen(
                 }
             }
         },
+        onViewChangelog = {
+            coroutineScope.launch {
+                val releases = updateManager.fetchAllReleases()
+                if (releases != null) {
+                    allReleases = releases
+                    showChangelogSheet = true
+                } else {
+                    Toast.makeText(context, "Failed to fetch changelog", Toast.LENGTH_SHORT).show()
+                }
+            }
+        },
         isCheckingForUpdate = checkingForUpdate
     )
 
@@ -388,7 +401,7 @@ fun SettingsScreen(
             ThemeConfig.LIGHT -> false
             ThemeConfig.DARK -> true
         }
-        UpdateBottomSheet(
+        com.etrisad.zenith.ui.components.UpdateBottomSheet(
             release = latestRelease!!,
             useExpressiveColors = preferences.expressiveColors,
             isDark = isDark,
@@ -398,6 +411,20 @@ fun SettingsScreen(
                 context.startActivity(intent)
                 showUpdateSheet = false
             }
+        )
+    }
+
+    if (showChangelogSheet && allReleases.isNotEmpty()) {
+        val isDark = when (preferences.themeConfig) {
+            ThemeConfig.FOLLOW_SYSTEM -> isSystemInDarkTheme()
+            ThemeConfig.LIGHT -> false
+            ThemeConfig.DARK -> true
+        }
+        com.etrisad.zenith.ui.components.ChangelogBottomSheet(
+            releases = allReleases,
+            useExpressiveColors = preferences.expressiveColors,
+            isDark = isDark,
+            onDismiss = { showChangelogSheet = false }
         )
     }
 
@@ -478,6 +505,7 @@ fun SettingsScreenContent(
     onResetCustomDelays: () -> Unit,
     onTestUpdateSheet: () -> Unit,
     onCheckForUpdate: () -> Unit,
+    onViewChangelog: () -> Unit,
     isCheckingForUpdate: Boolean
 ) {
     var showTargetSheet by remember { mutableStateOf(false) }
@@ -889,6 +917,16 @@ fun SettingsScreenContent(
                     icon = Icons.Outlined.Update,
                     shape = RoundedCornerShape(8.dp),
                     onClick = onCheckForUpdate
+                )
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(4.dp))
+                AboutActionCard(
+                    title = "View Changelog",
+                    icon = Icons.Outlined.History,
+                    shape = RoundedCornerShape(8.dp),
+                    onClick = onViewChangelog
                 )
             }
 

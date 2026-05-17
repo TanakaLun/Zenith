@@ -7,4 +7,7 @@ import retrofit2.http.GET
 interface GitHubService {
     @GET("repos/1372Slash/Zenith/releases/latest")
     suspend fun getLatestRelease(): Response<GitHubRelease>
+
+    @GET("repos/1372Slash/Zenith/releases")
+    suspend fun getAllReleases(): Response<List<GitHubRelease>>
 }

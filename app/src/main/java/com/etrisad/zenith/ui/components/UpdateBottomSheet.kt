@@ -5,6 +5,8 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -13,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ListAlt
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -36,6 +39,7 @@ import coil.request.ImageRequest
 import com.etrisad.zenith.data.remote.model.GitHubRelease
 import com.etrisad.zenith.ui.theme.ZenithTheme
 import androidx.compose.ui.tooling.preview.Preview
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,6 +54,7 @@ fun UpdateBottomSheet(
     val screenHeight = configuration.screenHeightDp.dp
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     var seedColor by remember { mutableStateOf<Color?>(null) }
     
@@ -86,53 +91,14 @@ fun UpdateBottomSheet(
     
     val dynamicColorScheme = remember(seedColor, isDark) {
         seedColor?.let { seed ->
-            val hsl = FloatArray(3)
-            val argb = seed.toArgb()
-            android.graphics.Color.RGBToHSV(
-                android.graphics.Color.red(argb),
-                android.graphics.Color.green(argb),
-                android.graphics.Color.blue(argb),
-                hsl
-            )
-            
-            val primaryV = if (isDark) 0.9f else 0.4f
-            val primary = Color(android.graphics.Color.HSVToColor(floatArrayOf(hsl[0], hsl[1] * 0.8f, primaryV)))
-            
-            val secondaryV = if (isDark) 0.9f else 0.35f
-            val secondary = Color(android.graphics.Color.HSVToColor(floatArrayOf(hsl[0], hsl[1] * 0.4f, secondaryV)))
-            
-            val tertiaryV = if (isDark) 0.9f else 0.45f
-            val tertiary = Color(android.graphics.Color.HSVToColor(floatArrayOf((hsl[0] + 60f) % 360f, hsl[1] * 0.6f, tertiaryV)))
+            generateDynamicColorScheme(seed, isDark, currentScheme)
+        }
+    }
 
-            val surfaceV = if (isDark) 0.1f else 0.98f
-            val surface = Color(android.graphics.Color.HSVToColor(floatArrayOf(hsl[0], hsl[1] * 0.1f, surfaceV)))
-            val surfaceContainer = Color(android.graphics.Color.HSVToColor(floatArrayOf(hsl[0], hsl[1] * 0.15f, if (isDark) 0.15f else 0.94f)))
-            val surfaceContainerHigh = Color(android.graphics.Color.HSVToColor(floatArrayOf(hsl[0], hsl[1] * 0.2f, if (isDark) 0.2f else 0.9f)))
-
-            currentScheme.copy(
-                primary = primary,
-                onPrimary = if (isDark) Color.Black else Color.White,
-                primaryContainer = primary.copy(alpha = if (isDark) 0.3f else 0.15f),
-                onPrimaryContainer = primary,
-                
-                secondary = secondary,
-                onSecondary = if (isDark) Color.Black else Color.White,
-                secondaryContainer = secondary.copy(alpha = if (isDark) 0.25f else 0.2f),
-                onSecondaryContainer = secondary,
-                
-                tertiary = tertiary,
-                onTertiary = if (isDark) Color.Black else Color.White,
-                tertiaryContainer = tertiary.copy(alpha = if (isDark) 0.25f else 0.14f),
-                onTertiaryContainer = tertiary,
-
-                surface = surface,
-                onSurface = if (isDark) Color.White else Color.Black,
-                surfaceVariant = surfaceContainer,
-                onSurfaceVariant = if (isDark) Color.LightGray else Color.DarkGray,
-                surfaceContainer = surfaceContainer,
-                surfaceContainerHigh = surfaceContainerHigh,
-                surfaceContainerHighest = surfaceContainerHigh.copy(alpha = 0.9f)
-            )
+    val hideAndDismiss = {
+        scope.launch {
+            sheetState.hide()
+            onDismiss()
         }
     }
 
@@ -154,8 +120,11 @@ fun UpdateBottomSheet(
                 release = release,
                 containerColor = containerColor,
                 screenHeight = screenHeight,
-                onDismiss = onDismiss,
-                onUpdate = onUpdate
+                onDismiss = { hideAndDismiss() },
+                onUpdate = {
+                    onUpdate()
+                    hideAndDismiss()
+                }
             )
         }
     }
@@ -169,6 +138,227 @@ fun UpdateBottomSheet(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ChangelogBottomSheet(
+    releases: List<GitHubRelease>,
+    useExpressiveColors: Boolean,
+    isDark: Boolean = isSystemInDarkTheme(),
+    onDismiss: () -> Unit
+) {
+    val configuration = LocalConfiguration.current
+    val screenHeight = configuration.screenHeightDp.dp
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        dragHandle = { BottomSheetDefaults.DragHandle() },
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = screenHeight * 0.9f)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Surface(
+                    modifier = Modifier.size(64.dp),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Outlined.History,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Changelog History",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = 32.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                items(releases) { release ->
+                    ChangelogVersionCard(
+                        release = release,
+                        useExpressiveColors = useExpressiveColors,
+                        isDark = isDark
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ChangelogVersionCard(
+    release: GitHubRelease,
+    useExpressiveColors: Boolean,
+    isDark: Boolean
+) {
+    val context = LocalContext.current
+    var seedColor by remember { mutableStateOf<Color?>(null) }
+    
+    val firstImageUrl = remember(release.body) {
+        val lines = release.body.trim().lines()
+        lines.firstOrNull { it.trim().startsWith("![") || it.trim().startsWith("<img", ignoreCase = true) }?.let { line ->
+            if (line.trim().startsWith("![")) {
+                line.substringAfter("(").substringBefore(")")
+            } else {
+                line.substringAfter("src=\"", "").substringBefore("\"")
+            }
+        }
+    }
+
+    LaunchedEffect(firstImageUrl) {
+        if (firstImageUrl != null) {
+            val loader = coil.Coil.imageLoader(context)
+            val request = ImageRequest.Builder(context)
+                .data(firstImageUrl)
+                .allowHardware(false)
+                .build()
+            val result = loader.execute(request)
+            if (result is coil.request.SuccessResult) {
+                val bitmap = result.drawable.toBitmap()
+                Palette.from(bitmap).generate { palette ->
+                    seedColor = palette?.vibrantSwatch?.rgb?.let { Color(it) }
+                        ?: palette?.dominantSwatch?.rgb?.let { Color(it) }
+                }
+            }
+        }
+    }
+
+    val currentScheme = MaterialTheme.colorScheme
+    val dynamicColorScheme = remember(seedColor, isDark) {
+        seedColor?.let { seed ->
+            generateDynamicColorScheme(seed, isDark, currentScheme)
+        } ?: currentScheme
+    }
+
+    MaterialTheme(colorScheme = dynamicColorScheme) {
+        val containerColor = if (useExpressiveColors) MaterialTheme.colorScheme.surfaceContainerHighest
+        else MaterialTheme.colorScheme.surfaceContainerHigh
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.primary,
+                        shape = CircleShape
+                    ) {
+                        Text(
+                            text = release.tagName,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
+                    Text(
+                        text = formatReleaseDate(release.publishedAt),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                MarkdownBody(
+                    content = release.body,
+                    containerColor = containerColor
+                )
+            }
+        }
+    }
+}
+
+private fun formatReleaseDate(dateString: String?): String {
+    if (dateString == null) return ""
+    return try {
+        val instant = java.time.Instant.parse(dateString)
+        val formatter = java.time.format.DateTimeFormatter.ofPattern("MMM dd, yyyy")
+            .withZone(java.time.ZoneId.systemDefault())
+        formatter.format(instant)
+    } catch (e: Exception) {
+        dateString.substringBefore("T")
+    }
+}
+
+private fun generateDynamicColorScheme(seed: Color, isDark: Boolean, currentScheme: ColorScheme): ColorScheme {
+    val hsl = FloatArray(3)
+    val argb = seed.toArgb()
+    android.graphics.Color.RGBToHSV(
+        android.graphics.Color.red(argb),
+        android.graphics.Color.green(argb),
+        android.graphics.Color.blue(argb),
+        hsl
+    )
+    
+    val primaryV = if (isDark) 0.9f else 0.4f
+    val primary = Color(android.graphics.Color.HSVToColor(floatArrayOf(hsl[0], hsl[1] * 0.8f, primaryV)))
+    
+    val secondaryV = if (isDark) 0.9f else 0.35f
+    val secondary = Color(android.graphics.Color.HSVToColor(floatArrayOf(hsl[0], hsl[1] * 0.4f, secondaryV)))
+    
+    val tertiaryV = if (isDark) 0.9f else 0.45f
+    val tertiary = Color(android.graphics.Color.HSVToColor(floatArrayOf((hsl[0] + 60f) % 360f, hsl[1] * 0.6f, tertiaryV)))
+
+    val surfaceV = if (isDark) 0.1f else 0.98f
+    val surface = Color(android.graphics.Color.HSVToColor(floatArrayOf(hsl[0], hsl[1] * 0.1f, surfaceV)))
+    val surfaceContainer = Color(android.graphics.Color.HSVToColor(floatArrayOf(hsl[0], hsl[1] * 0.15f, if (isDark) 0.15f else 0.94f)))
+    val surfaceContainerHigh = Color(android.graphics.Color.HSVToColor(floatArrayOf(hsl[0], hsl[1] * 0.2f, if (isDark) 0.2f else 0.9f)))
+
+    return currentScheme.copy(
+        primary = primary,
+        onPrimary = if (isDark) Color.Black else Color.White,
+        primaryContainer = primary.copy(alpha = if (isDark) 0.3f else 0.15f),
+        onPrimaryContainer = primary,
+        
+        secondary = secondary,
+        onSecondary = if (isDark) Color.Black else Color.White,
+        secondaryContainer = secondary.copy(alpha = if (isDark) 0.25f else 0.2f),
+        onSecondaryContainer = secondary,
+        
+        tertiary = tertiary,
+        onTertiary = if (isDark) Color.Black else Color.White,
+        tertiaryContainer = tertiary.copy(alpha = if (isDark) 0.25f else 0.14f),
+        onTertiaryContainer = tertiary,
+
+        surface = surface,
+        onSurface = if (isDark) Color.White else Color.Black,
+        surfaceVariant = surfaceContainer,
+        onSurfaceVariant = if (isDark) Color.LightGray else Color.DarkGray,
+        surfaceContainer = surfaceContainer,
+        surfaceContainerHigh = surfaceContainerHigh,
+        surfaceContainerHighest = surfaceContainerHigh.copy(alpha = 0.9f)
+    )
+}
 
 @Composable
 fun UpdateBottomSheetContent(
@@ -374,7 +564,7 @@ fun MarkdownGroupedCard(
                 colors = CardDefaults.cardColors(containerColor = containerColor),
                 shape = shape
             ) {
-                Column(modifier = Modifier.padding(20.dp)) {
+                Column(modifier = Modifier.padding(16.dp)) {
                     group.forEach { element ->
                         when (element) {
                             is MarkdownElement.Header2 -> {

@@ -9,6 +9,7 @@ data class GitHubRelease(
     val name: String,
     val body: String,
     @Json(name = "html_url") val htmlUrl: String,
+    @Json(name = "published_at") val publishedAt: String? = null,
     val assets: List<GitHubAsset>
 )
 
