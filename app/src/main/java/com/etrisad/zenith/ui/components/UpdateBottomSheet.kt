@@ -382,7 +382,8 @@ fun MarkdownGroupedCard(
                                     text = element.text,
                                     icon = Icons.AutoMirrored.Outlined.ListAlt,
                                     containerColor = MaterialTheme.colorScheme.tertiary,
-                                    contentColor = MaterialTheme.colorScheme.onTertiary
+                                    contentColor = MaterialTheme.colorScheme.onTertiary,
+                                    style = MaterialTheme.typography.titleLarge
                                 )
                             }
                             is MarkdownElement.Header3 -> {
@@ -390,7 +391,8 @@ fun MarkdownGroupedCard(
                                     text = element.text,
                                     icon = Icons.Outlined.AutoAwesome,
                                     containerColor = MaterialTheme.colorScheme.secondary,
-                                    contentColor = MaterialTheme.colorScheme.onSecondary
+                                    contentColor = MaterialTheme.colorScheme.onSecondary,
+                                    style = MaterialTheme.typography.titleMedium
                                 )
                             }
                             is MarkdownElement.ListItem -> {
@@ -422,7 +424,8 @@ fun MarkdownHeaderItem(
     text: String,
     icon: ImageVector,
     containerColor: Color,
-    contentColor: Color
+    contentColor: Color,
+    style: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.titleMedium
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -444,7 +447,7 @@ fun MarkdownHeaderItem(
         Spacer(modifier = Modifier.width(12.dp))
         Text(
             text = parseInlineMarkdown(text),
-            style = MaterialTheme.typography.titleMedium,
+            style = style,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface
         )
@@ -513,45 +516,102 @@ fun MarkdownQuoteItem(text: String) {
 fun parseInlineMarkdown(text: String): androidx.compose.ui.text.AnnotatedString {
     val builder = androidx.compose.ui.text.AnnotatedString.Builder()
     var i = 0
-    val onSurface = MaterialTheme.colorScheme.onSurface
+    val colorScheme = MaterialTheme.colorScheme
+    val onSurface = colorScheme.onSurface
 
     while (i < text.length) {
-        if (text.startsWith("**", i)) {
-            val end = text.indexOf("**", i + 2)
-            if (end != -1) {
-                builder.pushStyle(androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight.Bold, color = onSurface))
-                builder.append(text.substring(i + 2, end))
-                builder.pop()
-                i = end + 2
-                continue
-            }
-        } else if (text.startsWith("*", i) && !text.startsWith("**", i)) {
-            val end = text.indexOf("*", i + 1)
-            if (end != -1) {
-                builder.pushStyle(androidx.compose.ui.text.SpanStyle(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic))
-                builder.append(text.substring(i + 1, end))
-                builder.pop()
-                i = end + 1
-                continue
-            }
-        } else if (text.startsWith("![", i)) {
-            val endAlt = text.indexOf("]", i)
-            if (endAlt != -1 && text.startsWith("(", endAlt + 1)) {
-                val endUrl = text.indexOf(")", endAlt + 1)
-                if (endUrl != -1) {
-                    i = endUrl + 1
-                    continue
+        when {
+            text.startsWith("**", i) -> {
+                val end = text.indexOf("**", i + 2)
+                if (end != -1) {
+                    builder.pushStyle(androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight.Bold, color = onSurface))
+                    builder.append(text.substring(i + 2, end))
+                    builder.pop()
+                    i = end + 2
+                } else {
+                    builder.append(text[i])
+                    i++
                 }
             }
-        } else if (text.startsWith("<img", i)) {
-            val end = text.indexOf(">", i)
-            if (end != -1) {
-                i = end + 1
-                continue
+            text.startsWith("*", i) -> {
+                val end = text.indexOf("*", i + 1)
+                if (end != -1) {
+                    builder.pushStyle(androidx.compose.ui.text.SpanStyle(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic))
+                    builder.append(text.substring(i + 1, end))
+                    builder.pop()
+                    i = end + 1
+                } else {
+                    builder.append(text[i])
+                    i++
+                }
+            }
+            text.startsWith("![", i) -> {
+                val endAlt = text.indexOf("]", i)
+                if (endAlt != -1 && text.startsWith("(", endAlt + 1)) {
+                    val endUrl = text.indexOf(")", endAlt + 1)
+                    if (endUrl != -1) {
+                        i = endUrl + 1
+                    } else {
+                        builder.append(text[i])
+                        i++
+                    }
+                } else {
+                    builder.append(text[i])
+                    i++
+                }
+            }
+            text.startsWith("[", i) -> {
+                val endText = text.indexOf("]", i)
+                if (endText != -1 && text.startsWith("(", endText + 1)) {
+                    val endUrl = text.indexOf(")", endText + 1)
+                    if (endUrl != -1) {
+                        val linkText = text.substring(i + 1, endText)
+                        val url = text.substring(endText + 2, endUrl)
+                        builder.pushStyle(androidx.compose.ui.text.SpanStyle(
+                            color = colorScheme.primary,
+                            textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline,
+                            fontWeight = FontWeight.Bold
+                        ))
+                        builder.append(linkText)
+                        builder.addStringAnnotation("URL", url, builder.length - linkText.length, builder.length)
+                        builder.pop()
+                        i = endUrl + 1
+                    } else {
+                        builder.append(text[i])
+                        i++
+                    }
+                } else {
+                    builder.append(text[i])
+                    i++
+                }
+            }
+            text.startsWith("<img", i) -> {
+                val end = text.indexOf(">", i)
+                if (end != -1) {
+                    i = end + 1
+                } else {
+                    builder.append(text[i])
+                    i++
+                }
+            }
+            text[i] == '#' && i + 1 < text.length && text[i+1].isDigit() -> {
+                var j = i + 1
+                while (j < text.length && text[j].isDigit()) {
+                    j++
+                }
+                builder.pushStyle(androidx.compose.ui.text.SpanStyle(
+                    color = colorScheme.secondary,
+                    fontWeight = FontWeight.ExtraBold
+                ))
+                builder.append(text.substring(i, j))
+                builder.pop()
+                i = j
+            }
+            else -> {
+                builder.append(text[i])
+                i++
             }
         }
-        builder.append(text[i])
-        i++
     }
     return builder.toAnnotatedString()
 }
