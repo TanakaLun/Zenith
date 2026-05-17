@@ -1480,15 +1480,24 @@ fun GoalHeatmapItem(
                     val isMet = day.totalTime > 0 && day.totalTime <= targetMillis
                     val isSelected = day.date == selectedDateMillis
                     
-                    val color = when {
+                    val proximity = if (targetMillis > 0) (day.totalTime.toFloat() / targetMillis).coerceIn(0f, 1f) else 0f
+                    val targetMetAlpha = (1f - (proximity * 0.6f)).coerceAtLeast(0.4f)
+                    
+                    val targetColor = when {
                         day.totalTime == 0L -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                        isMet -> MaterialTheme.colorScheme.tertiary
+                        isMet -> MaterialTheme.colorScheme.tertiary.copy(alpha = targetMetAlpha)
                         else -> MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
                     }
                     
+                    val animatedColor by animateColorAsState(
+                        targetValue = targetColor,
+                        animationSpec = spring(stiffness = Spring.StiffnessLow),
+                        label = "HeatmapColor"
+                    )
+                    
                     val animatedScale by animateFloatAsState(
                         targetValue = if (isSelected) 1.2f else 1f,
-                        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy),
+                        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow),
                         label = "HeatmapScale"
                     )
 
@@ -1501,7 +1510,7 @@ fun GoalHeatmapItem(
                                 scaleY = animatedScale
                             }
                             .clip(RoundedCornerShape(4.dp))
-                            .background(color)
+                            .background(animatedColor)
                             .clickable { onDayClick(day.date) }
                     )
                 }
