@@ -767,7 +767,7 @@ class HomeViewModel(
             }
 
             val currentSnapshotStamps = _uiState.value.snapshotStamps
-            val snapshotStamps = if (currentSnapshotStamps.isEmpty() || isSelectedToday) {
+            val snapshotStamps = if (currentSnapshotStamps.isEmpty()) {
                 (0..20).map { i ->
                     val dStart = getMidnight(i)
                     val dEnd = if (i == 0) now else dStart + (24 * 60 * 60 * 1000L)
@@ -827,6 +827,32 @@ class HomeViewModel(
                         AppUsageInfo("", "", 0, hasDatabaseRecord = hasDb, hasSystemData = hasSys, isLive = i == 0)
                     }
                 }.reversed()
+            } else if (isSelectedToday) {
+                // Optimized: Only update today's snapshot instead of re-calculating 21 days
+                val topEntry = filteredTodayUsage.maxByOrNull { it.value }?.let { it.key to it.value }
+                val topPackage = topEntry?.first
+                var usageTime = topEntry?.second ?: 0L
+                if (usageTime > timeSinceMidnight + 10000) usageTime = timeSinceMidnight
+
+                val updatedTodayStamp = if (topPackage != null) {
+                    val cached = appInfoCache[topPackage]
+                    if (cached != null) {
+                        AppUsageInfo(topPackage, cached.first, usageTime, cached.second, isLive = true)
+                    } else {
+                        try {
+                            val appInfo = pm.getApplicationInfo(topPackage, 0)
+                            val label = pm.getApplicationLabel(appInfo).toString()
+                            val icon = pm.getApplicationIcon(appInfo)
+                            appInfoCache[topPackage] = label to icon
+                            AppUsageInfo(topPackage, label, usageTime, icon, isLive = true)
+                        } catch (_: Exception) {
+                            AppUsageInfo("", "", 0, isLive = true)
+                        }
+                    }
+                } else {
+                    AppUsageInfo("", "", 0, isLive = true)
+                }
+                currentSnapshotStamps.dropLast(1) + updatedTodayStamp
             } else {
                 currentSnapshotStamps
             }
