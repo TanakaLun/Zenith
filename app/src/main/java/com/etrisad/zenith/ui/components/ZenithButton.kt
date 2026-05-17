@@ -506,12 +506,25 @@ fun ZenithGroupedButton(
     size: ZenithButtonSize = ZenithButtonSize.Large,
     content: @Composable RowScope.() -> Unit
 ) {
-    val h = when(size){ZenithButtonSize.Small->32.dp; ZenithButtonSize.Medium->40.dp; ZenithButtonSize.Large->48.dp; else->56.dp}
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(h / 2),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        content = { Row(modifier = Modifier.padding(4.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically, content = content) }
+    val spacing = when(size) {
+        ZenithButtonSize.Small -> 2.dp
+        ZenithButtonSize.Medium -> 4.dp
+        ZenithButtonSize.Large -> 4.dp
+        ZenithButtonSize.ExtraLarge -> 4.dp
+    }
+    
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .animateContentSize(
+                spring(
+                    dampingRatio = Spring.DampingRatioLowBouncy,
+                    stiffness = Spring.StiffnessLow
+                )
+            ),
+        horizontalArrangement = Arrangement.spacedBy(spacing),
+        verticalAlignment = Alignment.CenterVertically,
+        content = content
     )
 }
 
