@@ -130,11 +130,13 @@ class UsageSyncManager(
             val dateStr = dateFormat.format(cal.time)
             val hour = cal.get(Calendar.HOUR_OF_DAY)
             
-            cal.add(Calendar.HOUR_OF_DAY, 1)
-            cal.set(Calendar.MINUTE, 0)
-            cal.set(Calendar.SECOND, 0)
-            cal.set(Calendar.MILLISECOND, 0)
-            val nextHourStart = cal.timeInMillis
+            val nextHourStartCal = (cal.clone() as Calendar).apply {
+                add(Calendar.HOUR_OF_DAY, 1)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            val nextHourStart = nextHourStartCal.timeInMillis
 
             val chunkEnd = minOf(end, nextHourStart)
             val duration = chunkEnd - current
@@ -144,6 +146,8 @@ class UsageSyncManager(
                     .getOrPut(hour) { mutableListOf() }
                     .add(UsageChunk(pkg, duration))
             }
+            
+            if (chunkEnd <= current) break
             current = chunkEnd
         }
     }
@@ -157,9 +161,10 @@ class UsageSyncManager(
         val carryOver = mutableListOf<UsageChunk>()
         
         val sortedDates = buckets.keys.sorted().toMutableList()
-        var dateIdx = 0
+        if (sortedDates.isEmpty() && carryOver.isEmpty()) return
         
-        while (dateIdx < sortedDates.size || carryOver.isNotEmpty()) {
+        var dateIdx = 0
+        while (dateIdx < sortedDates.size || (carryOver.isNotEmpty() && dateIdx < 3)) {
             val date = if (dateIdx < sortedDates.size) {
                 sortedDates[dateIdx]
             } else {
@@ -173,7 +178,7 @@ class UsageSyncManager(
             }
             dateIdx++
 
-            val existingRecords = repository.getHourlyUsageForDate(date).first()
+            val existingRecords = repository.getHourlyUsageForDateSync(date)
             val existingMap = existingRecords.associateBy { it.hour to it.packageName }
             val dayBuckets = buckets[date] ?: mutableMapOf()
 
@@ -193,18 +198,30 @@ class UsageSyncManager(
                 val currentNewTotal = combined.sumOf { it.duration }
                 
                 if (existingHourTotal + currentNewTotal > limit) {
-                    var excess = (existingHourTotal + currentNewTotal) - limit
-                    while (excess > 0 && combined.isNotEmpty()) {
-                        val last = combined.last()
-                        if (last.duration <= excess) {
-                            excess -= last.duration
-                            carryOver.add(0, combined.removeAt(combined.size - 1))
-                        } else {
-                            val move = excess
-                            last.duration -= move
-                            carryOver.add(0, UsageChunk(last.packageName, move))
-                            excess = 0
+                    val allowedNew = (limit - existingHourTotal).coerceAtLeast(0L)
+                    if (allowedNew == 0L) {
+                        carryOver.addAll(combined)
+                        combined.clear()
+                    } else {
+                        var accumulated = 0L
+                        val toKeep = mutableListOf<UsageChunk>()
+                        for (chunk in combined) {
+                            if (accumulated + chunk.duration <= allowedNew) {
+                                toKeep.add(chunk)
+                                accumulated += chunk.duration
+                            } else {
+                                val remaining = allowedNew - accumulated
+                                if (remaining > 0) {
+                                    toKeep.add(UsageChunk(chunk.packageName, remaining))
+                                    carryOver.add(UsageChunk(chunk.packageName, chunk.duration - remaining))
+                                    accumulated = allowedNew
+                                } else {
+                                    carryOver.add(chunk)
+                                }
+                            }
                         }
+                        combined.clear()
+                        combined.addAll(toKeep)
                     }
                 }
 

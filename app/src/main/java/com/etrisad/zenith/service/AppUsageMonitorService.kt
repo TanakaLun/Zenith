@@ -272,9 +272,9 @@ class AppUsageMonitorService : Service() {
                     if (overlayGoals.isNotEmpty()) {
                         val calendar = Calendar.getInstance()
                         val hour = calendar.get(Calendar.HOUR_OF_DAY)
-                        val isNightTime = hour >= 22 || hour < 6
+                        val isNightTime = hour >= 22 || hour < 5
 
-                        if (!isBedtimeActive && !isNightTime) {
+                        if ((!isBedtimeActive || hour >= 6) && !isNightTime) {
                             try {
                                 val wakeLock = powerManager.newWakeLock(
                                     android.os.PowerManager.FULL_WAKE_LOCK or

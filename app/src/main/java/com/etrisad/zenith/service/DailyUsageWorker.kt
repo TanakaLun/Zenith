@@ -183,6 +183,12 @@ class DailyUsageWorker(context: Context, params: WorkerParameters) : CoroutineWo
 
         dailyUsageDao.insertAll(usagesToInsert)
         
+        try {
+            val app = applicationContext as com.etrisad.zenith.ZenithApplication
+            val syncManager = UsageSyncManager(applicationContext, app.shieldRepository, app.userPreferencesRepository)
+            syncManager.syncUsageData()
+        } catch (_: Exception) {}
+
         if (!isBackup) {
             sendDataSavedNotification()
             dailyUsageDao.deleteOldUsage(dateFormat.format(Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -21) }.time))

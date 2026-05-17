@@ -668,6 +668,7 @@ class HomeViewModel(
                 }
                 if (newlyLocked.isNotEmpty()) {
                     shieldRepository.insertHourlyUsage(newlyLocked)
+                    userPreferencesRepository.setLastSyncTimestamp(System.currentTimeMillis())
                 }
             }
 
