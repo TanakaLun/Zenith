@@ -199,82 +199,87 @@ class UsageSyncManager(
                 }
 
                 val newChunks = dayBuckets[hour] ?: mutableListOf()
-                if (newChunks.isEmpty() && carryOver.isEmpty()) continue
+                val isPastHour = date < currentDateStr || (date == currentDateStr && hour < currentHour)
+
+                if (newChunks.isEmpty() && carryOver.isEmpty()) {
+                    val existingTotal = existingMap[hour to "TOTAL"]?.usageTimeMillis ?: 0L
+                    if (!(isPastHour && existingTotal > limit)) {
+                        continue
+                    }
+                }
 
                 val combined = mutableListOf<UsageChunk>()
                 combined.addAll(carryOver)
                 carryOver.clear()
                 combined.addAll(newChunks)
 
-                val existingHourTotal = existingRecords
-                    .filter { it.hour == hour && it.packageName != "TOTAL" }
-                    .sumOf { it.usageTimeMillis }
+                val existingHourRecords = existingRecords.filter { it.hour == hour && it.packageName != "TOTAL" }
+                val currentHourAppState = existingHourRecords.associate { it.packageName to it.usageTimeMillis }.toMutableMap()
                 
-                val currentNewTotal = combined.sumOf { it.duration }
-                val isPastHour = date < currentDateStr || (date == currentDateStr && hour < currentHour)
+                combined.forEach { chunk ->
+                    currentHourAppState[chunk.packageName] = (currentHourAppState[chunk.packageName] ?: 0L) + chunk.duration
+                }
+
+                val totalInHour = currentHourAppState.values.sum()
                 
-                if (existingHourTotal + currentNewTotal > limit && isPastHour) {
-                    val allowedNew = (limit - existingHourTotal).coerceAtLeast(0L)
-                    if (allowedNew == 0L) {
-                        carryOver.addAll(combined)
-                        combined.clear()
-                    } else {
-                        var accumulated = 0L
-                        val toKeep = mutableListOf<UsageChunk>()
-                        for (chunk in combined) {
-                            if (accumulated + chunk.duration <= allowedNew) {
-                                toKeep.add(chunk)
-                                accumulated += chunk.duration
-                            } else {
-                                val remaining = allowedNew - accumulated
-                                if (remaining > 0) {
-                                    toKeep.add(UsageChunk(chunk.packageName, remaining))
-                                    carryOver.add(UsageChunk(chunk.packageName, chunk.duration - remaining))
-                                    accumulated = allowedNew
-                                } else {
-                                    carryOver.add(chunk)
-                                }
-                            }
+                if (isPastHour && totalInHour > limit) {
+                    var excess = totalInHour - limit
+                    
+                    for (i in combined.indices.reversed()) {
+                        if (excess <= 0) break
+                        val chunk = combined[i]
+                        val toMove = minOf(chunk.duration, excess)
+                        
+                        currentHourAppState[chunk.packageName] = (currentHourAppState[chunk.packageName] ?: 0L) - toMove
+                        if (toMove > 0) {
+                            carryOver.add(0, UsageChunk(chunk.packageName, toMove))
                         }
-                        combined.clear()
-                        combined.addAll(toKeep)
+                        excess -= toMove
+                    }
+                    
+                    if (excess > 0) {
+                        val sortedPackages = currentHourAppState.keys.sortedByDescending { currentHourAppState[it] }
+                        for (pkg in sortedPackages) {
+                            if (excess <= 0) break
+                            val currentVal = currentHourAppState[pkg] ?: 0L
+                            val toMove = minOf(currentVal, excess)
+                            
+                            currentHourAppState[pkg] = currentVal - toMove
+                            if (toMove > 0) {
+                                carryOver.add(0, UsageChunk(pkg, toMove))
+                            }
+                            excess -= toMove
+                        }
                     }
                 }
 
-                val appsToSave = mutableMapOf<String, Long>()
-                combined.forEach { 
-                    appsToSave[it.packageName] = (appsToSave[it.packageName] ?: 0L) + it.duration 
-                }
-
-                var hourTotalIncrement = 0L
-                appsToSave.forEach { (pkg, duration) ->
-                    if (duration <= 0) return@forEach
+                var finalHourTotal = 0L
+                currentHourAppState.forEach { (pkg, duration) ->
                     val existing = existingMap[hour to pkg]
-                    val totalDuration = (existing?.usageTimeMillis ?: 0L) + duration
-                    hourTotalIncrement += duration
-
-                    finalEntities.add(
-                        HourlyUsageEntity(
-                            id = existing?.id ?: 0,
-                            date = date,
-                            hour = hour,
-                            packageName = pkg,
-                            usageTimeMillis = totalDuration,
-                            lastUpdated = now
+                    if (existing == null || existing.usageTimeMillis != duration) {
+                        finalEntities.add(
+                            HourlyUsageEntity(
+                                id = existing?.id ?: 0,
+                                date = date,
+                                hour = hour,
+                                packageName = pkg,
+                                usageTimeMillis = duration,
+                                lastUpdated = now
+                            )
                         )
-                    )
+                    }
+                    finalHourTotal += duration
                 }
 
-                if (hourTotalIncrement > 0) {
-                    val existingTotalRec = existingMap[hour to "TOTAL"]
-                    val newTotal = (existingTotalRec?.usageTimeMillis ?: 0L) + hourTotalIncrement
+                val existingTotalRec = existingMap[hour to "TOTAL"]
+                if (existingTotalRec == null || existingTotalRec.usageTimeMillis != finalHourTotal) {
                     finalEntities.add(
                         HourlyUsageEntity(
                             id = existingTotalRec?.id ?: 0,
                             date = date,
                             hour = hour,
                             packageName = "TOTAL",
-                            usageTimeMillis = newTotal,
+                            usageTimeMillis = finalHourTotal,
                             lastUpdated = now
                         )
                     )
