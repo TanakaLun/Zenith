@@ -25,9 +25,8 @@ object BackupUtils {
         val latestUsageMillis: Long? = null,
         val hasHourly: Boolean = false,
         val hasPiechart: Boolean = false,
-        val last7DaysSnapshot: List<Pair<String, Long>> = emptyList(),
-        val last7DaysTopApps: List<Triple<String, String, Long>> = emptyList(),
-        val last7DaysDbStatus: List<Pair<String, Boolean>> = emptyList(),
+        val historySnapshot: List<Pair<String, Long>> = emptyList(),
+        val topAppsHistory: List<Triple<String, String, Long>> = emptyList(),
         val latestHourlyData: Map<Int, Long> = emptyMap(),
         val latestPiechartData: Map<String, Long> = emptyMap(),
         val latestShieldUsage: Long = 0L,
@@ -46,6 +45,8 @@ object BackupUtils {
     suspend fun backupDatabase(context: Context, targetUri: Uri): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val dbFile = context.getDatabasePath(DATABASE_NAME)
+            val dbWal = File("${dbFile.path}-wal")
+            val dbShm = File("${dbFile.path}-shm")
             val prefsFile = File(context.filesDir, "datastore/$PREFS_FILE_NAME")
 
             ZenithDatabase.closeDatabase()
@@ -54,6 +55,12 @@ object BackupUtils {
                 ZipOutputStream(outputStream).use { zipOut ->
                     if (dbFile.exists()) {
                         addToZip(zipOut, dbFile, DATABASE_NAME)
+                    }
+                    if (dbWal.exists()) {
+                        addToZip(zipOut, dbWal, "$DATABASE_NAME-wal")
+                    }
+                    if (dbShm.exists()) {
+                        addToZip(zipOut, dbShm, "$DATABASE_NAME-shm")
                     }
                     if (prefsFile.exists()) {
                         addToZip(zipOut, prefsFile, PREFS_FILE_NAME)
@@ -74,12 +81,23 @@ object BackupUtils {
                 ZipInputStream(inputStream).use { zipIn ->
                     var entry: ZipEntry? = zipIn.nextEntry
                     while (entry != null) {
-                        when (entry.name) {
-                            DATABASE_NAME -> {
+                        when {
+                            entry.name == DATABASE_NAME -> {
                                 val dbFile = context.getDatabasePath(DATABASE_NAME)
+                                dbFile.parentFile?.mkdirs()
                                 FileOutputStream(dbFile).use { zipIn.copyTo(it) }
                             }
-                            PREFS_FILE_NAME -> {
+                            entry.name == "$DATABASE_NAME-wal" -> {
+                                val walFile = File("${context.getDatabasePath(DATABASE_NAME).path}-wal")
+                                walFile.parentFile?.mkdirs()
+                                FileOutputStream(walFile).use { zipIn.copyTo(it) }
+                            }
+                            entry.name == "$DATABASE_NAME-shm" -> {
+                                val shmFile = File("${context.getDatabasePath(DATABASE_NAME).path}-shm")
+                                shmFile.parentFile?.mkdirs()
+                                FileOutputStream(shmFile).use { zipIn.copyTo(it) }
+                            }
+                            entry.name == PREFS_FILE_NAME -> {
                                 val prefsFile = File(context.filesDir, "datastore/$PREFS_FILE_NAME")
                                 prefsFile.parentFile?.mkdirs()
                                 FileOutputStream(prefsFile).use { zipIn.copyTo(it) }
@@ -91,9 +109,22 @@ object BackupUtils {
                 }
             }
 
+            // If WAL files were not in the zip, ensure old ones are deleted to avoid corruption
             val dbPath = context.getDatabasePath(DATABASE_NAME).path
-            File("$dbPath-wal").delete()
-            File("$dbPath-shm").delete()
+            context.contentResolver.openInputStream(sourceUri)?.use { input ->
+                ZipInputStream(input).use { zipIn ->
+                    var hasWal = false
+                    var entry = zipIn.nextEntry
+                    while (entry != null) {
+                        if (entry.name.endsWith("-wal")) hasWal = true
+                        entry = zipIn.nextEntry
+                    }
+                    if (!hasWal) {
+                        File("$dbPath-wal").delete()
+                        File("$dbPath-shm").delete()
+                    }
+                }
+            }
 
             Result.success(Unit)
         } catch (e: Exception) {
@@ -141,8 +172,8 @@ object BackupUtils {
                 var latestMillis: Long? = null
                 var hasHourly = false
                 var hasPiechart = false
-                var last7DaysSnapshot = listOf<Pair<String, Long>>()
-                var last7DaysTopApps = listOf<Triple<String, String, Long>>()
+                var historySnapshot = listOf<Pair<String, Long>>()
+                var topAppsHistory = listOf<Triple<String, String, Long>>()
                 var latestHourlyData = mapOf<Int, Long>()
                 var latestPiechartData = mapOf<String, Long>()
                 var shieldU = 0L
@@ -152,13 +183,17 @@ object BackupUtils {
                 if (hasDb) {
                     try {
                         val tempDbFile = File(context.cacheDir, "temp_restore.db")
+                        val tempWalFile = File(context.cacheDir, "temp_restore.db-wal")
+                        val tempShmFile = File(context.cacheDir, "temp_restore.db-shm")
+                        
                         context.contentResolver.openInputStream(uri)?.use { input ->
                             ZipInputStream(input).use { zipIn ->
                                 var entry = zipIn.nextEntry
                                 while (entry != null) {
-                                    if (entry.name.lowercase().contains(DATABASE_NAME.lowercase())) {
-                                        FileOutputStream(tempDbFile).use { zipIn.copyTo(it) }
-                                        break
+                                    when (entry.name) {
+                                        DATABASE_NAME -> FileOutputStream(tempDbFile).use { zipIn.copyTo(it) }
+                                        "$DATABASE_NAME-wal" -> FileOutputStream(tempWalFile).use { zipIn.copyTo(it) }
+                                        "$DATABASE_NAME-shm" -> FileOutputStream(tempShmFile).use { zipIn.copyTo(it) }
                                     }
                                     zipIn.closeEntry()
                                     entry = zipIn.nextEntry
@@ -177,13 +212,17 @@ object BackupUtils {
                                 tempDbFile.path, null, android.database.sqlite.SQLiteDatabase.OPEN_READONLY
                             )
                             
+                            val maxDate: String? = db.rawQuery("SELECT MAX(date) FROM daily_usage", null).use { 
+                                if (it.moveToFirst()) it.getString(0) else null 
+                            }
+                            latestDate = maxDate
+
                             db.rawQuery(
-                                "SELECT date, usageTimeMillis FROM daily_usage WHERE packageName = 'TOTAL' ORDER BY date DESC LIMIT 1",
-                                null
+                                "SELECT usageTimeMillis FROM daily_usage WHERE packageName = 'TOTAL' AND date = ?",
+                                arrayOf(maxDate ?: "")
                             ).use { cursor ->
                                 if (cursor.moveToFirst()) {
-                                    latestDate = cursor.getString(0)
-                                    latestMillis = cursor.getLong(1)
+                                    latestMillis = cursor.getLong(0)
                                 }
                             }
 
@@ -195,14 +234,14 @@ object BackupUtils {
 
                             try {
                                 db.rawQuery(
-                                    "SELECT date, usageTimeMillis FROM daily_usage WHERE packageName = 'TOTAL' ORDER BY date DESC LIMIT 7",
+                                    "SELECT date, usageTimeMillis FROM daily_usage WHERE packageName = 'TOTAL' ORDER BY date DESC LIMIT 21",
                                     null
                                 ).use { cursor ->
                                     val snapshot = mutableListOf<Pair<String, Long>>()
                                     while (cursor.moveToNext()) {
                                         snapshot.add(cursor.getString(0) to cursor.getLong(1))
                                     }
-                                    last7DaysSnapshot = snapshot
+                                    historySnapshot = snapshot
                                 }
                             } catch (_: Exception) {}
 
@@ -218,17 +257,21 @@ object BackupUtils {
                                             topAppsMap[date] = cursor.getString(1) to cursor.getLong(2)
                                         }
                                     }
-                                    last7DaysTopApps = topAppsMap.map { Triple(it.key, it.value.first, it.value.second) }
+                                    topAppsHistory = topAppsMap.map { Triple(it.key, it.value.first, it.value.second) }
                                         .sortedByDescending { it.first }
-                                        .take(7)
+                                        .take(21)
                                 }
                             } catch (_: Exception) {}
 
                             if (hasHourly) {
                                 try {
+                                    val latestHourlyDate = db.rawQuery("SELECT MAX(date) FROM hourly_usage", null).use {
+                                        if (it.moveToFirst()) it.getString(0) else maxDate
+                                    }
+
                                     db.rawQuery(
-                                        "SELECT hour, SUM(usageTimeMillis) FROM hourly_usage WHERE date = (SELECT MAX(date) FROM daily_usage) GROUP BY hour",
-                                        null
+                                        "SELECT hour, usageTimeMillis FROM hourly_usage WHERE date = ? AND packageName = 'TOTAL' GROUP BY hour",
+                                        arrayOf(latestHourlyDate ?: "")
                                     ).use { cursor ->
                                         val hourly = mutableMapOf<Int, Long>()
                                         while (cursor.moveToNext()) {
@@ -241,8 +284,8 @@ object BackupUtils {
 
                             try {
                                 db.rawQuery(
-                                    "SELECT packageName, usageTimeMillis FROM daily_usage WHERE date = (SELECT MAX(date) FROM daily_usage) AND packageName != 'TOTAL' AND packageName NOT LIKE '%_TOTAL' ORDER BY usageTimeMillis DESC LIMIT 5",
-                                    null
+                                    "SELECT packageName, usageTimeMillis FROM daily_usage WHERE date = ? AND packageName != 'TOTAL' AND packageName NOT LIKE '%_TOTAL' ORDER BY usageTimeMillis DESC LIMIT 5",
+                                    arrayOf(maxDate ?: "")
                                 ).use { cursor ->
                                     val pie = mutableMapOf<String, Long>()
                                     while (cursor.moveToNext()) {
@@ -255,8 +298,8 @@ object BackupUtils {
 
                             try {
                                 db.rawQuery(
-                                    "SELECT packageName, usageTimeMillis FROM daily_usage WHERE date = (SELECT MAX(date) FROM daily_usage) AND packageName LIKE '%_TOTAL'",
-                                    null
+                                    "SELECT packageName, usageTimeMillis FROM daily_usage WHERE date = ? AND packageName LIKE '%_TOTAL'",
+                                    arrayOf(maxDate ?: "")
                                 ).use { cursor ->
                                     while (cursor.moveToNext()) {
                                         val pkg = cursor.getString(0)
@@ -273,6 +316,8 @@ object BackupUtils {
                             db.close()
                         }
                         tempDbFile.delete()
+                        tempWalFile.delete()
+                        tempShmFile.delete()
                     } catch (e: Exception) {
                         e.printStackTrace()
                     }
@@ -286,8 +331,8 @@ object BackupUtils {
                     latestUsageMillis = latestMillis,
                     hasHourly = hasHourly,
                     hasPiechart = hasPiechart,
-                    last7DaysSnapshot = last7DaysSnapshot,
-                    last7DaysTopApps = last7DaysTopApps,
+                    historySnapshot = historySnapshot,
+                    topAppsHistory = topAppsHistory,
                     latestHourlyData = latestHourlyData,
                     latestPiechartData = latestPiechartData,
                     latestShieldUsage = shieldU,

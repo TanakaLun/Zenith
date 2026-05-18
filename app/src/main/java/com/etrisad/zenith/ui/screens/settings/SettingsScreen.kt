@@ -64,6 +64,7 @@ import com.etrisad.zenith.ui.components.UpdateBottomSheetContent
 import com.etrisad.zenith.data.manager.GitHubUpdateManager
 import com.etrisad.zenith.data.remote.model.GitHubRelease
 import com.etrisad.zenith.ui.components.RestoreConfirmationBottomSheet
+import com.etrisad.zenith.service.UsageSyncManager
 import kotlinx.coroutines.launch
 import com.etrisad.zenith.worker.BackupManager
 import androidx.navigation.NavController
@@ -124,6 +125,11 @@ fun SettingsScreen(
         onResult = { uri ->
             uri?.let {
                 coroutineScope.launch {
+                    // Force sync before backup to ensure all current data is included
+                    try {
+                        UsageSyncManager(context, app.shieldRepository, app.userPreferencesRepository).syncUsageData()
+                    } catch (_: Exception) {}
+
                     BackupUtils.backupDatabase(context, it).onSuccess {
                         preferencesRepository.setLastBackupTimestamp(System.currentTimeMillis())
                         Toast.makeText(context, "Backup successful!", Toast.LENGTH_SHORT).show()

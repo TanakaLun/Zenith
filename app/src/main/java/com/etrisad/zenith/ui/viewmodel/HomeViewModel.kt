@@ -766,96 +766,72 @@ class HomeViewModel(
                 else               -> 0f
             }
 
-            val currentSnapshotStamps = _uiState.value.snapshotStamps
-            val snapshotStamps = if (currentSnapshotStamps.isEmpty()) {
-                (0..20).map { i ->
-                    val dStart = getMidnight(i)
-                    val dEnd = if (i == 0) now else dStart + (24 * 60 * 60 * 1000L)
-                    val dateStr = dateFormat.format(Date(dStart))
-                    
-                    val topEntry = if (i == 0) {
+            val excludedPkgs = setOf("TOTAL", "SHIELD_TOTAL", "GOAL_TOTAL", "OTHER_TOTAL")
+            val historyByDate = allHistory.filter { it.packageName !in excludedPkgs }.groupBy { it.date }
+
+            val snapshotStamps = (0..20).map { i ->
+                val dStart = getMidnight(i)
+                val dEnd = if (i == 0) now else dStart + (24 * 60 * 60 * 1000L)
+                val dateStr = dateFormat.format(Date(dStart))
+                
+                val dbDayApps = historyByDate[dateStr] ?: emptyList()
+
+                val topEntry = if (dbDayApps.isNotEmpty()) {
+                    val dbMax = dbDayApps.maxByOrNull { it.usageTimeMillis }!!
+                    if (i == 0) {
+                        val liveTop = filteredTodayUsage.maxByOrNull { it.value }
+                        if (liveTop != null && liveTop.value > dbMax.usageTimeMillis) {
+                            liveTop.key to liveTop.value
+                        } else {
+                            dbMax.packageName to dbMax.usageTimeMillis
+                        }
+                    } else {
+                        dbMax.packageName to dbMax.usageTimeMillis
+                    }
+                } else {
+                    if (i == 0) {
                         filteredTodayUsage.maxByOrNull { it.value }?.let { it.key to it.value }
                     } else {
-                        val dbDayApps = allHistory.filter {
-                            it.date == dateStr && 
-                            it.packageName != "TOTAL" && 
-                            it.packageName != "SHIELD_TOTAL" && 
-                            it.packageName != "GOAL_TOTAL" && 
-                            it.packageName != "OTHER_TOTAL" 
-                        }
-                        
-                        if (dbDayApps.isNotEmpty()) {
-                            dbDayApps.maxByOrNull { it.usageTimeMillis }?.let { it.packageName to it.usageTimeMillis }
-                        } else {
-                            val statsMap = usm.queryAndAggregateUsageStats(dStart, dEnd)
-                            statsMap.filter { (pkg, _) -> 
-                                pkg !in excludePackages && pkg in launcherApps 
-                            }.maxByOrNull { (_, stat) -> 
-                                stat.totalTimeVisible.coerceAtLeast(stat.totalTimeInForeground) 
-                            }?.let { it.key to it.value.totalTimeVisible.coerceAtLeast(it.value.totalTimeInForeground) }
-                        }
+                        val statsMap = usm.queryAndAggregateUsageStats(dStart, dEnd)
+                        statsMap.filter { (pkg, _) -> 
+                            pkg !in excludePackages && pkg in launcherApps 
+                        }.maxByOrNull { (_, stat) -> 
+                            stat.totalTimeVisible.coerceAtLeast(stat.totalTimeInForeground) 
+                        }?.let { it.key to it.value.totalTimeVisible.coerceAtLeast(it.value.totalTimeInForeground) }
                     }
-                    
-                    val topPackage = topEntry?.first
-                    var usageTime = topEntry?.second ?: 0L
-                    
-                    if (i == 0 && usageTime > timeSinceMidnight + 10000) {
-                        usageTime = timeSinceMidnight
-                    }
-
-                    val hasDb = allHistory.any { it.date == dateStr && it.packageName != "TOTAL" }
-                    val hasSys = globalFallbackMap[dateStr] != null
-                    
-                    val shouldShow = i == 0 || hasDb || preferSystemUsageHistory
-
-                    if (topPackage != null && shouldShow) {
-                        val cached = appInfoCache[topPackage]
-                        if (cached != null) {
-                            AppUsageInfo(topPackage, cached.first, usageTime, cached.second, hasDb, hasSys, i == 0)
-                        } else {
-                            try {
-                                val appInfo = pm.getApplicationInfo(topPackage, 0)
-                                val label = pm.getApplicationLabel(appInfo).toString()
-                                val icon = pm.getApplicationIcon(appInfo)
-                                appInfoCache[topPackage] = label to icon
-                                AppUsageInfo(topPackage, label, usageTime, icon, hasDb, hasSys, i == 0)
-                            } catch (_: Exception) {
-                                AppUsageInfo("", "", 0, hasDatabaseRecord = hasDb, hasSystemData = hasSys, isLive = i == 0)
-                            }
-                        }
-                    } else {
-                        AppUsageInfo("", "", 0, hasDatabaseRecord = hasDb, hasSystemData = hasSys, isLive = i == 0)
-                    }
-                }.reversed()
-            } else if (isSelectedToday) {
-                // Optimized: Only update today's snapshot instead of re-calculating 21 days
-                val topEntry = filteredTodayUsage.maxByOrNull { it.value }?.let { it.key to it.value }
+                }
+                
                 val topPackage = topEntry?.first
                 var usageTime = topEntry?.second ?: 0L
-                if (usageTime > timeSinceMidnight + 10000) usageTime = timeSinceMidnight
+                
+                if (i == 0 && usageTime > timeSinceMidnight + 10000) {
+                    usageTime = timeSinceMidnight
+                }
 
-                val updatedTodayStamp = if (topPackage != null) {
+                val hasDb = dbDayApps.isNotEmpty()
+                val hasSys = globalFallbackMap[dateStr] != null
+                
+                val shouldShow = i == 0 || hasDb || (preferSystemUsageHistory && hasSys)
+
+                if (topPackage != null && shouldShow) {
                     val cached = appInfoCache[topPackage]
                     if (cached != null) {
-                        AppUsageInfo(topPackage, cached.first, usageTime, cached.second, isLive = true)
+                        AppUsageInfo(topPackage, cached.first, usageTime, cached.second, hasDb, hasSys, i == 0)
                     } else {
                         try {
                             val appInfo = pm.getApplicationInfo(topPackage, 0)
                             val label = pm.getApplicationLabel(appInfo).toString()
                             val icon = pm.getApplicationIcon(appInfo)
                             appInfoCache[topPackage] = label to icon
-                            AppUsageInfo(topPackage, label, usageTime, icon, isLive = true)
+                            AppUsageInfo(topPackage, label, usageTime, icon, hasDb, hasSys, i == 0)
                         } catch (_: Exception) {
-                            AppUsageInfo("", "", 0, isLive = true)
+                            AppUsageInfo(topPackage, topPackage, usageTime, null, hasDb, hasSys, i == 0)
                         }
                     }
                 } else {
-                    AppUsageInfo("", "", 0, isLive = true)
+                    AppUsageInfo("", "", 0, hasDatabaseRecord = hasDb, hasSystemData = hasSys, isLive = i == 0)
                 }
-                currentSnapshotStamps.dropLast(1) + updatedTodayStamp
-            } else {
-                currentSnapshotStamps
-            }
+            }.reversed()
 
             val targetMillis = currentTargetMinutes * 60 * 1000L
 

@@ -115,6 +115,12 @@ fun SnapshotSection(
     val pageCount = pages.size.coerceAtLeast(1)
     val pagerState = rememberPagerState(pageCount = { pageCount }, initialPage = (pageCount - 1).coerceAtLeast(0))
 
+    LaunchedEffect(pageCount) {
+        if (pageCount > 0) {
+            pagerState.scrollToPage(pageCount - 1)
+        }
+    }
+
     fun getLocalGroupShape(index: Int): RoundedCornerShape {
         return when {
             totalCount == 1 -> RoundedCornerShape(24.dp)
@@ -263,11 +269,14 @@ fun SnapshotCard(
     formatDuration: (Long) -> String,
     showDatabaseIndicator: Boolean = false,
     pagerState: PagerState,
+    isBackupPreview: Boolean = false,
+    referenceDateMillis: Long? = null,
     shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(24.dp),
     containerColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.surfaceContainerLow
 ) {
     val pages = remember(stamps) { stamps.chunked(7) }
     val pageCount = pages.size.coerceAtLeast(1)
+    val referenceTime = referenceDateMillis ?: System.currentTimeMillis()
     val currentHour = remember { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
 
     val streaks = remember(stamps) {
@@ -286,7 +295,7 @@ fun SnapshotCard(
         }
     }
     
-    val selectedIndex = remember(stamps, selectedDateMillis) {
+    val selectedIndex = remember(stamps, selectedDateMillis, referenceTime) {
         val cal = Calendar.getInstance()
         cal.timeInMillis = selectedDateMillis
         cal.set(Calendar.HOUR_OF_DAY, 0)
@@ -297,6 +306,7 @@ fun SnapshotCard(
 
         stamps.indices.find { i ->
             val dCal = Calendar.getInstance()
+            dCal.timeInMillis = referenceTime
             val daysAgo = (stamps.size - 1) - i
             dCal.add(Calendar.DAY_OF_YEAR, -daysAgo)
             dCal.set(Calendar.HOUR_OF_DAY, 0)
@@ -340,7 +350,7 @@ fun SnapshotCard(
 
                 val selectedApp = selectedIndex?.let { stamps.getOrNull(it) }
                 val isSelectedToday = selectedIndex == stamps.size - 1
-                val isPendingTodaySelected = isSelectedToday && currentHour < 21
+                val isPendingTodaySelected = !isBackupPreview && isSelectedToday && currentHour < 21
                 
                 val displayApp = if (isPendingTodaySelected) null else selectedApp
 
@@ -407,7 +417,7 @@ fun SnapshotCard(
 
                         val targetIndicatorSize = when {
                             isPendingToday -> 34.dp
-                            app.icon != null -> 40.dp
+                            app.icon != null || app.packageName.isNotEmpty() -> 40.dp
                             else -> 24.dp
                         }
 
@@ -449,6 +459,7 @@ fun SnapshotCard(
                                     indication = null
                                 ) {
                                     val cal = Calendar.getInstance()
+                                    cal.timeInMillis = referenceTime
                                     val daysAgo = (stamps.size - 1) - indexInStamps
                                     cal.add(Calendar.DAY_OF_YEAR, -daysAgo)
                                     onDaySelected(cal.timeInMillis)
@@ -509,7 +520,7 @@ fun SnapshotCard(
                                     modifier = Modifier.size(40.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    if (isPendingToday) {
+                                    if (!isBackupPreview && isPendingToday) {
                                         WavyCircularProgress(
                                             progress = currentHour / 21f,
                                             color = streakColor,
@@ -526,6 +537,21 @@ fun SnapshotCard(
                                             modifier = Modifier.size(28.dp).clip(CircleShape),
                                             contentScale = ContentScale.Crop
                                         )
+                                    } else if (app.packageName.isNotEmpty()) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(28.dp)
+                                                .clip(CircleShape)
+                                                .background(streakColor.copy(alpha = 0.2f)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Outlined.Camera,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(16.dp),
+                                                tint = streakColor
+                                            )
+                                        }
                                     } else {
                                         Box(
                                             modifier = Modifier
@@ -536,8 +562,9 @@ fun SnapshotCard(
                                     }
                                 }
                                 Spacer(modifier = Modifier.height(6.dp))
-                                val dayLabel = remember(pageIndex, appIndex, stamps.size) {
+                                val dayLabel = remember(pageIndex, appIndex, stamps.size, referenceTime) {
                                     val cal = Calendar.getInstance()
+                                    cal.timeInMillis = referenceTime
                                     val indexInStamps = pageIndex * 7 + appIndex
                                     val daysAgo = (stamps.size - 1) - indexInStamps
                                     cal.add(Calendar.DAY_OF_YEAR, -daysAgo)
@@ -551,7 +578,7 @@ fun SnapshotCard(
                                 )
                                 if (showDatabaseIndicator) {
                                     val indicatorColor = when {
-                                        app.totalTimeVisible == 0L && !app.isLive -> MaterialTheme.colorScheme.error
+                                        (app.totalTimeVisible == 0L || app.packageName.isEmpty()) && !app.isLive -> MaterialTheme.colorScheme.error
                                         app.isLive -> MaterialTheme.colorScheme.tertiary
                                         app.hasDatabaseRecord -> MaterialTheme.colorScheme.primary
                                         app.hasSystemData -> MaterialTheme.colorScheme.secondary

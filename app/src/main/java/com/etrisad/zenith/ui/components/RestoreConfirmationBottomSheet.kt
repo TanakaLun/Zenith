@@ -155,8 +155,8 @@ fun RestoreConfirmationBottomSheet(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            BackupBadge(label = "History", isAvailable = metadata.last7DaysSnapshot.isNotEmpty())
-                            BackupBadge(label = "Snapshot", isAvailable = metadata.last7DaysTopApps.isNotEmpty())
+                            BackupBadge(label = "History", isAvailable = metadata.historySnapshot.isNotEmpty())
+                            BackupBadge(label = "Snapshot", isAvailable = metadata.topAppsHistory.isNotEmpty())
                             BackupBadge(label = "Hourly", isAvailable = metadata.hasHourly)
                             BackupBadge(label = "Piechart", isAvailable = metadata.hasPiechart)
                         }
@@ -189,9 +189,9 @@ fun RestoreConfirmationBottomSheet(
                         ) { tab ->
                             when (tab) {
                                 0 -> HistoryDetail(preferences, metadata)
-                                1 -> SnapshotDetail(metadata)
-                                2 -> HourlyDetail(metadata)
-                                3 -> PiechartDetail(metadata)
+                                1 -> SnapshotDetail(preferences, metadata)
+                                2 -> HourlyDetail(preferences, metadata)
+                                3 -> PiechartDetail(preferences, metadata)
                             }
                         }
                         
@@ -299,8 +299,14 @@ private fun HistoryDetail(
     metadata: BackupUtils.BackupMetadata
 ) {
     val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
-    val history = remember(metadata.last7DaysSnapshot) {
+    val history = remember(metadata.historySnapshot, metadata.latestUsageDate) {
         val calendar = Calendar.getInstance()
+        metadata.latestUsageDate?.let {
+            try {
+                dateFormat.parse(it)?.let { date -> calendar.time = date }
+            } catch (_: Exception) {}
+        }
+        
         val dates = (0 until 21).map {
             val d = dateFormat.format(calendar.time)
             calendar.add(Calendar.DAY_OF_YEAR, -1)
@@ -308,7 +314,7 @@ private fun HistoryDetail(
         }.reversed()
 
         dates.map { dateStr ->
-            val snapshot = metadata.last7DaysSnapshot.find { it.first == dateStr }
+            val snapshot = metadata.historySnapshot.find { it.first == dateStr }
             val dateLong = try { dateFormat.parse(dateStr)?.time ?: 0L } catch (e: Exception) { 0L }
             DailyUsage(
                 date = dateLong,
@@ -322,6 +328,8 @@ private fun HistoryDetail(
         history = history,
         targetMillis = preferences.screenTimeTargetMinutes * 60 * 1000L,
         formatDuration = { formatDuration(it) },
+        showDatabaseIndicator = preferences.showDatabaseIndicator,
+        selectedDateMillis = history.lastOrNull()?.date,
         containerColor = Color.Transparent,
         shape = RoundedCornerShape(0.dp),
         title = "Last 21 Days (Global)"
@@ -330,14 +338,25 @@ private fun HistoryDetail(
 
 @Composable
 private fun SnapshotDetail(
+    preferences: UserPreferences,
     metadata: BackupUtils.BackupMetadata
 ) {
     val context = LocalContext.current
     val pm = remember { context.packageManager }
     val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
 
-    val snapshotStamps = remember(metadata.last7DaysTopApps) {
+    val latestDateMillis = remember(metadata.latestUsageDate) {
+        metadata.latestUsageDate?.let {
+            try {
+                dateFormat.parse(it)?.time
+            } catch (_: Exception) { null }
+        } ?: System.currentTimeMillis()
+    }
+
+    val snapshotStamps = remember(metadata.topAppsHistory, latestDateMillis) {
         val calendar = Calendar.getInstance()
+        calendar.timeInMillis = latestDateMillis
+
         val dates = (0 until 7).map {
             val d = dateFormat.format(calendar.time)
             calendar.add(Calendar.DAY_OF_YEAR, -1)
@@ -345,7 +364,7 @@ private fun SnapshotDetail(
         }.reversed()
 
         dates.map { dateStr ->
-            val topApp = metadata.last7DaysTopApps.find { it.first == dateStr }
+            val topApp = metadata.topAppsHistory.find { it.first == dateStr }
             if (topApp != null) {
                 val pkg = topApp.second
                 var appName = pkg
@@ -361,10 +380,12 @@ private fun SnapshotDetail(
                     appName = appName,
                     totalTimeVisible = topApp.third,
                     icon = icon,
-                    hasDatabaseRecord = true
+                    hasDatabaseRecord = true,
+                    hasSystemData = false,
+                    isLive = false
                 )
             } else {
-                AppUsageInfo("", "", 0L)
+                AppUsageInfo("", "", 0L, hasDatabaseRecord = false)
             }
         }
     }
@@ -373,18 +394,21 @@ private fun SnapshotDetail(
     
     SnapshotCard(
         stamps = snapshotStamps,
-        selectedDateMillis = System.currentTimeMillis(),
+        selectedDateMillis = latestDateMillis,
         getAppType = { _ -> null },
         onDaySelected = { _ -> },
         formatDuration = { formatDuration(it) },
+        showDatabaseIndicator = preferences.showDatabaseIndicator,
         pagerState = pagerState,
+        isBackupPreview = true,
+        referenceDateMillis = latestDateMillis,
         containerColor = Color.Transparent,
         shape = RoundedCornerShape(0.dp)
     )
 }
 
 @Composable
-private fun HourlyDetail(metadata: BackupUtils.BackupMetadata) {
+private fun HourlyDetail(preferences: UserPreferences, metadata: BackupUtils.BackupMetadata) {
     if (metadata.latestHourlyData.isEmpty()) {
         Box(
             modifier = Modifier.fillMaxWidth().padding(32.dp),
@@ -393,6 +417,15 @@ private fun HourlyDetail(metadata: BackupUtils.BackupMetadata) {
             Text("No hourly data available", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     } else {
+        val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
+        val latestDateMillis = remember(metadata.latestUsageDate) {
+            metadata.latestUsageDate?.let {
+                try {
+                    dateFormat.parse(it)?.time
+                } catch (_: Exception) { null }
+            } ?: System.currentTimeMillis()
+        }
+
         Column {
             Text(
                 text = "Usage on ${metadata.latestUsageDate ?: "Latest Day"}",
@@ -418,14 +451,15 @@ private fun HourlyDetail(metadata: BackupUtils.BackupMetadata) {
                 bedtimeStartTime = "22:00",
                 bedtimeEndTime = "07:00",
                 bedtimeDays = emptySet(),
-                dateMillis = System.currentTimeMillis()
+                dateMillis = latestDateMillis,
+                showDatabaseIndicator = preferences.showDatabaseIndicator
             )
         }
     }
 }
 
 @Composable
-private fun PiechartDetail(metadata: BackupUtils.BackupMetadata) {
+private fun PiechartDetail(preferences: UserPreferences, metadata: BackupUtils.BackupMetadata) {
     if (metadata.latestPiechartData.isEmpty() && metadata.latestShieldUsage == 0L) {
         Box(
             modifier = Modifier.fillMaxWidth().padding(32.dp),
@@ -434,6 +468,9 @@ private fun PiechartDetail(metadata: BackupUtils.BackupMetadata) {
             Text("No app breakdown available", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     } else {
+        val context = LocalContext.current
+        val pm = remember { context.packageManager }
+        
         Column {
             Text(
                 text = "Breakdown on ${metadata.latestUsageDate ?: "Latest Day"}",
@@ -456,6 +493,60 @@ private fun PiechartDetail(metadata: BackupUtils.BackupMetadata) {
                 highlightedCategory = null,
                 onCategoryClick = {}
             )
+            
+            if (metadata.latestPiechartData.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(20.dp))
+                Text(
+                    text = "Top Apps in Backup",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                
+                metadata.latestPiechartData.forEach { (pkg, duration) ->
+                    var appName = pkg
+                    var icon: android.graphics.drawable.Drawable? = null
+                    try {
+                        val appInfo = pm.getApplicationInfo(pkg, 0)
+                        appName = pm.getApplicationLabel(appInfo).toString()
+                        icon = pm.getApplicationIcon(appInfo)
+                    } catch (_: Exception) {}
+                    
+                    Row(
+                        modifier = Modifier.padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier.size(24.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (icon != null) {
+                                androidx.compose.foundation.Image(
+                                    painter = com.google.accompanist.drawablepainter.rememberDrawablePainter(icon),
+                                    contentDescription = null,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            } else {
+                                Icon(Icons.Outlined.Android, null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.outline)
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = appName,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = formatDuration(duration),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -526,6 +617,33 @@ fun HourlyStatsContent(
                         .clip(CircleShape)
                         .background(barColor)
                 )
+            }
+        }
+        
+        if (showDatabaseIndicator) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                hourlyUsage.forEach { hourInfo ->
+                    val indicatorColor = when {
+                        hourInfo.usageTimeMillis == 0L && !hourInfo.isLive -> MaterialTheme.colorScheme.error
+                        hourInfo.isLive -> MaterialTheme.colorScheme.tertiary
+                        hourInfo.hasDatabaseRecord -> MaterialTheme.colorScheme.primary
+                        hourInfo.hasSystemData -> MaterialTheme.colorScheme.secondary
+                        else -> MaterialTheme.colorScheme.error
+                    }
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 1.5.dp)
+                            .height(2.dp)
+                            .clip(CircleShape)
+                            .background(indicatorColor)
+                    )
+                }
             }
         }
         
