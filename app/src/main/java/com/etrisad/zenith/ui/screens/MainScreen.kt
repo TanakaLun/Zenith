@@ -687,6 +687,12 @@ fun MainScreen(
                             onBack = { navController.popBackStack() }
                         )
                     }
+                    composable(Screen.GSFlexCustomizer.route) {
+                        com.etrisad.zenith.ui.screens.settings.GSFlexCustomizerScreen(
+                            repository = userPreferencesRepository,
+                            onBack = { navController.popBackStack() }
+                        )
+                    }
                     composable(
                         route = Screen.AppDetail.route,
                         arguments = listOf(androidx.navigation.navArgument("packageName") {

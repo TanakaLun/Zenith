@@ -5,14 +5,20 @@ import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
 import android.media.MediaPlayer
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.core.net.toUri
+import com.etrisad.zenith.ZenithApplication
+import com.etrisad.zenith.data.preferences.ThemeConfig
+import com.etrisad.zenith.data.preferences.UserPreferences
 import com.etrisad.zenith.ui.components.AppGoalOverlayContent
 import com.etrisad.zenith.ui.theme.ZenithTheme
 import kotlinx.coroutines.CoroutineScope
@@ -38,23 +44,32 @@ class AppGoalOverlayActivity : ComponentActivity() {
         activePackageNames.addAll(packageList)
         playGoalSound(packageList.firstOrNull())
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-            setShowWhenLocked(true)
-            setTurnScreenOn(true)
-            val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-            keyguardManager.requestDismissKeyguard(this, null)
-        } else {
-            @Suppress("DEPRECATION")
-            window.addFlags(
-                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                        WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
-                        WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
-            )
-        }
+        setShowWhenLocked(true)
+        setTurnScreenOn(true)
+        val keyguardManager = getSystemService(KEYGUARD_SERVICE) as KeyguardManager
+        keyguardManager.requestDismissKeyguard(this, null)
+        
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         setContent {
-            ZenithTheme {
+            val userPreferencesRepository = (application as ZenithApplication).userPreferencesRepository
+            val userPreferences by userPreferencesRepository.userPreferencesFlow.collectAsState(
+                initial = UserPreferences()
+            )
+
+            val darkTheme = when (userPreferences.themeConfig) {
+                ThemeConfig.FOLLOW_SYSTEM -> isSystemInDarkTheme()
+                ThemeConfig.LIGHT -> false
+                ThemeConfig.DARK -> true
+            }
+
+            ZenithTheme(
+                darkTheme = darkTheme,
+                dynamicColor = userPreferences.dynamicColor,
+                fontOption = userPreferences.fontOption,
+                expressiveColors = userPreferences.expressiveColors,
+                gsFlexSettings = userPreferences.gsFlexSettings
+            ) {
                 AppGoalOverlayContent(
                     packageNames = activePackageNames,
                     onAnswer = { pkg ->
@@ -98,7 +113,7 @@ class AppGoalOverlayActivity : ComponentActivity() {
                     try {
                         mediaPlayer?.release()
                         val soundUri = if (shield?.goalCallerSoundUri != null) {
-                            Uri.parse(shield.goalCallerSoundUri)
+                            shield.goalCallerSoundUri.toUri()
                         } else {
                             android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_RINGTONE)
                         }

@@ -2,10 +2,8 @@ package com.etrisad.zenith.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.googlefonts.GoogleFont
 import androidx.compose.ui.text.googlefonts.Font as GoogleFontSource
@@ -17,17 +15,6 @@ val provider = GoogleFont.Provider(
     certificates = R.array.com_google_android_gms_fonts_certs
 )
 
-@OptIn(androidx.compose.ui.text.ExperimentalTextApi::class)
-val GoogleSansFlexFontFamily = FontFamily(
-    Font(
-        resId = R.font.google_sans_flex_variable,
-        variationSettings = FontVariation.Settings(
-            FontVariation.weight(400),
-            FontVariation.width(100f)
-        )
-    )
-)
-
 val nunitoName = GoogleFont("Nunito")
 val NunitoFontFamily = FontFamily(
     GoogleFontSource(googleFont = nunitoName, fontProvider = provider, weight = FontWeight.Normal),
@@ -36,7 +23,7 @@ val NunitoFontFamily = FontFamily(
     GoogleFontSource(googleFont = nunitoName, fontProvider = provider, weight = FontWeight.Bold)
 )
 
-private fun createTypography(fontFamily: FontFamily): Typography {
+private fun createBasicTypography(fontFamily: FontFamily): Typography {
     return Typography(
         displayLarge = TextStyle(fontFamily = fontFamily, fontWeight = FontWeight.Normal, fontSize = 57.sp, lineHeight = 64.sp, letterSpacing = (-0.25).sp),
         displayMedium = TextStyle(fontFamily = fontFamily, fontWeight = FontWeight.Normal, fontSize = 45.sp, lineHeight = 52.sp, letterSpacing = 0.sp),
@@ -56,8 +43,5 @@ private fun createTypography(fontFamily: FontFamily): Typography {
     )
 }
 
-val GoogleSansFlexTypography = createTypography(GoogleSansFlexFontFamily)
-val NunitoTypography = createTypography(NunitoFontFamily)
-val SystemTypography = createTypography(FontFamily.Default)
-
-val Typography = SystemTypography
+val NunitoTypography = createBasicTypography(NunitoFontFamily)
+val SystemTypography = createBasicTypography(FontFamily.Default)

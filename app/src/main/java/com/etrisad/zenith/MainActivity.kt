@@ -89,7 +89,8 @@ class MainActivity : ComponentActivity() {
                 darkTheme = darkTheme,
                 dynamicColor = userPreferences.dynamicColor,
                 fontOption = userPreferences.fontOption,
-                expressiveColors = userPreferences.expressiveColors
+                expressiveColors = userPreferences.expressiveColors,
+                gsFlexSettings = userPreferences.gsFlexSettings
             ) {
                 val windowSizeClass = calculateWindowSizeClass(this)
                 MainScreen(

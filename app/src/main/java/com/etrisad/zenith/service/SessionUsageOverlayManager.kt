@@ -35,6 +35,7 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
 import com.etrisad.zenith.ui.components.TooltipArrowPosition
 import com.etrisad.zenith.ui.components.ZenithTooltipBox
+import com.etrisad.zenith.ui.theme.GSFlexSettings
 import com.etrisad.zenith.ui.theme.ZenithTheme
 import kotlinx.coroutines.*
 import kotlin.math.roundToInt
@@ -202,7 +203,8 @@ class SessionUsageOverlayManager(private val context: Context) {
                 ZenithTheme(
                     fontOption = userPrefs?.fontOption ?: com.etrisad.zenith.data.preferences.FontOption.SYSTEM,
                     dynamicColor = userPrefs?.dynamicColor ?: true,
-                    expressiveColors = userPrefs?.expressiveColors ?: false
+                    expressiveColors = userPrefs?.expressiveColors ?: false,
+                    gsFlexSettings = userPrefs?.gsFlexSettings ?: GSFlexSettings()
                 ) {
                     SessionUsageHUD(
                         secondsLeftProvider = { if (session.isGoal) session.secondsElapsedState.intValue else session.secondsLeftState.intValue },

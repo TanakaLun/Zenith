@@ -36,6 +36,8 @@ sealed class Screen(
     object DataRepairment : Screen("data_repairment", "Data Repairment", Icons.Filled.Settings, Icons.Outlined.Settings)
 
     object FontTest : Screen("font_test", "Font Test", Icons.Filled.Settings, Icons.Outlined.Settings)
+
+    object GSFlexCustomizer : Screen("gs_flex_customizer", "GS Flex Customizer", Icons.Filled.Settings, Icons.Outlined.Settings)
 }
 
 val navItems = listOf(

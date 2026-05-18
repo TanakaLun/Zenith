@@ -14,6 +14,8 @@ import android.view.Gravity
 import android.view.WindowManager
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
 import androidx.lifecycle.*
@@ -21,6 +23,7 @@ import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import com.etrisad.zenith.ui.theme.GSFlexSettings
 import com.etrisad.zenith.ui.theme.ZenithTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -75,7 +78,13 @@ class InterceptOverlayManager(
     ) {
         overlayUsageState?.value = Pair(totalUsageToday, totalGlobalUsageToday)
         overlayView?.setContent {
-            ZenithTheme {
+            val userPrefs by preferencesRepository.userPreferencesFlow.collectAsState(initial = null)
+            ZenithTheme(
+                fontOption = userPrefs?.fontOption ?: com.etrisad.zenith.data.preferences.FontOption.SYSTEM,
+                dynamicColor = userPrefs?.dynamicColor ?: true,
+                expressiveColors = userPrefs?.expressiveColors ?: false,
+                gsFlexSettings = userPrefs?.gsFlexSettings ?: GSFlexSettings()
+            ) {
                 val usageState = overlayUsageState?.value ?: Pair(totalUsageToday, totalGlobalUsageToday)
                 Box(modifier = Modifier.fillMaxSize()) {
                     InterceptOverlayContent(

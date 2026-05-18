@@ -310,6 +310,9 @@ fun SettingsScreen(
         onNavigateToFontTest = {
             navController.navigate(Screen.FontTest.route)
         },
+        onNavigateToGSFlexCustomizer = {
+            navController.navigate(Screen.GSFlexCustomizer.route)
+        },
         onTestGoalOverlay = {
             showGoalTestSheet = true
         },
@@ -515,6 +518,7 @@ fun SettingsScreenContent(
     onNavigateToDatabaseDebug: () -> Unit,
     onNavigateToDataRepairment: () -> Unit,
     onNavigateToFontTest: () -> Unit,
+    onNavigateToGSFlexCustomizer: () -> Unit,
     onTestGoalOverlay: () -> Unit,
     onCustomDelayEnabledChange: (Boolean) -> Unit,
     onSetDelayPowerSave: (Long) -> Unit,
@@ -787,6 +791,7 @@ fun SettingsScreenContent(
                 FontSelector(
                     selectedFont = preferences.fontOption,
                     onFontChange = onFontChange,
+                    onCustomizeGSFlex = onNavigateToGSFlexCustomizer,
                     shape = RoundedCornerShape(8.dp)
                 )
             }
@@ -1305,10 +1310,11 @@ fun PreferenceCategory(title: String) {
 fun FontSelector(
     selectedFont: FontOption,
     onFontChange: (FontOption) -> Unit,
+    onCustomizeGSFlex: () -> Unit,
     shape: Shape = RoundedCornerShape(24.dp)
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().animateContentSize(),
         shape = shape,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow
@@ -1359,6 +1365,20 @@ fun FontSelector(
                 size = ZenithButtonSize.Medium,
                 isInsideContainer = true
             )
+
+            if (selectedFont == FontOption.GOOGLE_SANS_FLEX) {
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = onCustomizeGSFlex,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    contentPadding = PaddingValues(12.dp)
+                ) {
+                    Icon(Icons.Outlined.SettingsSuggest, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Customize GS Flex Variations")
+                }
+            }
         }
     }
 }

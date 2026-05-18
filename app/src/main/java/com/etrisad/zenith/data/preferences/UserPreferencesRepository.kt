@@ -9,12 +9,14 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import com.etrisad.zenith.data.local.entity.DailyUsageEntity
 import com.etrisad.zenith.data.repository.ShieldRepository
+import com.etrisad.zenith.ui.theme.FontAxes
+import com.etrisad.zenith.ui.theme.GSFlexSettings
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
@@ -31,6 +33,10 @@ enum class ThemeConfig {
 
 enum class FontOption {
     SYSTEM, GOOGLE_SANS_FLEX, NUNITO
+}
+
+enum class GSFlexPreset {
+    ZENITH, NEO, COMPACT, AIRY, CUSTOM
 }
 
 class UserPreferencesRepository(private val context: Context) {
@@ -92,224 +98,178 @@ class UserPreferencesRepository(private val context: Context) {
         val DELAY_SHIELD_NEAR = longPreferencesKey("delay_shield_near")
         val DELAY_DEFAULT = longPreferencesKey("delay_default")
         val MINDFUL_GATEWAY_ENABLED = booleanPreferencesKey("mindful_gateway_enabled")
+        
+        val GS_FLEX_PRESET = stringPreferencesKey("gs_flex_preset")
+        val GS_D_WGHT = floatPreferencesKey("gs_d_wght")
+        val GS_D_WDTH = floatPreferencesKey("gs_d_wdth")
+        val GS_D_OPSZ = floatPreferencesKey("gs_d_opsz")
+        val GS_D_GRAD = floatPreferencesKey("gs_d_grad")
+        val GS_D_SLNT = floatPreferencesKey("gs_d_slnt")
+        val GS_D_ROND = floatPreferencesKey("gs_d_rond")
+        val GS_H_WGHT = floatPreferencesKey("gs_h_wght")
+        val GS_H_WDTH = floatPreferencesKey("gs_h_wdth")
+        val GS_H_OPSZ = floatPreferencesKey("gs_h_opsz")
+        val GS_H_GRAD = floatPreferencesKey("gs_h_grad")
+        val GS_H_SLNT = floatPreferencesKey("gs_h_slnt")
+        val GS_H_ROND = floatPreferencesKey("gs_h_rond")
+        val GS_B_WGHT = floatPreferencesKey("gs_b_wght")
+        val GS_B_WDTH = floatPreferencesKey("gs_b_wdth")
+        val GS_B_OPSZ = floatPreferencesKey("gs_b_opsz")
+        val GS_B_GRAD = floatPreferencesKey("gs_b_grad")
+        val GS_B_SLNT = floatPreferencesKey("gs_b_slnt")
+        val GS_B_ROND = floatPreferencesKey("gs_b_rond")
     }
 
     val userPreferencesFlow: Flow<UserPreferences> = context.dataStore.data
         .catch { exception ->
-            if (exception is IOException) {
-                emit(emptyPreferences())
-            } else {
-                throw exception
-            }
+            if (exception is IOException) emit(emptyPreferences()) else throw exception
         }
         .map { preferences ->
-            val themeConfig = ThemeConfig.valueOf(
-                preferences[PreferencesKeys.THEME_CONFIG] ?: ThemeConfig.FOLLOW_SYSTEM.name
-            )
-            val fontOption = FontOption.valueOf(
-                preferences[PreferencesKeys.FONT_OPTION] ?: FontOption.NUNITO.name
-            )
-            val dynamicColor = preferences[PreferencesKeys.DYNAMIC_COLOR] ?: true
-            val accessibilityDisabled = preferences[PreferencesKeys.ACCESSIBILITY_DISABLED] ?: false
-            val screenTimeTarget = preferences[PreferencesKeys.SCREEN_TIME_TARGET] ?: 0
-            val emergencyRechargeDuration = preferences[PreferencesKeys.EMERGENCY_RECHARGE_DURATION_MINUTES] ?: 60
-            val delayAppDuration = preferences[PreferencesKeys.DELAY_APP_DURATION_SECONDS] ?: 30
-            val sessionUsageOverlayEnabled = preferences[PreferencesKeys.SESSION_USAGE_OVERLAY_ENABLED] ?: false
-            val sessionUsageOverlaySize = preferences[PreferencesKeys.SESSION_USAGE_OVERLAY_SIZE] ?: 100
-            val sessionUsageOverlayOpacity = preferences[PreferencesKeys.SESSION_USAGE_OVERLAY_OPACITY] ?: 90
-            val whitelistedPackages = preferences[PreferencesKeys.WHITELISTED_PACKAGES]?.split(",")?.filter { it.isNotEmpty() }?.toSet() ?: emptySet()
-            val lastResetDate = preferences[PreferencesKeys.LAST_RESET_DATE] ?: ""
-            val lastStreakCheckDate = preferences[PreferencesKeys.LAST_STREAK_CHECK_DATE] ?: ""
-            val globalCurrentStreak = preferences[PreferencesKeys.GLOBAL_CURRENT_STREAK] ?: 0
-            val globalBestStreak = preferences[PreferencesKeys.GLOBAL_BEST_STREAK] ?: 0
-            val globalLastStreakUpdateTimestamp = preferences[PreferencesKeys.GLOBAL_LAST_STREAK_UPDATE_TIMESTAMP] ?: 0L
-            val autoBackupEnabled = preferences[PreferencesKeys.AUTO_BACKUP_ENABLED] ?: false
-            val backupDirectoryUri = preferences[PreferencesKeys.BACKUP_DIRECTORY_URI] ?: ""
-            val backupIntervalHours = preferences[PreferencesKeys.BACKUP_INTERVAL_HOURS] ?: 3
-            val lastBackupTimestamp = preferences[PreferencesKeys.LAST_BACKUP_TIMESTAMP] ?: 0L
-            val floatingTabBarEnabled = preferences[PreferencesKeys.FLOATING_TAB_BAR_ENABLED] ?: false
-            val expressiveColors = preferences[PreferencesKeys.EXPRESSIVE_COLORS] ?: false
-            val totalUsagePillEnabled = preferences[PreferencesKeys.TOTAL_USAGE_PILL_ENABLED] ?: false
-            val lastKnownDailyUsage = preferences[PreferencesKeys.LAST_KNOWN_DAILY_USAGE] ?: 0L
-            val lastKnownDailyUsageDate = preferences[PreferencesKeys.LAST_KNOWN_DAILY_USAGE_DATE] ?: ""
-            
-            val bedtimeEnabled = preferences[PreferencesKeys.BEDTIME_ENABLED] ?: false
-            val bedtimeStartTime = preferences[PreferencesKeys.BEDTIME_START_TIME] ?: "22:00"
-            val bedtimeEndTime = preferences[PreferencesKeys.BEDTIME_END_TIME] ?: "07:00"
-            val bedtimeDays = preferences[PreferencesKeys.BEDTIME_DAYS]?.split(",")?.filter { it.isNotEmpty() }?.map { it.toInt() }?.toSet() ?: setOf(1, 2, 3, 4, 5, 6, 7)
-            val bedtimeDndEnabled = preferences[PreferencesKeys.BEDTIME_DND_ENABLED] ?: false
-            val bedtimeWindDownEnabled = preferences[PreferencesKeys.BEDTIME_WIND_DOWN_ENABLED] ?: false
-            val bedtimeNotificationEnabled = preferences[PreferencesKeys.BEDTIME_NOTIFICATION_ENABLED] ?: true
-            val bedtimeWhitelistedPackages = preferences[PreferencesKeys.BEDTIME_WHITELISTED_PACKAGES]?.split(",")?.filter { it.isNotEmpty() }?.toSet() ?: emptySet()
-            val userName = preferences[PreferencesKeys.USER_NAME] ?: "User"
-            val earlyKickEnabled = preferences[PreferencesKeys.EARLY_KICK_ENABLED] ?: false
-            val interceptAudioFocusEnabled = preferences[PreferencesKeys.INTERCEPT_AUDIO_FOCUS_ENABLED] ?: true
-            val showDatabaseIndicator = preferences[PreferencesKeys.SHOW_DATABASE_INDICATOR] ?: false
-            val developerModeEnabled = preferences[PreferencesKeys.DEVELOPER_MODE_ENABLED] ?: false
-            val lastSyncTimestamp = preferences[PreferencesKeys.LAST_SYNC_TIMESTAMP] ?: (System.currentTimeMillis() - 24 * 60 * 60 * 1000L)
-            val preferSystemUsageHistory = preferences[PreferencesKeys.PREFER_SYSTEM_USAGE_HISTORY] ?: true
-            val onboardingStatsCompleted = preferences[PreferencesKeys.ONBOARDING_STATS_COMPLETED] ?: false
-            val hudHideFeatureLearned = preferences[PreferencesKeys.HUD_HIDE_FEATURE_LEARNED] ?: false
-            val shortsScreenTimeMs = preferences[PreferencesKeys.SHORTS_SCREEN_TIME_MS] ?: 0L
-            val customDelayEnabled = preferences[PreferencesKeys.CUSTOM_DELAY_ENABLED] ?: false
-            val delayPowerSave = preferences[PreferencesKeys.DELAY_POWER_SAVE] ?: 5000L
-            val delayOverlayShowing = preferences[PreferencesKeys.DELAY_OVERLAY_SHOWING] ?: 8000L
-            val delayGoalNear = preferences[PreferencesKeys.DELAY_GOAL_NEAR] ?: 600L
-            val delayGoalMid = preferences[PreferencesKeys.DELAY_GOAL_MID] ?: 1200L
-            val delayGoalFar = preferences[PreferencesKeys.DELAY_GOAL_FAR] ?: 1800L
-            val delayShieldVeryFar = preferences[PreferencesKeys.DELAY_SHIELD_VERY_FAR] ?: 5000L
-            val delayShieldFar = preferences[PreferencesKeys.DELAY_SHIELD_FAR] ?: 3000L
-            val delayShieldMid = preferences[PreferencesKeys.DELAY_SHIELD_MID] ?: 1500L
-            val delayShieldNear = preferences[PreferencesKeys.DELAY_SHIELD_NEAR] ?: 600L
-            val delayDefault = preferences[PreferencesKeys.DELAY_DEFAULT] ?: 1200L
-            val mindfulGatewayEnabled = preferences[PreferencesKeys.MINDFUL_GATEWAY_ENABLED] ?: false
-
             UserPreferences(
-                themeConfig = themeConfig,
-                fontOption = fontOption,
-                dynamicColor = dynamicColor,
-                accessibilityDisabled = accessibilityDisabled,
-                screenTimeTargetMinutes = screenTimeTarget,
-                emergencyRechargeDurationMinutes = emergencyRechargeDuration,
-                delayAppDurationSeconds = delayAppDuration,
-                sessionUsageOverlayEnabled = sessionUsageOverlayEnabled,
-                sessionUsageOverlaySize = sessionUsageOverlaySize,
-                sessionUsageOverlayOpacity = sessionUsageOverlayOpacity,
-                whitelistedPackages = whitelistedPackages,
-                lastResetDate = lastResetDate,
-                lastStreakCheckDate = lastStreakCheckDate,
-                globalCurrentStreak = globalCurrentStreak,
-                globalBestStreak = globalBestStreak,
-                globalLastStreakUpdateTimestamp = globalLastStreakUpdateTimestamp,
-                autoBackupEnabled = autoBackupEnabled,
-                backupDirectoryUri = backupDirectoryUri,
-                backupIntervalHours = backupIntervalHours,
-                lastBackupTimestamp = lastBackupTimestamp,
-                floatingTabBarEnabled = floatingTabBarEnabled,
-                expressiveColors = expressiveColors,
-                totalUsagePillEnabled = totalUsagePillEnabled,
-                lastKnownDailyUsage = lastKnownDailyUsage,
-                lastKnownDailyUsageDate = lastKnownDailyUsageDate,
-                bedtimeEnabled = bedtimeEnabled,
-                bedtimeStartTime = bedtimeStartTime,
-                bedtimeEndTime = bedtimeEndTime,
-                bedtimeDays = bedtimeDays,
-                bedtimeDndEnabled = bedtimeDndEnabled,
-                bedtimeWindDownEnabled = bedtimeWindDownEnabled,
-                bedtimeNotificationEnabled = bedtimeNotificationEnabled,
-                bedtimeWhitelistedPackages = bedtimeWhitelistedPackages,
-                userName = userName,
-                earlyKickEnabled = earlyKickEnabled,
-                interceptAudioFocusEnabled = interceptAudioFocusEnabled,
-                showDatabaseIndicator = showDatabaseIndicator,
-                developerModeEnabled = developerModeEnabled,
-                lastSyncTimestamp = lastSyncTimestamp,
-                preferSystemUsageHistory = preferSystemUsageHistory,
-                onboardingStatsCompleted = onboardingStatsCompleted,
-                hudHideFeatureLearned = hudHideFeatureLearned,
-                shortsScreenTimeMs = shortsScreenTimeMs,
-                customDelayEnabled = customDelayEnabled,
-                delayPowerSave = delayPowerSave,
-                delayOverlayShowing = delayOverlayShowing,
-                delayGoalNear = delayGoalNear,
-                delayGoalMid = delayGoalMid,
-                delayGoalFar = delayGoalFar,
-                delayShieldVeryFar = delayShieldVeryFar,
-                delayShieldFar = delayShieldFar,
-                delayShieldMid = delayShieldMid,
-                delayShieldNear = delayShieldNear,
-                delayDefault = delayDefault,
-                mindfulGatewayEnabled = mindfulGatewayEnabled
+                themeConfig = ThemeConfig.valueOf(preferences[PreferencesKeys.THEME_CONFIG] ?: ThemeConfig.FOLLOW_SYSTEM.name),
+                fontOption = FontOption.valueOf(preferences[PreferencesKeys.FONT_OPTION] ?: FontOption.NUNITO.name),
+                dynamicColor = preferences[PreferencesKeys.DYNAMIC_COLOR] ?: true,
+                accessibilityDisabled = preferences[PreferencesKeys.ACCESSIBILITY_DISABLED] ?: false,
+                screenTimeTargetMinutes = preferences[PreferencesKeys.SCREEN_TIME_TARGET] ?: 0,
+                emergencyRechargeDurationMinutes = preferences[PreferencesKeys.EMERGENCY_RECHARGE_DURATION_MINUTES] ?: 60,
+                delayAppDurationSeconds = preferences[PreferencesKeys.DELAY_APP_DURATION_SECONDS] ?: 30,
+                sessionUsageOverlayEnabled = preferences[PreferencesKeys.SESSION_USAGE_OVERLAY_ENABLED] ?: false,
+                sessionUsageOverlaySize = preferences[PreferencesKeys.SESSION_USAGE_OVERLAY_SIZE] ?: 100,
+                sessionUsageOverlayOpacity = preferences[PreferencesKeys.SESSION_USAGE_OVERLAY_OPACITY] ?: 90,
+                whitelistedPackages = preferences[PreferencesKeys.WHITELISTED_PACKAGES]?.split(",")?.filter { it.isNotEmpty() }?.toSet() ?: emptySet(),
+                lastResetDate = preferences[PreferencesKeys.LAST_RESET_DATE] ?: "",
+                lastStreakCheckDate = preferences[PreferencesKeys.LAST_STREAK_CHECK_DATE] ?: "",
+                globalCurrentStreak = preferences[PreferencesKeys.GLOBAL_CURRENT_STREAK] ?: 0,
+                globalBestStreak = preferences[PreferencesKeys.GLOBAL_BEST_STREAK] ?: 0,
+                globalLastStreakUpdateTimestamp = preferences[PreferencesKeys.GLOBAL_LAST_STREAK_UPDATE_TIMESTAMP] ?: 0L,
+                autoBackupEnabled = preferences[PreferencesKeys.AUTO_BACKUP_ENABLED] ?: false,
+                backupDirectoryUri = preferences[PreferencesKeys.BACKUP_DIRECTORY_URI] ?: "",
+                backupIntervalHours = preferences[PreferencesKeys.BACKUP_INTERVAL_HOURS] ?: 3,
+                lastBackupTimestamp = preferences[PreferencesKeys.LAST_BACKUP_TIMESTAMP] ?: 0L,
+                floatingTabBarEnabled = preferences[PreferencesKeys.FLOATING_TAB_BAR_ENABLED] ?: false,
+                expressiveColors = preferences[PreferencesKeys.EXPRESSIVE_COLORS] ?: false,
+                totalUsagePillEnabled = preferences[PreferencesKeys.TOTAL_USAGE_PILL_ENABLED] ?: false,
+                lastKnownDailyUsage = preferences[PreferencesKeys.LAST_KNOWN_DAILY_USAGE] ?: 0L,
+                lastKnownDailyUsageDate = preferences[PreferencesKeys.LAST_KNOWN_DAILY_USAGE_DATE] ?: "",
+                bedtimeEnabled = preferences[PreferencesKeys.BEDTIME_ENABLED] ?: false,
+                bedtimeStartTime = preferences[PreferencesKeys.BEDTIME_START_TIME] ?: "22:00",
+                bedtimeEndTime = preferences[PreferencesKeys.BEDTIME_END_TIME] ?: "07:00",
+                bedtimeDays = preferences[PreferencesKeys.BEDTIME_DAYS]?.split(",")?.filter { it.isNotEmpty() }?.map { it.toInt() }?.toSet() ?: setOf(1, 2, 3, 4, 5, 6, 7),
+                bedtimeDndEnabled = preferences[PreferencesKeys.BEDTIME_DND_ENABLED] ?: false,
+                bedtimeWindDownEnabled = preferences[PreferencesKeys.BEDTIME_WIND_DOWN_ENABLED] ?: false,
+                bedtimeNotificationEnabled = preferences[PreferencesKeys.BEDTIME_NOTIFICATION_ENABLED] ?: true,
+                bedtimeWhitelistedPackages = preferences[PreferencesKeys.BEDTIME_WHITELISTED_PACKAGES]?.split(",")?.filter { it.isNotEmpty() }?.toSet() ?: emptySet(),
+                userName = preferences[PreferencesKeys.USER_NAME] ?: "User",
+                earlyKickEnabled = preferences[PreferencesKeys.EARLY_KICK_ENABLED] ?: false,
+                interceptAudioFocusEnabled = preferences[PreferencesKeys.INTERCEPT_AUDIO_FOCUS_ENABLED] ?: true,
+                showDatabaseIndicator = preferences[PreferencesKeys.SHOW_DATABASE_INDICATOR] ?: false,
+                developerModeEnabled = preferences[PreferencesKeys.DEVELOPER_MODE_ENABLED] ?: false,
+                lastSyncTimestamp = preferences[PreferencesKeys.LAST_SYNC_TIMESTAMP] ?: 0L,
+                preferSystemUsageHistory = preferences[PreferencesKeys.PREFER_SYSTEM_USAGE_HISTORY] ?: true,
+                onboardingStatsCompleted = preferences[PreferencesKeys.ONBOARDING_STATS_COMPLETED] ?: false,
+                hudHideFeatureLearned = preferences[PreferencesKeys.HUD_HIDE_FEATURE_LEARNED] ?: false,
+                shortsScreenTimeMs = preferences[PreferencesKeys.SHORTS_SCREEN_TIME_MS] ?: 0L,
+                customDelayEnabled = preferences[PreferencesKeys.CUSTOM_DELAY_ENABLED] ?: false,
+                delayPowerSave = preferences[PreferencesKeys.DELAY_POWER_SAVE] ?: 5000L,
+                delayOverlayShowing = preferences[PreferencesKeys.DELAY_OVERLAY_SHOWING] ?: 8000L,
+                delayGoalNear = preferences[PreferencesKeys.DELAY_GOAL_NEAR] ?: 600L,
+                delayGoalMid = preferences[PreferencesKeys.DELAY_GOAL_MID] ?: 1200L,
+                delayGoalFar = preferences[PreferencesKeys.DELAY_GOAL_FAR] ?: 1800L,
+                delayShieldVeryFar = preferences[PreferencesKeys.DELAY_SHIELD_VERY_FAR] ?: 5000L,
+                delayShieldFar = preferences[PreferencesKeys.DELAY_SHIELD_FAR] ?: 3000L,
+                delayShieldMid = preferences[PreferencesKeys.DELAY_SHIELD_MID] ?: 1500L,
+                delayShieldNear = preferences[PreferencesKeys.DELAY_SHIELD_NEAR] ?: 600L,
+                delayDefault = preferences[PreferencesKeys.DELAY_DEFAULT] ?: 1200L,
+                mindfulGatewayEnabled = preferences[PreferencesKeys.MINDFUL_GATEWAY_ENABLED] ?: false,
+                gsFlexSettings = GSFlexSettings(
+                    preset = GSFlexPreset.valueOf(preferences[PreferencesKeys.GS_FLEX_PRESET] ?: GSFlexPreset.ZENITH.name),
+                    display = FontAxes(
+                        weight = preferences[PreferencesKeys.GS_D_WGHT] ?: 400f,
+                        width = preferences[PreferencesKeys.GS_D_WDTH] ?: 100f,
+                        opsz = preferences[PreferencesKeys.GS_D_OPSZ] ?: 72f,
+                        grade = preferences[PreferencesKeys.GS_D_GRAD] ?: 0f,
+                        slant = preferences[PreferencesKeys.GS_D_SLNT] ?: 0f,
+                        roundness = preferences[PreferencesKeys.GS_D_ROND] ?: 0f
+                    ),
+                    headline = FontAxes(
+                        weight = preferences[PreferencesKeys.GS_H_WGHT] ?: 400f,
+                        width = preferences[PreferencesKeys.GS_H_WDTH] ?: 100f,
+                        opsz = preferences[PreferencesKeys.GS_H_OPSZ] ?: 32f,
+                        grade = preferences[PreferencesKeys.GS_H_GRAD] ?: 0f,
+                        slant = preferences[PreferencesKeys.GS_H_SLNT] ?: 0f,
+                        roundness = preferences[PreferencesKeys.GS_H_ROND] ?: 0f
+                    ),
+                    body = FontAxes(
+                        weight = preferences[PreferencesKeys.GS_B_WGHT] ?: 400f,
+                        width = preferences[PreferencesKeys.GS_B_WDTH] ?: 100f,
+                        opsz = preferences[PreferencesKeys.GS_B_OPSZ] ?: 16f,
+                        grade = preferences[PreferencesKeys.GS_B_GRAD] ?: 0f,
+                        slant = preferences[PreferencesKeys.GS_B_SLNT] ?: 0f,
+                        roundness = preferences[PreferencesKeys.GS_B_ROND] ?: 0f
+                    )
+                )
             )
         }
 
 
     suspend fun setUserName(name: String) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.USER_NAME] = name
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.USER_NAME] = name }
     }
 
     suspend fun setThemeConfig(themeConfig: ThemeConfig) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.THEME_CONFIG] = themeConfig.name
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.THEME_CONFIG] = themeConfig.name }
     }
 
     suspend fun setFontOption(fontOption: FontOption) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.FONT_OPTION] = fontOption.name
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.FONT_OPTION] = fontOption.name }
     }
 
     suspend fun setDynamicColor(enabled: Boolean) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.DYNAMIC_COLOR] = enabled
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.DYNAMIC_COLOR] = enabled }
     }
 
     suspend fun setAccessibilityDisabled(disabled: Boolean) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.ACCESSIBILITY_DISABLED] = disabled
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.ACCESSIBILITY_DISABLED] = disabled }
     }
 
     suspend fun setScreenTimeTarget(minutes: Int) {
         context.dataStore.edit { preferences ->
             val currentTarget = preferences[PreferencesKeys.SCREEN_TIME_TARGET] ?: 0
-            if (minutes > currentTarget && currentTarget > 0) {
-                preferences[PreferencesKeys.GLOBAL_CURRENT_STREAK] = 0
-            }
+            if (minutes > currentTarget && currentTarget > 0) preferences[PreferencesKeys.GLOBAL_CURRENT_STREAK] = 0
             preferences[PreferencesKeys.SCREEN_TIME_TARGET] = minutes
         }
     }
 
     suspend fun setEmergencyRechargeDuration(minutes: Int) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.EMERGENCY_RECHARGE_DURATION_MINUTES] = minutes
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.EMERGENCY_RECHARGE_DURATION_MINUTES] = minutes }
     }
 
     suspend fun setDelayAppDuration(seconds: Int) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.DELAY_APP_DURATION_SECONDS] = seconds
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.DELAY_APP_DURATION_SECONDS] = seconds }
     }
 
     suspend fun setSessionUsageOverlayEnabled(enabled: Boolean) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.SESSION_USAGE_OVERLAY_ENABLED] = enabled
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.SESSION_USAGE_OVERLAY_ENABLED] = enabled }
     }
 
     suspend fun setSessionUsageOverlaySize(size: Int) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.SESSION_USAGE_OVERLAY_SIZE] = size
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.SESSION_USAGE_OVERLAY_SIZE] = size }
     }
 
     suspend fun setSessionUsageOverlayOpacity(opacity: Int) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.SESSION_USAGE_OVERLAY_OPACITY] = opacity
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.SESSION_USAGE_OVERLAY_OPACITY] = opacity }
     }
 
     suspend fun setWhitelistedPackages(packages: Set<String>) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.WHITELISTED_PACKAGES] = packages.joinToString(",")
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.WHITELISTED_PACKAGES] = packages.joinToString(",") }
     }
 
     suspend fun setLastResetDate(date: String) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.LAST_RESET_DATE] = date
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.LAST_RESET_DATE] = date }
     }
 
     suspend fun setLastStreakCheckDate(date: String) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.LAST_STREAK_CHECK_DATE] = date
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.LAST_STREAK_CHECK_DATE] = date }
     }
 
     suspend fun updateGlobalStreak(current: Int, best: Int, timestamp: Long) {
@@ -330,317 +290,229 @@ class UserPreferencesRepository(private val context: Context) {
         val now = System.currentTimeMillis()
         val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
-        // 1. Calculate Today's usage
         val launcherApps = try {
-            context.packageManager.queryIntentActivities(
-                Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0
-            ).map { it.activityInfo.packageName }.toSet()
+            context.packageManager.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0).map { it.activityInfo.packageName }.toSet()
         } catch (_: Exception) { emptySet<String>() }
 
         val launcherIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
         val launcherPackage = try {
-            context.packageManager.resolveActivity(launcherIntent, PackageManager.MATCH_DEFAULT_ONLY)
-                ?.activityInfo?.packageName
+            context.packageManager.resolveActivity(launcherIntent, PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName
         } catch (_: Exception) { null }
 
         val excludePackages = setOfNotNull(context.packageName, launcherPackage)
 
-        val calendar = Calendar.getInstance()
-        calendar.set(Calendar.HOUR_OF_DAY, 0)
-        calendar.set(Calendar.MINUTE, 0)
-        calendar.set(Calendar.SECOND, 0)
-        calendar.set(Calendar.MILLISECOND, 0)
+        val calendar = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }
         val todayStart = calendar.timeInMillis
 
         val stats = usageStatsManager.queryAndAggregateUsageStats(todayStart, now)
         var totalToday = 0L
         stats.forEach { (pkg, stat) ->
-            if (pkg !in excludePackages && pkg in launcherApps) {
-                totalToday += stat.totalTimeVisible.coerceAtLeast(stat.totalTimeInForeground)
-            }
+            if (pkg !in excludePackages && pkg in launcherApps) totalToday += stat.totalTimeVisible.coerceAtLeast(stat.totalTimeInForeground)
         }
 
         val globalHistory = dbUsage.filter { it.packageName == "TOTAL" }
-
-        // 2. Calculate Live Streak
         var liveStreak = 0
         if (totalToday <= targetMillis) {
             liveStreak = 1
             val c = Calendar.getInstance()
             for (i in 1..60) {
-                c.timeInMillis = now
-                c.add(Calendar.DAY_OF_YEAR, -i)
+                c.timeInMillis = now; c.add(Calendar.DAY_OF_YEAR, -i)
                 val dStr = dateFormat.format(c.time)
                 val usage = globalHistory.find { it.date == dStr }?.usageTimeMillis
-
-                if (usage != null && usage <= targetMillis) {
-                    liveStreak++
-                } else if (usage != null) {
-                    break
-                } else {
-                    break
-                }
+                if (usage != null && usage <= targetMillis) liveStreak++ else break
             }
         }
 
-        // 3. Calculate Best Streak
         var bestStreak = prefs.globalBestStreak
         var currentTempStreak = 0
         for (i in 60 downTo 0) {
-            val checkCal = Calendar.getInstance().apply {
-                timeInMillis = now
-                add(Calendar.DAY_OF_YEAR, -i)
-            }
+            val checkCal = Calendar.getInstance().apply { timeInMillis = now; add(Calendar.DAY_OF_YEAR, -i) }
             val dStr = dateFormat.format(checkCal.time)
             val usage = if (i == 0) totalToday else globalHistory.find { it.date == dStr }?.usageTimeMillis
-
-            if (usage != null && usage <= targetMillis) {
-                currentTempStreak++
-            } else {
-                bestStreak = maxOf(bestStreak, currentTempStreak)
-                currentTempStreak = 0
-            }
+            if (usage != null && usage <= targetMillis) currentTempStreak++ else { bestStreak = maxOf(bestStreak, currentTempStreak); currentTempStreak = 0 }
         }
         bestStreak = maxOf(bestStreak, currentTempStreak)
-
         updateGlobalStreak(liveStreak, bestStreak, now)
         return Pair(liveStreak, bestStreak)
     }
 
     suspend fun setAutoBackupEnabled(enabled: Boolean) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.AUTO_BACKUP_ENABLED] = enabled
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.AUTO_BACKUP_ENABLED] = enabled }
     }
 
     suspend fun setBackupDirectoryUri(uri: String) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.BACKUP_DIRECTORY_URI] = uri
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.BACKUP_DIRECTORY_URI] = uri }
     }
 
     suspend fun setBackupIntervalHours(hours: Int) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.BACKUP_INTERVAL_HOURS] = hours
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.BACKUP_INTERVAL_HOURS] = hours }
     }
 
     suspend fun setLastBackupTimestamp(timestamp: Long) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.LAST_BACKUP_TIMESTAMP] = timestamp
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.LAST_BACKUP_TIMESTAMP] = timestamp }
     }
 
     suspend fun setFloatingTabBarEnabled(enabled: Boolean) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.FLOATING_TAB_BAR_ENABLED] = enabled
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.FLOATING_TAB_BAR_ENABLED] = enabled }
     }
 
     suspend fun setExpressiveColors(enabled: Boolean) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.EXPRESSIVE_COLORS] = enabled
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.EXPRESSIVE_COLORS] = enabled }
     }
 
     suspend fun setTotalUsagePillEnabled(enabled: Boolean) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.TOTAL_USAGE_PILL_ENABLED] = enabled
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.TOTAL_USAGE_PILL_ENABLED] = enabled }
     }
 
     suspend fun setLastKnownDailyUsage(usage: Long, date: String) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.LAST_KNOWN_DAILY_USAGE] = usage
-            preferences[PreferencesKeys.LAST_KNOWN_DAILY_USAGE_DATE] = date
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.LAST_KNOWN_DAILY_USAGE] = usage; preferences[PreferencesKeys.LAST_KNOWN_DAILY_USAGE_DATE] = date }
     }
 
     suspend fun setBedtimeEnabled(enabled: Boolean) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.BEDTIME_ENABLED] = enabled
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.BEDTIME_ENABLED] = enabled }
     }
 
     suspend fun setBedtimeStartTime(time: String) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.BEDTIME_START_TIME] = time
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.BEDTIME_START_TIME] = time }
     }
 
     suspend fun setBedtimeEndTime(time: String) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.BEDTIME_END_TIME] = time
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.BEDTIME_END_TIME] = time }
     }
 
     suspend fun setBedtimeDays(days: Set<Int>) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.BEDTIME_DAYS] = days.joinToString(",")
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.BEDTIME_DAYS] = days.joinToString(",") }
     }
 
     suspend fun setBedtimeDndEnabled(enabled: Boolean) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.BEDTIME_DND_ENABLED] = enabled
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.BEDTIME_DND_ENABLED] = enabled }
     }
 
     suspend fun setBedtimeWindDownEnabled(enabled: Boolean) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.BEDTIME_WIND_DOWN_ENABLED] = enabled
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.BEDTIME_WIND_DOWN_ENABLED] = enabled }
     }
 
     suspend fun setBedtimeNotificationEnabled(enabled: Boolean) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.BEDTIME_NOTIFICATION_ENABLED] = enabled
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.BEDTIME_NOTIFICATION_ENABLED] = enabled }
     }
 
     suspend fun setBedtimeWhitelistedPackages(packages: Set<String>) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.BEDTIME_WHITELISTED_PACKAGES] = packages.joinToString(",")
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.BEDTIME_WHITELISTED_PACKAGES] = packages.joinToString(",") }
     }
 
     suspend fun setEarlyKickEnabled(enabled: Boolean) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.EARLY_KICK_ENABLED] = enabled
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.EARLY_KICK_ENABLED] = enabled }
     }
 
     suspend fun setInterceptAudioFocusEnabled(enabled: Boolean) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.INTERCEPT_AUDIO_FOCUS_ENABLED] = enabled
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.INTERCEPT_AUDIO_FOCUS_ENABLED] = enabled }
     }
 
     suspend fun setShowDatabaseIndicator(enabled: Boolean) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.SHOW_DATABASE_INDICATOR] = enabled
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.SHOW_DATABASE_INDICATOR] = enabled }
     }
 
     suspend fun setDeveloperModeEnabled(enabled: Boolean) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.DEVELOPER_MODE_ENABLED] = enabled
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.DEVELOPER_MODE_ENABLED] = enabled }
     }
 
     suspend fun setLastSyncTimestamp(timestamp: Long) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.LAST_SYNC_TIMESTAMP] = timestamp
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.LAST_SYNC_TIMESTAMP] = timestamp }
     }
 
     suspend fun setPreferSystemUsageHistory(enabled: Boolean) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.PREFER_SYSTEM_USAGE_HISTORY] = enabled
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.PREFER_SYSTEM_USAGE_HISTORY] = enabled }
     }
 
     suspend fun setOnboardingStatsCompleted(completed: Boolean) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.ONBOARDING_STATS_COMPLETED] = completed
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.ONBOARDING_STATS_COMPLETED] = completed }
     }
 
     suspend fun setHudHideFeatureLearned(learned: Boolean) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.HUD_HIDE_FEATURE_LEARNED] = learned
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.HUD_HIDE_FEATURE_LEARNED] = learned }
     }
 
     suspend fun setShortsScreenTimeMs(ms: Long) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.SHORTS_SCREEN_TIME_MS] = ms
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.SHORTS_SCREEN_TIME_MS] = ms }
     }
 
     suspend fun setCustomDelayEnabled(enabled: Boolean) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.CUSTOM_DELAY_ENABLED] = enabled
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.CUSTOM_DELAY_ENABLED] = enabled }
     }
 
     suspend fun setDelayPowerSave(delay: Long) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.DELAY_POWER_SAVE] = delay
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.DELAY_POWER_SAVE] = delay }
     }
 
     suspend fun setDelayOverlayShowing(delay: Long) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.DELAY_OVERLAY_SHOWING] = delay
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.DELAY_OVERLAY_SHOWING] = delay }
     }
 
     suspend fun setDelayGoalNear(delay: Long) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.DELAY_GOAL_NEAR] = delay
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.DELAY_GOAL_NEAR] = delay }
     }
 
     suspend fun setDelayGoalMid(delay: Long) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.DELAY_GOAL_MID] = delay
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.DELAY_GOAL_MID] = delay }
     }
 
     suspend fun setDelayGoalFar(delay: Long) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.DELAY_GOAL_FAR] = delay
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.DELAY_GOAL_FAR] = delay }
     }
 
     suspend fun setDelayShieldVeryFar(delay: Long) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.DELAY_SHIELD_VERY_FAR] = delay
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.DELAY_SHIELD_VERY_FAR] = delay }
     }
 
     suspend fun setDelayShieldFar(delay: Long) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.DELAY_SHIELD_FAR] = delay
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.DELAY_SHIELD_FAR] = delay }
     }
 
     suspend fun setDelayShieldMid(delay: Long) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.DELAY_SHIELD_MID] = delay
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.DELAY_SHIELD_MID] = delay }
     }
 
     suspend fun setDelayShieldNear(delay: Long) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.DELAY_SHIELD_NEAR] = delay
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.DELAY_SHIELD_NEAR] = delay }
     }
 
     suspend fun setDelayDefault(delay: Long) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.DELAY_DEFAULT] = delay
-        }
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.DELAY_DEFAULT] = delay }
     }
 
     suspend fun setMindfulGatewayEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.MINDFUL_GATEWAY_ENABLED] = enabled }
+    }
+
+    suspend fun setGSFlexSettings(settings: GSFlexSettings) {
         context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.MINDFUL_GATEWAY_ENABLED] = enabled
+            preferences[PreferencesKeys.GS_FLEX_PRESET] = settings.preset.name
+            preferences[PreferencesKeys.GS_D_WGHT] = settings.display.weight
+            preferences[PreferencesKeys.GS_D_WDTH] = settings.display.width
+            preferences[PreferencesKeys.GS_D_OPSZ] = settings.display.opsz
+            preferences[PreferencesKeys.GS_D_GRAD] = settings.display.grade
+            preferences[PreferencesKeys.GS_D_SLNT] = settings.display.slant
+            preferences[PreferencesKeys.GS_D_ROND] = settings.display.roundness
+            preferences[PreferencesKeys.GS_H_WGHT] = settings.headline.weight
+            preferences[PreferencesKeys.GS_H_WDTH] = settings.headline.width
+            preferences[PreferencesKeys.GS_H_OPSZ] = settings.headline.opsz
+            preferences[PreferencesKeys.GS_H_GRAD] = settings.headline.grade
+            preferences[PreferencesKeys.GS_H_SLNT] = settings.headline.slant
+            preferences[PreferencesKeys.GS_H_ROND] = settings.headline.roundness
+            preferences[PreferencesKeys.GS_B_WGHT] = settings.body.weight
+            preferences[PreferencesKeys.GS_B_WDTH] = settings.body.width
+            preferences[PreferencesKeys.GS_B_OPSZ] = settings.body.opsz
+            preferences[PreferencesKeys.GS_B_GRAD] = settings.body.grade
+            preferences[PreferencesKeys.GS_B_SLNT] = settings.body.slant
+            preferences[PreferencesKeys.GS_B_ROND] = settings.body.roundness
         }
     }
 
     suspend fun resetCustomDelays() {
         context.dataStore.edit { preferences ->
-            preferences.remove(PreferencesKeys.DELAY_POWER_SAVE)
-            preferences.remove(PreferencesKeys.DELAY_OVERLAY_SHOWING)
-            preferences.remove(PreferencesKeys.DELAY_GOAL_NEAR)
-            preferences.remove(PreferencesKeys.DELAY_GOAL_MID)
-            preferences.remove(PreferencesKeys.DELAY_GOAL_FAR)
-            preferences.remove(PreferencesKeys.DELAY_SHIELD_VERY_FAR)
-            preferences.remove(PreferencesKeys.DELAY_SHIELD_FAR)
-            preferences.remove(PreferencesKeys.DELAY_SHIELD_MID)
-            preferences.remove(PreferencesKeys.DELAY_SHIELD_NEAR)
+            preferences.remove(PreferencesKeys.DELAY_POWER_SAVE); preferences.remove(PreferencesKeys.DELAY_OVERLAY_SHOWING); preferences.remove(PreferencesKeys.DELAY_GOAL_NEAR)
+            preferences.remove(PreferencesKeys.DELAY_GOAL_MID); preferences.remove(PreferencesKeys.DELAY_GOAL_FAR); preferences.remove(PreferencesKeys.DELAY_SHIELD_VERY_FAR)
+            preferences.remove(PreferencesKeys.DELAY_SHIELD_FAR); preferences.remove(PreferencesKeys.DELAY_SHIELD_MID); preferences.remove(PreferencesKeys.DELAY_SHIELD_NEAR)
             preferences.remove(PreferencesKeys.DELAY_DEFAULT)
         }
     }
@@ -701,5 +573,6 @@ data class UserPreferences(
     val delayShieldMid: Long = 1500L,
     val delayShieldNear: Long = 600L,
     val delayDefault: Long = 1200L,
-    val mindfulGatewayEnabled: Boolean = false
+    val mindfulGatewayEnabled: Boolean = false,
+    val gsFlexSettings: GSFlexSettings = GSFlexSettings()
 )

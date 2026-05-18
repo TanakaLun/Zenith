@@ -64,6 +64,7 @@ fun ZenithTheme(
     dynamicColor: Boolean = true,
     fontOption: FontOption = FontOption.SYSTEM,
     expressiveColors: Boolean = false,
+    gsFlexSettings: GSFlexSettings = GSFlexSettings(),
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
@@ -126,7 +127,7 @@ fun ZenithTheme(
 
     val typography = when (fontOption) {
         FontOption.SYSTEM -> SystemTypography
-        FontOption.GOOGLE_SANS_FLEX -> GoogleSansFlexTypography
+        FontOption.GOOGLE_SANS_FLEX -> VariableFontFactory.createTypography(gsFlexSettings)
         FontOption.NUNITO -> NunitoTypography
     }
 
