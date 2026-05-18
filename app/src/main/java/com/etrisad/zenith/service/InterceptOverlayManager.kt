@@ -79,7 +79,14 @@ class InterceptOverlayManager(
         overlayUsageState?.value = Pair(totalUsageToday, totalGlobalUsageToday)
         overlayView?.setContent {
             val userPrefs by preferencesRepository.userPreferencesFlow.collectAsState(initial = null)
+            val darkTheme = when (userPrefs?.themeConfig) {
+                com.etrisad.zenith.data.preferences.ThemeConfig.LIGHT -> false
+                com.etrisad.zenith.data.preferences.ThemeConfig.DARK -> true
+                else -> androidx.compose.foundation.isSystemInDarkTheme()
+            }
+
             ZenithTheme(
+                darkTheme = darkTheme,
                 fontOption = userPrefs?.fontOption ?: com.etrisad.zenith.data.preferences.FontOption.SYSTEM,
                 dynamicColor = userPrefs?.dynamicColor ?: true,
                 expressiveColors = userPrefs?.expressiveColors ?: false,
@@ -163,7 +170,20 @@ class InterceptOverlayManager(
             setViewTreeSavedStateRegistryOwner(lOwner)
             
             setContent {
-                ZenithTheme {
+                val userPrefs by preferencesRepository.userPreferencesFlow.collectAsState(initial = null)
+                val darkTheme = when (userPrefs?.themeConfig) {
+                    com.etrisad.zenith.data.preferences.ThemeConfig.LIGHT -> false
+                    com.etrisad.zenith.data.preferences.ThemeConfig.DARK -> true
+                    else -> androidx.compose.foundation.isSystemInDarkTheme()
+                }
+
+                ZenithTheme(
+                    darkTheme = darkTheme,
+                    fontOption = userPrefs?.fontOption ?: com.etrisad.zenith.data.preferences.FontOption.SYSTEM,
+                    dynamicColor = userPrefs?.dynamicColor ?: true,
+                    expressiveColors = userPrefs?.expressiveColors ?: false,
+                    gsFlexSettings = userPrefs?.gsFlexSettings ?: GSFlexSettings()
+                ) {
                     val (usage, globalUsage) = usageState.value
                     Box(modifier = Modifier.fillMaxSize()) {
                         InterceptOverlayContent(
@@ -234,7 +254,20 @@ class InterceptOverlayManager(
             setViewTreeSavedStateRegistryOwner(lOwner)
 
             setContent {
-                ZenithTheme {
+                val userPrefs by preferencesRepository.userPreferencesFlow.collectAsState(initial = null)
+                val darkTheme = when (userPrefs?.themeConfig) {
+                    com.etrisad.zenith.data.preferences.ThemeConfig.LIGHT -> false
+                    com.etrisad.zenith.data.preferences.ThemeConfig.DARK -> true
+                    else -> androidx.compose.foundation.isSystemInDarkTheme()
+                }
+
+                ZenithTheme(
+                    darkTheme = darkTheme,
+                    fontOption = userPrefs?.fontOption ?: com.etrisad.zenith.data.preferences.FontOption.SYSTEM,
+                    dynamicColor = userPrefs?.dynamicColor ?: true,
+                    expressiveColors = userPrefs?.expressiveColors ?: false,
+                    gsFlexSettings = userPrefs?.gsFlexSettings ?: GSFlexSettings()
+                ) {
                     val (_, globalUsage) = usageState.value
                     Box(modifier = Modifier.fillMaxSize()) {
                         ScheduleOverlayContent(
@@ -285,7 +318,20 @@ class InterceptOverlayManager(
 
         val composeView = ComposeView(context).apply {
             setContent {
-                ZenithTheme {
+                val userPrefs by preferencesRepository.userPreferencesFlow.collectAsState(initial = null)
+                val darkTheme = when (userPrefs?.themeConfig) {
+                    com.etrisad.zenith.data.preferences.ThemeConfig.LIGHT -> false
+                    com.etrisad.zenith.data.preferences.ThemeConfig.DARK -> true
+                    else -> androidx.compose.foundation.isSystemInDarkTheme()
+                }
+
+                ZenithTheme(
+                    darkTheme = darkTheme,
+                    fontOption = userPrefs?.fontOption ?: com.etrisad.zenith.data.preferences.FontOption.SYSTEM,
+                    dynamicColor = userPrefs?.dynamicColor ?: true,
+                    expressiveColors = userPrefs?.expressiveColors ?: false,
+                    gsFlexSettings = userPrefs?.gsFlexSettings ?: GSFlexSettings()
+                ) {
                     Box(modifier = Modifier.fillMaxSize()) {
                         BedtimeOverlayContent(
                             packageName = packageName,
@@ -317,7 +363,20 @@ class InterceptOverlayManager(
         }
         if (isShowing && currentPackage == packageName && overlayView != null) {
             overlayView?.setContent {
-                ZenithTheme {
+                val userPrefs by preferencesRepository.userPreferencesFlow.collectAsState(initial = null)
+                val darkTheme = when (userPrefs?.themeConfig) {
+                    com.etrisad.zenith.data.preferences.ThemeConfig.LIGHT -> false
+                    com.etrisad.zenith.data.preferences.ThemeConfig.DARK -> true
+                    else -> androidx.compose.foundation.isSystemInDarkTheme()
+                }
+
+                ZenithTheme(
+                    darkTheme = darkTheme,
+                    fontOption = userPrefs?.fontOption ?: com.etrisad.zenith.data.preferences.FontOption.SYSTEM,
+                    dynamicColor = userPrefs?.dynamicColor ?: true,
+                    expressiveColors = userPrefs?.expressiveColors ?: false,
+                    gsFlexSettings = userPrefs?.gsFlexSettings ?: GSFlexSettings()
+                ) {
                     Box(modifier = Modifier.fillMaxSize()) {
                         WindDownOverlayContent(
                             packageName = packageName,
@@ -352,7 +411,20 @@ class InterceptOverlayManager(
 
         val composeView = ComposeView(context).apply {
             setContent {
-                ZenithTheme {
+                val userPrefs by preferencesRepository.userPreferencesFlow.collectAsState(initial = null)
+                val darkTheme = when (userPrefs?.themeConfig) {
+                    com.etrisad.zenith.data.preferences.ThemeConfig.LIGHT -> false
+                    com.etrisad.zenith.data.preferences.ThemeConfig.DARK -> true
+                    else -> androidx.compose.foundation.isSystemInDarkTheme()
+                }
+
+                ZenithTheme(
+                    darkTheme = darkTheme,
+                    fontOption = userPrefs?.fontOption ?: com.etrisad.zenith.data.preferences.FontOption.SYSTEM,
+                    dynamicColor = userPrefs?.dynamicColor ?: true,
+                    expressiveColors = userPrefs?.expressiveColors ?: false,
+                    gsFlexSettings = userPrefs?.gsFlexSettings ?: GSFlexSettings()
+                ) {
                     Box(modifier = Modifier.fillMaxSize()) {
                         WindDownOverlayContent(
                             packageName = packageName,
