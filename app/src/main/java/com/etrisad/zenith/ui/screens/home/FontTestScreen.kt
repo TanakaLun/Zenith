@@ -6,7 +6,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.*
@@ -28,7 +27,8 @@ import com.etrisad.zenith.ui.screens.settings.VariableSlider
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FontTestScreen(
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    innerPadding: PaddingValues
 ) {
     var settings by remember { mutableStateOf(GSFlexSettings(preset = GSFlexPreset.ZENITH)) }
     var customText by remember { mutableStateOf("Zenith") }
@@ -36,110 +36,101 @@ fun FontTestScreen(
 
     val dynamicTypography = VariableFontFactory.createTypography(settings)
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("M3 Expressive Editor") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
-                    }
-                }
-            )
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(top = innerPadding.calculateTopPadding())
+    ) {
+        PrimaryTabRow(selectedTabIndex = selectedTab) {
+            Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Custom") })
+            Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Scale") })
+            Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text("Presets") })
         }
-    ) { padding ->
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
+                .padding(horizontal = 24.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            PrimaryTabRow(selectedTabIndex = selectedTab) {
-                Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Custom") })
-                Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Scale") })
-                Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text("Presets") })
-            }
+            Spacer(modifier = Modifier.height(16.dp))
 
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 24.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Spacer(modifier = Modifier.height(16.dp))
+            when (selectedTab) {
+                0 -> {
+                    OutlinedTextField(
+                        value = customText,
+                        onValueChange = { customText = it },
+                        label = { Text("Interactive Text") },
+                        modifier = Modifier.fillMaxWidth(),
+                        leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
+                        shape = MaterialTheme.shapes.large
+                    )
 
-                when (selectedTab) {
-                    0 -> {
-                        OutlinedTextField(
-                            value = customText,
-                            onValueChange = { customText = it },
-                            label = { Text("Interactive Text") },
-                            modifier = Modifier.fillMaxWidth(),
-                            leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
-                            shape = MaterialTheme.shapes.large
-                        )
-
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Column(
-                                modifier = Modifier.padding(24.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text(
-                                    text = customText,
-                                    style = dynamicTypography.displayLarge.copy(fontSize = 64.sp)
+                            Text(
+                                text = customText,
+                                style = dynamicTypography.displayLarge.copy(
+                                    fontSize = 64.sp,
+                                    lineHeight = 64.sp,
+                                    letterSpacing = (-2).sp
                                 )
-                                Text(
-                                    text = "Custom Editorial Treatment",
-                                    style = dynamicTypography.titleMedium,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            }
+                            )
+                            Text(
+                                text = "Custom Editorial Treatment",
+                                style = dynamicTypography.titleMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
                         }
                     }
-                    1 -> {
-                        Text("Dynamic Typescale", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-                        TypescaleItem("Display Large", dynamicTypography.displayLarge)
-                        TypescaleItem("Headline Medium", dynamicTypography.headlineMedium)
-                        TypescaleItem("Title Large", dynamicTypography.titleLarge)
-                        TypescaleItem("Body Large", dynamicTypography.bodyLarge)
-                        TypescaleItem("Label Small", dynamicTypography.labelSmall)
-                    }
-                    2 -> {
-                        ZenithProposeContent(
-                            currentPreset = settings.preset,
-                            onPresetChange = { settings = settings.copy(preset = it) },
-                            typography = dynamicTypography
-                        )
-                    }
                 }
-
-                if (selectedTab != 2) {
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                    Text("Global Axis Override (Simple Custom)", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
-                    
-                    val currentAxes = settings.display // Using display as global proxy for this simple test screen
-                    fun updateGlobal(newVal: (com.etrisad.zenith.ui.theme.FontAxes) -> com.etrisad.zenith.ui.theme.FontAxes) {
-                        settings = settings.copy(
-                            preset = GSFlexPreset.CUSTOM,
-                            display = newVal(settings.display),
-                            headline = newVal(settings.headline),
-                            body = newVal(settings.body)
-                        )
-                    }
-
-                    VariableSlider(label = "Weight", value = currentAxes.weight, range = 100f..1000f, onValueChange = { w -> updateGlobal { it.copy(weight = w) } })
-                    VariableSlider(label = "Width", value = currentAxes.width, range = 25f..150f, onValueChange = { w -> updateGlobal { it.copy(width = w) } })
-                    VariableSlider(label = "Optical Size", value = currentAxes.opsz, range = 6f..72f, onValueChange = { v -> updateGlobal { it.copy(opsz = v) } })
-                    VariableSlider(label = "Grade", value = currentAxes.grade, range = -200f..200f, onValueChange = { v -> updateGlobal { it.copy(grade = v) } })
-                    VariableSlider(label = "Slant", value = currentAxes.slant, range = -10f..0f, onValueChange = { v -> updateGlobal { it.copy(slant = v) } })
-                    VariableSlider(label = "Roundness", value = currentAxes.roundness, range = 0f..100f, onValueChange = { v -> updateGlobal { it.copy(roundness = v) } })
+                1 -> {
+                    Text("Dynamic Typescale", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                    TypescaleItem("Display Large", dynamicTypography.displayLarge)
+                    TypescaleItem("Headline Medium", dynamicTypography.headlineMedium)
+                    TypescaleItem("Title Large", dynamicTypography.titleLarge)
+                    TypescaleItem("Body Large", dynamicTypography.bodyLarge)
+                    TypescaleItem("Label Small", dynamicTypography.labelSmall)
                 }
-
-                Spacer(modifier = Modifier.height(32.dp))
+                2 -> {
+                    ZenithProposeContent(
+                        currentPreset = settings.preset,
+                        onPresetChange = { settings = settings.copy(preset = it) },
+                        typography = dynamicTypography
+                    )
+                }
             }
+
+            if (selectedTab != 2) {
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                Text("Global Axis Override (Simple Custom)", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
+                
+                val currentAxes = settings.display
+                fun updateGlobal(newVal: (com.etrisad.zenith.ui.theme.FontAxes) -> com.etrisad.zenith.ui.theme.FontAxes) {
+                    settings = settings.copy(
+                        preset = GSFlexPreset.CUSTOM,
+                        display = newVal(settings.display),
+                        headline = newVal(settings.headline),
+                        body = newVal(settings.body)
+                    )
+                }
+
+                VariableSlider(label = "Weight", value = currentAxes.weight, range = 100f..1000f, onValueChange = { w -> updateGlobal { it.copy(weight = w) } })
+                VariableSlider(label = "Width", value = currentAxes.width, range = 25f..150f, onValueChange = { w -> updateGlobal { it.copy(width = w) } })
+                VariableSlider(label = "Optical Size", value = currentAxes.opsz, range = 6f..72f, onValueChange = { v -> updateGlobal { it.copy(opsz = v) } })
+                VariableSlider(label = "Grade", value = currentAxes.grade, range = -200f..200f, onValueChange = { v -> updateGlobal { it.copy(grade = v) } })
+                VariableSlider(label = "Slant", value = currentAxes.slant, range = -10f..0f, onValueChange = { v -> updateGlobal { it.copy(slant = v) } })
+                VariableSlider(label = "Roundness", value = currentAxes.roundness, range = 0f..100f, onValueChange = { v -> updateGlobal { it.copy(roundness = v) } })
+            }
+
+            Spacer(modifier = Modifier.height(innerPadding.calculateBottomPadding() + 32.dp))
         }
     }
 }
@@ -165,15 +156,14 @@ fun ZenithProposeContent(
                 options = presetOptions.map { ZenithToggleOption(text = it.second) },
                 selectedIndices = setOf(presetOptions.indexOfFirst { it.first == currentPreset }.coerceAtLeast(0)),
                 onToggle = { onPresetChange(presetOptions[it].first) },
-                size = ZenithButtonSize.Medium,
-                isInsideContainer = true
+                size = ZenithButtonSize.Medium
             )
         }
 
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(24.dp))
+                .clip(MaterialTheme.shapes.extraLarge)
                 .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f))
                 .padding(24.dp)
         ) {

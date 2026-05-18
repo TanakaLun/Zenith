@@ -113,6 +113,8 @@ fun MainScreen(
                 currentRoute == Screen.Bedtime.route ||
                 currentRoute == Screen.DatabaseDebug.route ||
                 currentRoute == Screen.DataRepairment.route ||
+                currentRoute == Screen.FontTest.route ||
+                currentRoute == Screen.GSFlexCustomizer.route ||
                 currentRoute?.startsWith("app_detail") == true
 
     val enterAlwaysScrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
@@ -247,6 +249,8 @@ fun MainScreen(
                         currentRoute != Screen.Bedtime.route &&
                         currentRoute != Screen.DatabaseDebug.route &&
                         currentRoute != Screen.DataRepairment.route &&
+                        currentRoute != Screen.FontTest.route &&
+                        currentRoute != Screen.GSFlexCustomizer.route &&
                         currentRoute?.startsWith("app_detail") == false
 
             AnimatedVisibility(
@@ -684,13 +688,15 @@ fun MainScreen(
                     }
                     composable(Screen.FontTest.route) {
                         com.etrisad.zenith.ui.screens.home.FontTestScreen(
-                            onBack = { navController.popBackStack() }
+                            onBack = { navController.popBackStack() },
+                            innerPadding = innerPadding
                         )
                     }
                     composable(Screen.GSFlexCustomizer.route) {
                         com.etrisad.zenith.ui.screens.settings.GSFlexCustomizerScreen(
                             repository = userPreferencesRepository,
-                            onBack = { navController.popBackStack() }
+                            onBack = { navController.popBackStack() },
+                            innerPadding = innerPadding
                         )
                     }
                     composable(
@@ -711,11 +717,13 @@ fun MainScreen(
 
                 if (!useNavigationRail) {
                     val showBottomBar =
-                        currentRoute != Screen.UsageStats.route &&
-                                currentRoute != Screen.Bedtime.route &&
-                                currentRoute != Screen.DatabaseDebug.route &&
-                                currentRoute != Screen.DataRepairment.route &&
-                                currentRoute?.startsWith("app_detail") == false
+                    currentRoute != Screen.UsageStats.route &&
+                            currentRoute != Screen.Bedtime.route &&
+                            currentRoute != Screen.DatabaseDebug.route &&
+                            currentRoute != Screen.DataRepairment.route &&
+                            currentRoute != Screen.FontTest.route &&
+                            currentRoute != Screen.GSFlexCustomizer.route &&
+                            currentRoute?.startsWith("app_detail") == false
 
                     androidx.compose.animation.AnimatedVisibility(
                         visible = showBottomBar,

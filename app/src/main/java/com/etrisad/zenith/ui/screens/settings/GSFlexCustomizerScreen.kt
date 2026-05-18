@@ -8,7 +8,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.SettingsSuggest
 import androidx.compose.material3.*
@@ -26,7 +25,6 @@ import com.etrisad.zenith.ui.components.ZenithToggleButtonGroup
 import com.etrisad.zenith.ui.components.ZenithToggleOption
 import com.etrisad.zenith.ui.components.ZenithButtonSize
 import com.etrisad.zenith.ui.theme.FontAxes
-import com.etrisad.zenith.ui.theme.GSFlexSettings
 import com.etrisad.zenith.ui.theme.VariableFontFactory
 import kotlinx.coroutines.launch
 
@@ -34,7 +32,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun GSFlexCustomizerScreen(
     repository: UserPreferencesRepository,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    innerPadding: PaddingValues
 ) {
     val preferences by repository.userPreferencesFlow.collectAsState(initial = com.etrisad.zenith.data.preferences.UserPreferences())
     val scope = rememberCoroutineScope()
@@ -44,34 +43,33 @@ fun GSFlexCustomizerScreen(
 
     val previewTypography = VariableFontFactory.createTypography(tempSettings)
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("GS Flex Designer") },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back") } },
-                actions = {
-                    Button(
-                        onClick = { scope.launch { repository.setGSFlexSettings(tempSettings); onBack() } },
-                        modifier = Modifier.padding(end = 8.dp)
-                    ) {
-                        Icon(Icons.Outlined.Check, null, Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Apply")
-                    }
-                }
-            )
-        }
-    ) { padding ->
+    Box(modifier = Modifier.fillMaxSize()) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = innerPadding.calculateTopPadding())
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
             Box(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp).clip(RoundedCornerShape(32.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(24.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 16.dp)
+                    .clip(MaterialTheme.shapes.extraLarge)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .padding(24.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Zenith", style = previewTypography.displayLarge.copy(fontSize = 64.sp), color = MaterialTheme.colorScheme.primary)
+                    Text(
+                        text = "Zenith", 
+                        style = previewTypography.displayLarge.copy(
+                            fontSize = 64.sp,
+                            lineHeight = 64.sp,
+                            letterSpacing = (-2).sp
+                        ), 
+                        color = MaterialTheme.colorScheme.primary
+                    )
                     Text("Headline Treatment", style = previewTypography.headlineMedium, color = MaterialTheme.colorScheme.onSurface)
                     Text("Standard body text for optimized reading experience in the Zenith app.", style = previewTypography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp), textAlign = TextAlign.Center)
                 }
@@ -84,7 +82,7 @@ fun GSFlexCustomizerScreen(
                     options = presetOptions.map { ZenithToggleOption(text = it.second) },
                     selectedIndices = setOf(presetOptions.indexOfFirst { it.first == tempSettings.preset }),
                     onToggle = { tempSettings = tempSettings.copy(preset = presetOptions[it].first) },
-                    size = ZenithButtonSize.Medium, isInsideContainer = true
+                    size = ZenithButtonSize.Medium
                 )
             }
 
@@ -122,8 +120,22 @@ fun GSFlexCustomizerScreen(
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(innerPadding.calculateBottomPadding() + 80.dp))
         }
+
+        ExtendedFloatingActionButton(
+            onClick = { scope.launch { repository.setGSFlexSettings(tempSettings); onBack() } },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(
+                    bottom = innerPadding.calculateBottomPadding() + 24.dp,
+                    end = 24.dp
+                ),
+            icon = { Icon(Icons.Outlined.Check, null) },
+            text = { Text("Apply Settings") },
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary
+        )
     }
 }
 

@@ -414,7 +414,7 @@ fun UsageDashboard(
 
             Text(
                 text = formatDuration(uiState.totalScreenTime),
-                style = MaterialTheme.typography.displayMedium,
+                style = MaterialTheme.typography.displayLarge,
                 fontWeight = FontWeight.ExtraBold,
                 color = MaterialTheme.colorScheme.onSurface
             )
