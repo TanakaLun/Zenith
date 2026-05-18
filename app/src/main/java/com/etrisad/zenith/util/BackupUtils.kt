@@ -22,7 +22,17 @@ object BackupUtils {
         val hasPreferences: Boolean,
         val fileSize: Long,
         val latestUsageDate: String? = null,
-        val latestUsageMillis: Long? = null
+        val latestUsageMillis: Long? = null,
+        val hasHourly: Boolean = false,
+        val hasPiechart: Boolean = false,
+        val last7DaysSnapshot: List<Pair<String, Long>> = emptyList(),
+        val last7DaysTopApps: List<Triple<String, String, Long>> = emptyList(),
+        val last7DaysDbStatus: List<Pair<String, Boolean>> = emptyList(),
+        val latestHourlyData: Map<Int, Long> = emptyMap(),
+        val latestPiechartData: Map<String, Long> = emptyMap(),
+        val latestShieldUsage: Long = 0L,
+        val latestGoalUsage: Long = 0L,
+        val latestOtherUsage: Long = 0L
     )
 
     fun restartApp(context: Context) {
@@ -129,6 +139,15 @@ object BackupUtils {
             if (hasDb || hasPrefs) {
                 var latestDate: String? = null
                 var latestMillis: Long? = null
+                var hasHourly = false
+                var hasPiechart = false
+                var last7DaysSnapshot = listOf<Pair<String, Long>>()
+                var last7DaysTopApps = listOf<Triple<String, String, Long>>()
+                var latestHourlyData = mapOf<Int, Long>()
+                var latestPiechartData = mapOf<String, Long>()
+                var shieldU = 0L
+                var goalU = 0L
+                var otherU = 0L
 
                 if (hasDb) {
                     try {
@@ -157,6 +176,7 @@ object BackupUtils {
                             val db = android.database.sqlite.SQLiteDatabase.openDatabase(
                                 tempDbFile.path, null, android.database.sqlite.SQLiteDatabase.OPEN_READONLY
                             )
+                            
                             db.rawQuery(
                                 "SELECT date, usageTimeMillis FROM daily_usage WHERE packageName = 'TOTAL' ORDER BY date DESC LIMIT 1",
                                 null
@@ -166,6 +186,90 @@ object BackupUtils {
                                     latestMillis = cursor.getLong(1)
                                 }
                             }
+
+                            try {
+                                db.rawQuery("SELECT 1 FROM hourly_usage LIMIT 1", null).use { 
+                                    hasHourly = it.moveToFirst() 
+                                }
+                            } catch (_: Exception) {}
+
+                            try {
+                                db.rawQuery(
+                                    "SELECT date, usageTimeMillis FROM daily_usage WHERE packageName = 'TOTAL' ORDER BY date DESC LIMIT 7",
+                                    null
+                                ).use { cursor ->
+                                    val snapshot = mutableListOf<Pair<String, Long>>()
+                                    while (cursor.moveToNext()) {
+                                        snapshot.add(cursor.getString(0) to cursor.getLong(1))
+                                    }
+                                    last7DaysSnapshot = snapshot
+                                }
+                            } catch (_: Exception) {}
+
+                            try {
+                                db.rawQuery(
+                                    "SELECT date, packageName, usageTimeMillis FROM daily_usage WHERE packageName != 'TOTAL' AND packageName NOT LIKE '%_TOTAL' ORDER BY date DESC, usageTimeMillis DESC",
+                                    null
+                                ).use { cursor ->
+                                    val topAppsMap = mutableMapOf<String, Pair<String, Long>>()
+                                    while (cursor.moveToNext()) {
+                                        val date = cursor.getString(0)
+                                        if (!topAppsMap.containsKey(date)) {
+                                            topAppsMap[date] = cursor.getString(1) to cursor.getLong(2)
+                                        }
+                                    }
+                                    last7DaysTopApps = topAppsMap.map { Triple(it.key, it.value.first, it.value.second) }
+                                        .sortedByDescending { it.first }
+                                        .take(7)
+                                }
+                            } catch (_: Exception) {}
+
+                            if (hasHourly) {
+                                try {
+                                    db.rawQuery(
+                                        "SELECT hour, SUM(usageTimeMillis) FROM hourly_usage WHERE date = (SELECT MAX(date) FROM daily_usage) GROUP BY hour",
+                                        null
+                                    ).use { cursor ->
+                                        val hourly = mutableMapOf<Int, Long>()
+                                        while (cursor.moveToNext()) {
+                                            hourly[cursor.getInt(0)] = cursor.getLong(1)
+                                        }
+                                        latestHourlyData = hourly
+                                    }
+                                } catch (_: Exception) {}
+                            }
+
+                            try {
+                                db.rawQuery(
+                                    "SELECT packageName, usageTimeMillis FROM daily_usage WHERE date = (SELECT MAX(date) FROM daily_usage) AND packageName != 'TOTAL' AND packageName NOT LIKE '%_TOTAL' ORDER BY usageTimeMillis DESC LIMIT 5",
+                                    null
+                                ).use { cursor ->
+                                    val pie = mutableMapOf<String, Long>()
+                                    while (cursor.moveToNext()) {
+                                        pie[cursor.getString(0)] = cursor.getLong(1)
+                                    }
+                                    latestPiechartData = pie
+                                    hasPiechart = pie.isNotEmpty()
+                                }
+                            } catch (_: Exception) {}
+
+                            try {
+                                db.rawQuery(
+                                    "SELECT packageName, usageTimeMillis FROM daily_usage WHERE date = (SELECT MAX(date) FROM daily_usage) AND packageName LIKE '%_TOTAL'",
+                                    null
+                                ).use { cursor ->
+                                    while (cursor.moveToNext()) {
+                                        val pkg = cursor.getString(0)
+                                        val valU = cursor.getLong(1)
+                                        when (pkg) {
+                                            "SHIELD_TOTAL" -> shieldU = valU
+                                            "GOAL_TOTAL" -> goalU = valU
+                                            "OTHER_TOTAL" -> otherU = valU
+                                        }
+                                    }
+                                }
+                            } catch (_: Exception) {}
+
                             db.close()
                         }
                         tempDbFile.delete()
@@ -174,7 +278,22 @@ object BackupUtils {
                     }
                 }
 
-                BackupMetadata(hasDb, hasPrefs, fileSize, latestDate, latestMillis)
+                BackupMetadata(
+                    hasDatabase = hasDb,
+                    hasPreferences = hasPrefs,
+                    fileSize = fileSize,
+                    latestUsageDate = latestDate,
+                    latestUsageMillis = latestMillis,
+                    hasHourly = hasHourly,
+                    hasPiechart = hasPiechart,
+                    last7DaysSnapshot = last7DaysSnapshot,
+                    last7DaysTopApps = last7DaysTopApps,
+                    latestHourlyData = latestHourlyData,
+                    latestPiechartData = latestPiechartData,
+                    latestShieldUsage = shieldU,
+                    latestGoalUsage = goalU,
+                    latestOtherUsage = otherU
+                )
             } else {
                 null
             }

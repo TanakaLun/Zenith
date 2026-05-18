@@ -63,9 +63,16 @@ import com.etrisad.zenith.ui.components.UpdateBottomSheet
 import com.etrisad.zenith.ui.components.UpdateBottomSheetContent
 import com.etrisad.zenith.data.manager.GitHubUpdateManager
 import com.etrisad.zenith.data.remote.model.GitHubRelease
+import com.etrisad.zenith.ui.components.RestoreConfirmationBottomSheet
 import kotlinx.coroutines.launch
 import com.etrisad.zenith.worker.BackupManager
 import androidx.navigation.NavController
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
+import java.text.SimpleDateFormat
 
 @Composable
 fun SettingsScreen(
@@ -1043,210 +1050,7 @@ fun SettingsScreenContent(
     }
 
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun RestoreConfirmationBottomSheet(
-    preferences: UserPreferences,
-    metadata: BackupUtils.BackupMetadata,
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit
-) {
-    val scope = rememberCoroutineScope()
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 32.dp)
-                .navigationBarsPadding(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Surface(
-                modifier = Modifier.size(64.dp),
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.errorContainer
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Outlined.WarningAmber,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(32.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                text = "Restore Data?",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
-            )
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            Text(
-                text = "Restoring will permanently overwrite your current settings and data with the selected backup.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = if (preferences.expressiveColors)
-                        MaterialTheme.colorScheme.surfaceContainer
-                    else MaterialTheme.colorScheme.surfaceContainerHigh
-                ),
-                shape = RoundedCornerShape(20.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Backup Contents",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    
-                    BackupDetailItem(
-                        icon = Icons.Outlined.Storage,
-                        label = "Database",
-                        status = if (metadata.hasDatabase) "Available" else "Not found",
-                        isAvailable = metadata.hasDatabase
-                    )
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    BackupDetailItem(
-                        icon = Icons.Outlined.Settings,
-                        label = "User Preferences",
-                        status = if (metadata.hasPreferences) "Available" else "Not found",
-                        isAvailable = metadata.hasPreferences
-                    )
-
-                    if (metadata.latestUsageDate != null && metadata.latestUsageMillis != null) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        BackupDetailItem(
-                            icon = Icons.Outlined.History,
-                            label = "Latest Record",
-                            status = "${metadata.latestUsageDate} - ${formatDuration(metadata.latestUsageMillis)}",
-                            isAvailable = true
-                        )
-                    }
-                    
-                    HorizontalDivider(
-                        modifier = Modifier.padding(vertical = 12.dp),
-                        color = MaterialTheme.colorScheme.outlineVariant
-                    )
-                    
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = "Total Size",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = formatFileSize(metadata.fileSize),
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                OutlinedButton(
-                    onClick = {
-                        scope.launch {
-                            sheetState.hide()
-                            onDismiss()
-                        }
-                    },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Text("Cancel")
-                }
-                
-                Button(
-                    onClick = {
-                        scope.launch {
-                            sheetState.hide()
-                            onConfirm()
-                        }
-                    },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error
-                    )
-                ) {
-                    Text("Restore")
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun BackupDetailItem(
-    icon: ImageVector,
-    label: String,
-    status: String,
-    isAvailable: Boolean
-) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            modifier = Modifier.size(20.dp),
-            tint = if (isAvailable) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-        )
-        Spacer(modifier = Modifier.width(12.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(1f)
-        )
-        Text(
-            text = status,
-            style = MaterialTheme.typography.labelMedium,
-            color = if (isAvailable) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
-        )
-    }
-}
-
-private fun formatDuration(millis: Long): String {
-    val totalMinutes = millis / (1000 * 60)
-    val hours = totalMinutes / 60
-    val minutes = totalMinutes % 60
-    return if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
-}
-
-private fun formatFileSize(size: Long): String {
-    if (size <= 0) return "0 B"
-    val units = arrayOf("B", "KB", "MB", "GB", "TB")
-    val digitGroups = (Math.log10(size.toDouble()) / Math.log10(1024.0)).toInt()
-    return String.format("%.1f %s", size / Math.pow(1024.0, digitGroups.toDouble()), units[digitGroups])
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
