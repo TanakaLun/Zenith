@@ -682,6 +682,11 @@ fun MainScreen(
                             innerPadding = innerPadding
                         )
                     }
+                    composable(Screen.FontTest.route) {
+                        com.etrisad.zenith.ui.screens.home.FontTestScreen(
+                            onBack = { navController.popBackStack() }
+                        )
+                    }
                     composable(
                         route = Screen.AppDetail.route,
                         arguments = listOf(androidx.navigation.navArgument("packageName") {

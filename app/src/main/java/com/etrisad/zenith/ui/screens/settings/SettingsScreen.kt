@@ -307,6 +307,9 @@ fun SettingsScreen(
         onNavigateToDataRepairment = {
             navController.navigate(Screen.DataRepairment.route)
         },
+        onNavigateToFontTest = {
+            navController.navigate(Screen.FontTest.route)
+        },
         onTestGoalOverlay = {
             showGoalTestSheet = true
         },
@@ -511,6 +514,7 @@ fun SettingsScreenContent(
     onDeveloperModeEnabledChange: (Boolean) -> Unit,
     onNavigateToDatabaseDebug: () -> Unit,
     onNavigateToDataRepairment: () -> Unit,
+    onNavigateToFontTest: () -> Unit,
     onTestGoalOverlay: () -> Unit,
     onCustomDelayEnabledChange: (Boolean) -> Unit,
     onSetDelayPowerSave: (Long) -> Unit,
@@ -883,6 +887,17 @@ fun SettingsScreenContent(
                         summary = "Immediately trigger the new update bottom sheet",
                         onClick = onTestUpdateSheet,
                         icon = Icons.Outlined.NewReleases,
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    SettingsActionItem(
+                        title = "Test Variable Font",
+                        summary = "Demo variable axes with Google Sans Flex",
+                        onClick = onNavigateToFontTest,
+                        icon = Icons.Outlined.FontDownload,
                         shape = RoundedCornerShape(8.dp)
                     )
                 }

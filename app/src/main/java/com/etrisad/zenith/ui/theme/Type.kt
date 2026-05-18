@@ -2,11 +2,13 @@ package com.etrisad.zenith.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.googlefonts.GoogleFont
-import androidx.compose.ui.text.googlefonts.Font
+import androidx.compose.ui.text.googlefonts.Font as GoogleFontSource
 import com.etrisad.zenith.R
 
 val provider = GoogleFont.Provider(
@@ -15,20 +17,23 @@ val provider = GoogleFont.Provider(
     certificates = R.array.com_google_android_gms_fonts_certs
 )
 
-val googleSansFlexName = GoogleFont("Google Sans Flex")
+@OptIn(androidx.compose.ui.text.ExperimentalTextApi::class)
 val GoogleSansFlexFontFamily = FontFamily(
-    Font(googleFont = googleSansFlexName, fontProvider = provider, weight = FontWeight.Normal),
-    Font(googleFont = googleSansFlexName, fontProvider = provider, weight = FontWeight.Medium),
-    Font(googleFont = googleSansFlexName, fontProvider = provider, weight = FontWeight.SemiBold),
-    Font(googleFont = googleSansFlexName, fontProvider = provider, weight = FontWeight.Bold)
+    Font(
+        resId = R.font.google_sans_flex_variable,
+        variationSettings = FontVariation.Settings(
+            FontVariation.weight(400),
+            FontVariation.width(100f)
+        )
+    )
 )
 
 val nunitoName = GoogleFont("Nunito")
 val NunitoFontFamily = FontFamily(
-    Font(googleFont = nunitoName, fontProvider = provider, weight = FontWeight.Normal),
-    Font(googleFont = nunitoName, fontProvider = provider, weight = FontWeight.Medium),
-    Font(googleFont = nunitoName, fontProvider = provider, weight = FontWeight.SemiBold),
-    Font(googleFont = nunitoName, fontProvider = provider, weight = FontWeight.Bold)
+    GoogleFontSource(googleFont = nunitoName, fontProvider = provider, weight = FontWeight.Normal),
+    GoogleFontSource(googleFont = nunitoName, fontProvider = provider, weight = FontWeight.Medium),
+    GoogleFontSource(googleFont = nunitoName, fontProvider = provider, weight = FontWeight.SemiBold),
+    GoogleFontSource(googleFont = nunitoName, fontProvider = provider, weight = FontWeight.Bold)
 )
 
 private fun createTypography(fontFamily: FontFamily): Typography {
