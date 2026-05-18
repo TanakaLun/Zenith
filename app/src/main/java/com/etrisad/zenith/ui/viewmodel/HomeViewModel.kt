@@ -379,11 +379,48 @@ class HomeViewModel(
         syncDataNow()
     }
 
+    val todayHourlyUsage: Flow<List<HourlyUsageEntity>> = allDatabaseUsage.flatMapLatest {
+        val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        shieldRepository.getHourlyUsageForDate(today)
+    }
+
     fun syncDataNow() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             val syncManager = UsageSyncManager(context, shieldRepository, userPreferencesRepository)
             syncManager.syncUsageData()
+            refreshUsageStats()
+        }
+    }
+
+    fun resetCarryover() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+            
+            userPreferencesRepository.setLastSyncTimestamp(getMidnight(0))
+            
+            shieldRepository.deleteHourlyUsageForDate(today)
+            
+            val syncManager = UsageSyncManager(context, shieldRepository, userPreferencesRepository)
+            syncManager.syncUsageData()
+
+            refreshUsageStats()
+        }
+    }
+
+    fun deleteHourlyPackageUsageToday(packageName: String) {
+        viewModelScope.launch {
+            val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+            shieldRepository.deleteHourlyUsageForPackage(today, packageName)
+            refreshUsageStats()
+        }
+    }
+
+    fun deleteHourlyUsageAtHour(hour: Int, packageName: String) {
+        viewModelScope.launch {
+            val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+            shieldRepository.deleteHourlyUsageAtHour(today, hour, packageName)
             refreshUsageStats()
         }
     }
