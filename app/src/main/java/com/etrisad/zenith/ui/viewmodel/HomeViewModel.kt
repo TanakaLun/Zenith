@@ -629,10 +629,6 @@ class HomeViewModel(
             val topApps = appList.sortedByDescending { it.totalTimeVisible }.take(5)
             val allAppsUsage = appList.sortedByDescending { it.totalTimeVisible }
 
-            val rawTotals = appTotals.keys.associateWith { pkg ->
-                (0..23).sumOf { h -> hourlyAppUsage[h]?.get(pkg) ?: 0L }
-            }
-
             val selectedDateStr = dateFormat.format(Date(selectedDate))
             
             val selectedDayHistory = allHistory.filter { it.date == selectedDateStr }
@@ -674,10 +670,13 @@ class HomeViewModel(
             val newlyLocked = mutableListOf<HourlyUsageEntity>()
 
             if (isSelectedToday) {
-                val lockedHours = dbHourly.map { it.hour }.distinct().toSet()
+                val dbHourlyMap = dbHourly.groupBy { it.hour }
+                
                 for (h in 0 until currentHour) {
-                    if (h !in lockedHours) {
-                        appTotals.keys.forEach { pkg ->
+                    val existingPkgInHour = dbHourlyMap[h]?.map { it.packageName }?.toSet() ?: emptySet()
+                    
+                    appTotals.keys.forEach { pkg ->
+                        if (pkg !in existingPkgInHour) {
                             val diff = hourlyAppUsage[h]?.get(pkg) ?: 0L
                             
                             if (diff > 0) {
@@ -690,7 +689,9 @@ class HomeViewModel(
                                 ))
                             }
                         }
+                    }
 
+                    if ("TOTAL" !in existingPkgInHour) {
                         val hourTotal = hourlyAppUsage[h]?.values?.sum() ?: 0L
                         if (hourTotal > 0) {
                             newlyLocked.add(HourlyUsageEntity(
@@ -715,25 +716,22 @@ class HomeViewModel(
                 val appsInHour = appTotals.mapNotNull { (pkg, trueTotal) ->
                     val dbEntry = allHourlyData.find { it.hour == hour && it.packageName == pkg }
                     
-                    val durationForThisHour = when {
-                        dbEntry != null -> dbEntry.usageTimeMillis
-                        isSelectedToday && hour == currentHour -> {
-                            val sumLocked = allHourlyData.filter { it.packageName == pkg && it.hour < currentHour }.sumOf { it.usageTimeMillis }
-                            (trueTotal - sumLocked).coerceAtLeast(0L)
-                        }
-                        else -> {
-                            if (!isSelectedToday && allHourlyData.any { it.hour == hour }) {
-                                0L
+                    val durationForThisHour = if (dbEntry != null) {
+                        dbEntry.usageTimeMillis
+                    } else {
+                        val lockedHours = allHourlyData.filter { it.packageName == pkg }.map { it.hour }.toSet()
+                        if (hour in lockedHours) {
+                            0L
+                        } else {
+                            val sumLocked = allHourlyData.filter { it.packageName == pkg }.sumOf { it.usageTimeMillis }
+                            val remainingToDistribute = (trueTotal - sumLocked).coerceAtLeast(0L)
+                            val rawUnlockedTotal = (0..23).filter { it !in lockedHours }.sumOf { h -> hourlyAppUsage[h]?.get(pkg) ?: 0L }
+                            val rawHourUsage = hourlyAppUsage[hour]?.get(pkg) ?: 0L
+                            
+                            if (rawUnlockedTotal > 0) {
+                                (remainingToDistribute * (rawHourUsage.toDouble() / rawUnlockedTotal)).toLong()
                             } else {
-                                val rawTotal = rawTotals[pkg] ?: 0L
-                                val rawHourUsage = hourlyAppUsage[hour]?.get(pkg) ?: 0L
-                                if (rawTotal > 0) {
-                                    (trueTotal * (rawHourUsage.toDouble() / rawTotal)).toLong()
-                                } else if (!isSelectedToday && hour == 23) {
-                                    trueTotal
-                                } else {
-                                    0L
-                                }
+                                0L
                             }
                         }
                     }

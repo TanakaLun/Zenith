@@ -43,7 +43,7 @@ class UsageSyncManager(
             set(Calendar.MILLISECOND, 0)
         }.timeInMillis
 
-        val queryStart = maxOf(startOfToday, lastSyncTime - (60 * 60 * 1000L))
+        val queryStart = maxOf(startOfToday, lastSyncTime - (24 * 60 * 60 * 1000L))
         val events = usageStatsManager.queryEvents(queryStart, currentTime)
         val event = UsageEvents.Event()
         
@@ -202,10 +202,7 @@ class UsageSyncManager(
                 val isPastHour = date < currentDateStr || (date == currentDateStr && hour < currentHour)
 
                 if (newChunks.isEmpty() && carryOver.isEmpty()) {
-                    val existingTotal = existingMap[hour to "TOTAL"]?.usageTimeMillis ?: 0L
-                    if (!(isPastHour && existingTotal > limit)) {
-                        continue
-                    }
+                    continue
                 }
 
                 val combined = mutableListOf<UsageChunk>()
@@ -290,6 +287,56 @@ class UsageSyncManager(
 
         if (finalEntities.isNotEmpty()) {
             repository.insertHourlyUsage(finalEntities)
+        }
+        
+        // Sync Daily Usage based on the hourly data we just processed
+        syncDailyFromHourly(buckets.keys)
+        preferencesRepository.setLastSyncTimestamp(System.currentTimeMillis())
+    }
+
+    private suspend fun syncDailyFromHourly(dates: Set<String>) {
+        val now = System.currentTimeMillis()
+        val dailyEntities = mutableListOf<com.etrisad.zenith.data.local.entity.DailyUsageEntity>()
+        
+        // Get all shields to categorize usage
+        val allShields = repository.allShields.first()
+        val shieldPkgs = allShields.filter { it.type == com.etrisad.zenith.data.local.entity.FocusType.SHIELD }.map { it.packageName }.toSet()
+        val goalPkgs = allShields.filter { it.type == com.etrisad.zenith.data.local.entity.FocusType.GOAL }.map { it.packageName }.toSet()
+
+        dates.forEach { date ->
+            val hourlyData = repository.getHourlyUsageForDateSync(date)
+            if (hourlyData.isEmpty()) return@forEach
+
+            val appTotals = hourlyData.filter { it.packageName != "TOTAL" }
+                .groupBy { it.packageName }
+                .mapValues { it.value.sumOf { h -> h.usageTimeMillis } }
+
+            var totalTime = 0L
+            var shieldTime = 0L
+            var goalTime = 0L
+
+            appTotals.forEach { (pkg, time) ->
+                dailyEntities.add(
+                    com.etrisad.zenith.data.local.entity.DailyUsageEntity(
+                        date = date,
+                        packageName = pkg,
+                        usageTimeMillis = time,
+                        lastUpdated = now
+                    )
+                )
+                totalTime += time
+                if (pkg in shieldPkgs) shieldTime += time
+                else if (pkg in goalPkgs) goalTime += time
+            }
+
+            dailyEntities.add(com.etrisad.zenith.data.local.entity.DailyUsageEntity(date = date, packageName = "TOTAL", usageTimeMillis = totalTime, lastUpdated = now))
+            dailyEntities.add(com.etrisad.zenith.data.local.entity.DailyUsageEntity(date = date, packageName = "SHIELD_TOTAL", usageTimeMillis = shieldTime, lastUpdated = now))
+            dailyEntities.add(com.etrisad.zenith.data.local.entity.DailyUsageEntity(date = date, packageName = "GOAL_TOTAL", usageTimeMillis = goalTime, lastUpdated = now))
+            dailyEntities.add(com.etrisad.zenith.data.local.entity.DailyUsageEntity(date = date, packageName = "OTHER_TOTAL", usageTimeMillis = (totalTime - (shieldTime + goalTime)).coerceAtLeast(0L), lastUpdated = now))
+        }
+
+        if (dailyEntities.isNotEmpty()) {
+            dailyEntities.forEach { repository.insertDailyUsage(it) }
         }
     }
 

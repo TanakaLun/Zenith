@@ -49,7 +49,7 @@ object ScreenUsageHelper {
         var activePkg: String? = null
         var activeStartTime = 0L
 
-        val events = usageStatsManager.queryEvents(start - (60 * 60 * 1000L), end)
+        val events = usageStatsManager.queryEvents(start - (24 * 60 * 60 * 1000L), end)
         val event = UsageEvents.Event()
         
         var isScreenOn = true 
@@ -136,7 +136,17 @@ object ScreenUsageHelper {
         
         if (isScreenOn && activePkg != null) {
             val segmentStart = maxOf(activeStartTime, start)
-            val segmentEnd = end
+            var segmentEnd = end
+            
+            val stats = aggregatedStats?.get(activePkg)
+            if (stats != null) {
+                val lastActivity = maxOf(stats.lastTimeUsed, stats.lastTimeVisible)
+                
+                if (lastActivity in segmentStart until segmentEnd && (currentTime - lastActivity) > 60000) {
+                    segmentEnd = lastActivity
+                }
+            }
+
             if (segmentStart < segmentEnd) {
                 val duration = segmentEnd - segmentStart
                 if (duration > 100) {
