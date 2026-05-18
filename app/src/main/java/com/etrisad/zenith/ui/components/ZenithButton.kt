@@ -29,6 +29,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -454,11 +455,32 @@ private fun ZenithButtonCore(
                         }
                     ) {
                         if (content != null) { content() } else {
-                            if (icon != null) {
-                                Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(resIconS))
-                                if (text != null) Spacer(Modifier.width(resH * 0.15f))
+                            AnimatedVisibility(
+                                visible = icon != null,
+                                enter = fadeIn() + expandHorizontally(),
+                                exit = fadeOut() + shrinkHorizontally()
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    icon?.let {
+                                        Icon(
+                                            imageVector = it,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(resIconS)
+                                        )
+                                        if (text != null) {
+                                            Spacer(Modifier.width(resH * 0.15f))
+                                        }
+                                    }
+                                }
                             }
-                            if (text != null) Text(text = text, style = resTextS, fontWeight = FontWeight.Bold)
+                            if (text != null) {
+                                Text(
+                                    text = text, 
+                                    style = resTextS, 
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
                         }
                     }
                 }
@@ -476,7 +498,7 @@ fun ZenithToggleButtonGroup(
     isMultiSelect: Boolean = false,
     size: ZenithButtonSize = ZenithButtonSize.Medium,
     isInsideContainer: Boolean = false,
-    showCheckmarkOnMultiSelect: Boolean = true
+    isShowingCheck: Boolean = true
 ) {
     val resH = when(size){ZenithButtonSize.Small->32.dp; ZenithButtonSize.Medium->40.dp; ZenithButtonSize.Large->48.dp; else->56.dp}
     Row(modifier = modifier.height(resH).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -529,7 +551,7 @@ fun ZenithToggleButtonGroup(
                 type = currentType,
                 size = size,
                 text = option.text,
-                icon = if (isSelected && isMultiSelect && showCheckmarkOnMultiSelect && option.icon == null) Icons.Default.Check else option.icon,
+                icon = if (isSelected && isMultiSelect && isShowingCheck && option.icon == null) Icons.Default.Check else option.icon,
                 isLoading = option.isLoading,
                 loadingProgress = option.loadingProgress,
                 backgroundProgress = option.backgroundProgress,

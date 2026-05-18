@@ -564,7 +564,7 @@ fun DaysSelector(selectedDays: Set<Int>, onDaysChange: (Set<Int>) -> Unit) {
         isMultiSelect = true,
         size = ZenithButtonSize.Medium,
         isInsideContainer = true,
-        showCheckmarkOnMultiSelect = false
+        isShowingCheck = false
     )
 }
 
