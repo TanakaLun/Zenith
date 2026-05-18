@@ -1368,16 +1368,14 @@ fun FontSelector(
 
             if (selectedFont == FontOption.GOOGLE_SANS_FLEX) {
                 Spacer(modifier = Modifier.height(12.dp))
-                OutlinedButton(
+                ZenithButton(
                     onClick = onCustomizeGSFlex,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    contentPadding = PaddingValues(12.dp)
-                ) {
-                    Icon(Icons.Outlined.SettingsSuggest, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Customize GS Flex Variations")
-                }
+                    text = "Customize GS Flex Variations",
+                    icon = Icons.Outlined.SettingsSuggest,
+                    type = ZenithButtonType.Outlined,
+                    size = ZenithButtonSize.Large
+                )
             }
         }
     }
