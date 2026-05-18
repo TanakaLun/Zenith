@@ -77,6 +77,27 @@ class ShieldRepository(
         hourlyUsageDao.deleteOldUsage(thresholdDate)
     }
 
+    suspend fun deleteHourlyUsageForDate(date: String) {
+        hourlyUsageDao.deleteHourlyUsageForDate(date)
+    }
+
+    suspend fun deleteHourlyUsageForPackage(date: String, packageName: String) {
+        hourlyUsageDao.deleteHourlyUsageForPackage(date, packageName)
+    }
+
+    suspend fun deleteHourlyUsageAtHour(date: String, hour: Int, packageName: String) {
+        hourlyUsageDao.deleteHourlyUsageAtHour(date, hour, packageName)
+    }
+
+    suspend fun deleteDailyUsageForDate(date: String) {
+        dailyUsageDao.deleteUsageForDate(date)
+    }
+
+    suspend fun deleteUsageForPackage(date: String, packageName: String) {
+        dailyUsageDao.deleteUsageForPackage(date, packageName)
+        hourlyUsageDao.deleteHourlyUsageForPackage(date, packageName)
+    }
+
     suspend fun insertDailyUsage(usage: DailyUsageEntity) {
         dailyUsageDao.insertDailyUsage(usage)
     }

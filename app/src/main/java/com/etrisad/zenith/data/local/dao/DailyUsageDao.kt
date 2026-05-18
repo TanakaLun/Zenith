@@ -32,4 +32,10 @@ interface DailyUsageDao {
 
     @Query("DELETE FROM daily_usage WHERE date < :thresholdDate")
     suspend fun deleteOldUsage(thresholdDate: String)
+
+    @Query("DELETE FROM daily_usage WHERE date = :date")
+    suspend fun deleteUsageForDate(date: String)
+
+    @Query("DELETE FROM daily_usage WHERE date = :date AND packageName = :packageName")
+    suspend fun deleteUsageForPackage(date: String, packageName: String)
 }

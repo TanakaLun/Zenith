@@ -26,4 +26,13 @@ interface HourlyUsageDao {
 
     @Query("DELETE FROM hourly_usage WHERE date < :thresholdDate")
     suspend fun deleteOldUsage(thresholdDate: String)
+
+    @Query("DELETE FROM hourly_usage WHERE date = :date")
+    suspend fun deleteHourlyUsageForDate(date: String)
+
+    @Query("DELETE FROM hourly_usage WHERE date = :date AND packageName = :packageName")
+    suspend fun deleteHourlyUsageForPackage(date: String, packageName: String)
+
+    @Query("DELETE FROM hourly_usage WHERE date = :date AND hour = :hour AND packageName = :packageName")
+    suspend fun deleteHourlyUsageAtHour(date: String, hour: Int, packageName: String)
 }
