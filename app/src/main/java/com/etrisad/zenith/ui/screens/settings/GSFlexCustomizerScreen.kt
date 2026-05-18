@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.SettingsSuggest
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -39,6 +40,9 @@ fun GSFlexCustomizerScreen(
     val scope = rememberCoroutineScope()
 
     var tempSettings by remember(preferences.gsFlexSettings) { mutableStateOf(preferences.gsFlexSettings) }
+    var lastNonCustomPreset by remember(preferences.gsFlexSettings) {
+        mutableStateOf(if (preferences.gsFlexSettings.preset == GSFlexPreset.CUSTOM) GSFlexPreset.ZENITH else preferences.gsFlexSettings.preset)
+    }
     var selectedLevelTab by remember { mutableIntStateOf(0) }
 
     val previewTypography = VariableFontFactory.createTypography(tempSettings)
@@ -77,17 +81,72 @@ fun GSFlexCustomizerScreen(
 
             Column(modifier = Modifier.padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text("Design System Presets", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                val presetOptions = listOf(GSFlexPreset.ZENITH to "Zenith", GSFlexPreset.NEO to "Neo", GSFlexPreset.COMPACT to "Impact", GSFlexPreset.AIRY to "Airy", GSFlexPreset.CUSTOM to "Custom")
+                val presetOptions = listOf(GSFlexPreset.ZENITH to "Zenith", GSFlexPreset.NEO to "Neo", GSFlexPreset.COMPACT to "Impact", GSFlexPreset.AIRY to "Airy")
                 ZenithToggleButtonGroup(
                     options = presetOptions.map { ZenithToggleOption(text = it.second) },
-                    selectedIndices = setOf(presetOptions.indexOfFirst { it.first == tempSettings.preset }),
-                    onToggle = { tempSettings = tempSettings.copy(preset = presetOptions[it].first) },
+                    selectedIndices = setOf(presetOptions.indexOfFirst { it.first == lastNonCustomPreset }),
+                    onToggle = {
+                        val newPreset = presetOptions[it].first
+                        lastNonCustomPreset = newPreset
+                        if (tempSettings.preset != GSFlexPreset.CUSTOM) {
+                            tempSettings = tempSettings.copy(preset = newPreset)
+                        }
+                    },
                     size = ZenithButtonSize.Medium
                 )
             }
 
+            Column(modifier = Modifier.padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text("Customize", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(MaterialTheme.shapes.medium)
+                        .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Use Custom Variable", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text("Override preset with your own fine-tuned axes", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(
+                        checked = tempSettings.preset == GSFlexPreset.CUSTOM,
+                        onCheckedChange = { checked ->
+                            tempSettings = tempSettings.copy(
+                                preset = if (checked) GSFlexPreset.CUSTOM else lastNonCustomPreset
+                            )
+                        }
+                    )
+                }
+            }
+
             AnimatedVisibility(visible = tempSettings.preset == GSFlexPreset.CUSTOM, modifier = Modifier.animateContentSize()) {
                 Column(modifier = Modifier.padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Button(
+                        onClick = {
+                            val presetAxes = VariableFontFactory.getPresetFontAxes(lastNonCustomPreset)
+                            tempSettings = tempSettings.copy(
+                                display = presetAxes.first,
+                                headline = presetAxes.second,
+                                body = presetAxes.third
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(16.dp),
+                        shape = MaterialTheme.shapes.large,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    ) {
+                        Icon(Icons.Outlined.ContentCopy, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Copy from Current Preset")
+                    }
+
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Outlined.SettingsSuggest, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))

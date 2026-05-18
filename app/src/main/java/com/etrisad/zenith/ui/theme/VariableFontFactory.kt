@@ -51,30 +51,39 @@ object VariableFontFactory {
         )
     }
 
-    private fun getPresetAxes(preset: GSFlexPreset): Triple<FontVariation.Settings, FontVariation.Settings, FontVariation.Settings> {
+    fun getPresetFontAxes(preset: GSFlexPreset): Triple<FontAxes, FontAxes, FontAxes> {
         return when (preset) {
             GSFlexPreset.ZENITH -> Triple(
-                FontVariation.Settings(FontVariation.weight(950), FontVariation.width(85f), FontVariation.Setting("opsz", 72f), FontVariation.Setting("ROND", 100f)),
-                FontVariation.Settings(FontVariation.weight(700), FontVariation.width(115f), FontVariation.Setting("opsz", 32f), FontVariation.Setting("ROND", 60f)),
-                FontVariation.Settings(FontVariation.weight(450), FontVariation.width(100f), FontVariation.Setting("opsz", 16f), FontVariation.grade(20), FontVariation.Setting("ROND", 0f))
+                FontAxes(950f, 85f, 72f, 0f, 0f, 100f),
+                FontAxes(700f, 115f, 32f, 0f, 0f, 60f),
+                FontAxes(450f, 100f, 16f, 20f, 0f, 0f)
             )
             GSFlexPreset.NEO -> Triple(
-                FontVariation.Settings(FontVariation.weight(800), FontVariation.width(125f), FontVariation.Setting("opsz", 72f), FontVariation.Setting("ROND", 0f)),
-                FontVariation.Settings(FontVariation.weight(600), FontVariation.width(100f), FontVariation.Setting("opsz", 32f), FontVariation.Setting("ROND", 0f)),
-                FontVariation.Settings(FontVariation.weight(400), FontVariation.width(95f), FontVariation.Setting("opsz", 16f), FontVariation.grade(10), FontVariation.Setting("ROND", 0f))
+                FontAxes(800f, 125f, 72f, 0f, 0f, 0f),
+                FontAxes(600f, 100f, 32f, 0f, 0f, 0f),
+                FontAxes(400f, 95f, 16f, 10f, 0f, 0f)
             )
             GSFlexPreset.COMPACT -> Triple(
-                FontVariation.Settings(FontVariation.weight(900), FontVariation.width(75f), FontVariation.Setting("opsz", 72f), FontVariation.Setting("ROND", 30f)),
-                FontVariation.Settings(FontVariation.weight(800), FontVariation.width(85f), FontVariation.Setting("opsz", 32f), FontVariation.grade(50), FontVariation.Setting("ROND", 20f)),
-                FontVariation.Settings(FontVariation.weight(500), FontVariation.width(90f), FontVariation.Setting("opsz", 16f), FontVariation.grade(30), FontVariation.Setting("ROND", 10f))
+                FontAxes(900f, 75f, 72f, 0f, 0f, 30f),
+                FontAxes(800f, 85f, 32f, 50f, 0f, 20f),
+                FontAxes(500f, 90f, 16f, 30f, 0f, 10f)
             )
             GSFlexPreset.AIRY -> Triple(
-                FontVariation.Settings(FontVariation.weight(300), FontVariation.width(140f), FontVariation.Setting("opsz", 72f), FontVariation.Setting("ROND", 100f)),
-                FontVariation.Settings(FontVariation.weight(500), FontVariation.width(120f), FontVariation.Setting("opsz", 32f), FontVariation.Setting("ROND", 100f)),
-                FontVariation.Settings(FontVariation.weight(400), FontVariation.width(110f), FontVariation.Setting("opsz", 16f), FontVariation.Setting("ROND", 50f))
+                FontAxes(300f, 140f, 72f, 0f, 0f, 100f),
+                FontAxes(500f, 120f, 32f, 0f, 0f, 100f),
+                FontAxes(400f, 110f, 16f, 0f, 0f, 50f)
             )
-            else -> getPresetAxes(GSFlexPreset.ZENITH)
+            else -> getPresetFontAxes(GSFlexPreset.ZENITH)
         }
+    }
+
+    private fun getPresetAxes(preset: GSFlexPreset): Triple<FontVariation.Settings, FontVariation.Settings, FontVariation.Settings> {
+        val axes = getPresetFontAxes(preset)
+        return Triple(
+            axes.first.toVariationSettings(),
+            axes.second.toVariationSettings(),
+            axes.third.toVariationSettings()
+        )
     }
 
     @OptIn(ExperimentalTextApi::class)
