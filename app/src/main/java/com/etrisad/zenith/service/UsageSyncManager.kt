@@ -221,33 +221,19 @@ class UsageSyncManager(
 
                 if (isPastHour && totalInHour > limit) {
                     var excess = totalInHour - limit
+                    val sortedEntries = currentHourAppState.entries.sortedByDescending { it.value }
                     
-                    val sortedChunks = combined.sortedByDescending { it.duration }
-                    for (chunk in sortedChunks) {
+                    for (entry in sortedEntries) {
                         if (excess <= 0) break
-                        val currentPkgVal = currentHourAppState[chunk.packageName] ?: 0L
-                        val toMove = minOf(currentPkgVal, excess)
+                        val pkg = entry.key
+                        val currentValue = currentHourAppState[pkg] ?: 0L
+                        val toMove = minOf(currentValue, excess)
                         
-                        currentHourAppState[chunk.packageName] = currentPkgVal - toMove
+                        currentHourAppState[pkg] = currentValue - toMove
                         if (toMove > 0) {
-                            carryOver.add(0, UsageChunk(chunk.packageName, toMove))
+                            carryOver.add(UsageChunk(pkg, toMove))
                         }
                         excess -= toMove
-                    }
-                    
-                    if (excess > 0) {
-                        val sortedPackages = currentHourAppState.keys.sortedByDescending { currentHourAppState[it] }
-                        for (pkg in sortedPackages) {
-                            if (excess <= 0) break
-                            val currentVal = currentHourAppState[pkg] ?: 0L
-                            val toMove = minOf(currentVal, excess)
-                            
-                            currentHourAppState[pkg] = currentVal - toMove
-                            if (toMove > 0) {
-                                carryOver.add(0, UsageChunk(pkg, toMove))
-                            }
-                            excess -= toMove
-                        }
                     }
                 }
 
@@ -269,15 +255,16 @@ class UsageSyncManager(
                     finalHourTotal += duration
                 }
 
+                val finalTotalCapped = minOf(finalHourTotal, limit)
                 val existingTotalRec = existingMap[hour to "TOTAL"]
-                if (existingTotalRec == null || existingTotalRec.usageTimeMillis != finalHourTotal) {
+                if (existingTotalRec == null || existingTotalRec.usageTimeMillis != finalTotalCapped) {
                     finalEntities.add(
                         HourlyUsageEntity(
                             id = existingTotalRec?.id ?: 0,
                             date = date,
                             hour = hour,
                             packageName = "TOTAL",
-                            usageTimeMillis = finalHourTotal,
+                            usageTimeMillis = finalTotalCapped,
                             lastUpdated = now
                         )
                     )
@@ -312,7 +299,18 @@ class UsageSyncManager(
                 .groupBy { it.packageName }
                 .mapValues { it.value.sumOf { h -> h.usageTimeMillis } }
 
-            var totalTime = 0L
+            val prefs = preferencesRepository.userPreferencesFlow.first()
+            val todayDateStr = dateFormat.format(Date(now))
+            var totalTime = appTotals.values.sum()
+
+            if (date == todayDateStr) {
+                val lastKnownDailyUsage = prefs.lastKnownDailyUsage
+                val lastKnownDailyUsageDate = prefs.lastKnownDailyUsageDate
+                if (lastKnownDailyUsageDate == todayDateStr && lastKnownDailyUsage > totalTime) {
+                    totalTime = lastKnownDailyUsage
+                }
+            }
+
             var shieldTime = 0L
             var goalTime = 0L
 
@@ -325,7 +323,6 @@ class UsageSyncManager(
                         lastUpdated = now
                     )
                 )
-                totalTime += time
                 if (pkg in shieldPkgs) shieldTime += time
                 else if (pkg in goalPkgs) goalTime += time
             }

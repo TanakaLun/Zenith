@@ -102,15 +102,29 @@ class AppUsageMonitorService : Service() {
     private var lastMonitoringError: String? = null
     private var lastMonitoringErrorTime = 0L
 
+    private var monitoringWakeLock: android.os.PowerManager.WakeLock? = null
+    private var monitoringLoopActive = false
+
     private val screenStateReceiver = object : android.content.BroadcastReceiver() {
         override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
             when (intent?.action) {
-                Intent.ACTION_SCREEN_ON -> isScreenOn = true
+                Intent.ACTION_SCREEN_ON -> {
+                    isScreenOn = true
+                    monitoringWakeLock?.let { if (it.isHeld) it.release() }
+                }
                 Intent.ACTION_SCREEN_OFF -> {
                     isScreenOn = false
                     currentShieldCache = null
                     currentSessionPackage = null
                     usageStatsCache = null
+                    
+                    if (monitoringWakeLock == null) {
+                        monitoringWakeLock = powerManager.newWakeLock(
+                            android.os.PowerManager.PARTIAL_WAKE_LOCK,
+                            "Zenith:MonitorWakeLock"
+                        )
+                    }
+                    monitoringWakeLock?.acquire(600_000L)
                 }
                 android.os.PowerManager.ACTION_POWER_SAVE_MODE_CHANGED -> {
                     isPowerSaveMode = powerManager.isPowerSaveMode
@@ -132,8 +146,35 @@ class AppUsageMonitorService : Service() {
         when (intent?.action) {
             "SEND_TEST_NOTIFICATION" -> sendTestNotification()
             "com.etrisad.zenith.action.MIDNIGHT_RESET_SERVICE" -> onMidnightReset()
+            "com.etrisad.zenith.action.HEARTBEAT" -> {
+                scheduleHeartbeatAlarm()
+                if (serviceJob.isCancelled || !monitoringLoopActive) {
+                    startMonitoring()
+                }
+            }
         }
         return START_STICKY
+    }
+
+    private fun scheduleHeartbeatAlarm() {
+        val alarmManager = getSystemService(android.content.Context.ALARM_SERVICE) as android.app.AlarmManager
+        val intent = Intent(this, ZenithHeartbeatReceiver::class.java).apply {
+            action = "com.etrisad.zenith.action.HEARTBEAT"
+        }
+        val pendingIntent = PendingIntent.getBroadcast(
+            this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val triggerAt = System.currentTimeMillis() + 15 * 60 * 1000L
+        
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
+            alarmManager.setAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
+        } else {
+            try {
+                alarmManager.setExactAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
+            } catch (e: SecurityException) {
+                alarmManager.setAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
+            }
+        }
     }
 
     private fun onMidnightReset() {
@@ -144,6 +185,7 @@ class AppUsageMonitorService : Service() {
             notifiedGoals.clear()
             earlyKickManager.reset()
             dailyUsageCache.clear()
+            com.etrisad.zenith.util.ScreenUsageHelper.clearCache()
             lastAllowedRemainingTime.clear()
             usageStatsCache = null
             lastUsageCacheTime = 0L
@@ -235,6 +277,7 @@ class AppUsageMonitorService : Service() {
             currentPreferences = preferencesRepository.userPreferencesFlow.first()
             com.etrisad.zenith.util.AlarmTasksSchedulingHelper.scheduleMidnightResetTask(this@AppUsageMonitorService)
             startMonitoring()
+            scheduleHeartbeatAlarm()
         }
         startGoalReminderCheck()
     }
@@ -358,6 +401,7 @@ class AppUsageMonitorService : Service() {
     private val notifiedGoals = mutableSetOf<String>()
 
     private fun startMonitoring() {
+        monitoringLoopActive = true
         serviceScope.launch {
             checkDayChangeOnStartup()
 
@@ -374,6 +418,7 @@ class AppUsageMonitorService : Service() {
                         notifiedGoals.clear()
                         earlyKickManager.reset()
                         dailyUsageCache.clear()
+                        com.etrisad.zenith.util.ScreenUsageHelper.clearCache()
                         lastAllowedRemainingTime.clear()
                         usageStatsCache = null
                         lastUsageCacheTime = 0L
@@ -1082,6 +1127,7 @@ class AppUsageMonitorService : Service() {
             shieldRepository.resetAllRemainingTimes()
             notifiedGoals.clear()
             dailyUsageCache.clear()
+            com.etrisad.zenith.util.ScreenUsageHelper.clearCache()
             lastAllowedRemainingTime.clear()
         }
         
@@ -1705,6 +1751,7 @@ class AppUsageMonitorService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        monitoringLoopActive = false
         try {
             unregisterReceiver(screenStateReceiver)
         } catch (_: Exception) {}

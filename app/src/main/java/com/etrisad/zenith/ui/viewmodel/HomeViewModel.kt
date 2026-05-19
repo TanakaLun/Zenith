@@ -731,10 +731,12 @@ class HomeViewModel(
                                 ))
                             }
                         }
-                        if (totalInHour > 0) {
+                        
+                        val finalTotalInHour = minOf(totalInHour, hourLimit)
+                        if (finalTotalInHour > 0) {
                             newlyLocked.add(HourlyUsageEntity(
                                 date = selectedDateStr, hour = h, packageName = "TOTAL",
-                                usageTimeMillis = totalInHour, lastUpdated = System.currentTimeMillis()
+                                usageTimeMillis = finalTotalInHour, lastUpdated = System.currentTimeMillis()
                             ))
                         }
                     } else {

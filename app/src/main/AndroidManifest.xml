@@ -92,6 +92,15 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".service.ZenithHeartbeatReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.etrisad.zenith.action.HEARTBEAT" />
+            </intent-filter>
+        </receiver>
+
         <activity
             android:name=".ui.widget.AppStreakWidgetConfigurationActivity"
             android:exported="true"

@@ -208,4 +208,9 @@ object ScreenUsageHelper {
     fun fetchAppUsageTodayTillNow(usageStatsManager: UsageStatsManager): Map<String, Long> {
         return fetchDetailedUsageToday(usageStatsManager).appUsageMap
     }
+
+    fun clearCache() {
+        lastResult = null
+        lastQueryTime = 0L
+    }
 }
