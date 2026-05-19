@@ -28,6 +28,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -413,8 +414,11 @@ class AppUsageMonitorService : Service() {
                     val currentDay = calendar.get(Calendar.DAY_OF_YEAR)
 
                     if (lastCheckedDay != -1 && currentDay != lastCheckedDay) {
-                        updateStreaks()
-                        shieldRepository.resetAllRemainingTimes()
+                        withContext(Dispatchers.IO) {
+                            updateStreaks()
+                            shieldRepository.resetAllRemainingTimes()
+                        }
+                        preferencesRepository.refreshGlobalStreak(shieldRepository)
                         notifiedGoals.clear()
                         earlyKickManager.reset()
                         dailyUsageCache.clear()
@@ -434,6 +438,10 @@ class AppUsageMonitorService : Service() {
                         
                         lastCheckedDay = currentDay
                         lastCheckedDayTimestamp = currentTime
+                        
+                        // Give time for Flow collectors to update allShieldsCache from DB
+                        delay(1000)
+                        continue
                     }
 
                     if (currentTime - lastCheckedDayTimestamp > 60000) {
@@ -509,16 +517,18 @@ class AppUsageMonitorService : Service() {
                                 val systemGlobal = getFilteredGlobalUsage(detailedUsage.appUsageMap)
 
                                 val startOfDay = getStartOfDay()
+                                val timeSinceMidnight = (currentTime - startOfDay).coerceAtLeast(0L)
+                                
                                 val shield = currentShieldCache
                                 val dbUsage = if (shield != null && shield.lastUsedTimestamp >= startOfDay) {
                                     val limitMillis = (shield.timeLimitMinutes * 60 * 1000L)
                                     (limitMillis - shield.remainingTimeMillis).coerceAtLeast(0L)
                                 } else 0L
                                 
-                                baseUsageAtSessionStart = maxOf(systemUsage, dbUsage)
+                                baseUsageAtSessionStart = maxOf(systemUsage, dbUsage).coerceAtMost(timeSinceMidnight)
                                 cachedTotalUsage = baseUsageAtSessionStart
-                                baseGlobalUsageAtSessionStart = systemGlobal
-                                cachedTotalGlobalUsage = systemGlobal
+                                baseGlobalUsageAtSessionStart = systemGlobal.coerceAtMost(timeSinceMidnight)
+                                cachedTotalGlobalUsage = baseGlobalUsageAtSessionStart
 
                                 if (!shouldBypassBlocking(currentApp)) {
                                     checkBlockingInstant(currentApp, currentShieldCache)
@@ -768,7 +778,7 @@ class AppUsageMonitorService : Service() {
                 lastHUDUpdateTime = currentTime
 
                 val detailedUsage = com.etrisad.zenith.util.ScreenUsageHelper.fetchDetailedUsageToday(usageStatsManager)
-                val realUsage = detailedUsage.appUsageMap[packageName] ?: 0L
+                val realUsage = (detailedUsage.appUsageMap[packageName] ?: 0L).coerceAtMost(currentTime - getStartOfDay())
 
                 baseUsageAtSessionStart = realUsage
                 sessionStartTime = currentTime
@@ -783,14 +793,15 @@ class AppUsageMonitorService : Service() {
             val systemUsage = detailedUsage.appUsageMap[packageName] ?: 0L
             val systemGlobal = getFilteredGlobalUsage(detailedUsage.appUsageMap)
             val startOfDay = getStartOfDay()
+            val timeSinceMidnight = (currentTime - startOfDay).coerceAtLeast(0L)
             
             val dbUsage = if (shield.lastUsedTimestamp >= startOfDay) {
                 val limitMillis = (shield.timeLimitMinutes * 60 * 1000L)
                 (limitMillis - shield.remainingTimeMillis).coerceAtLeast(0L)
             } else 0L
             
-            baseUsageAtSessionStart = maxOf(systemUsage, dbUsage) - sessionElapsed
-            baseGlobalUsageAtSessionStart = systemGlobal - sessionElapsed
+            baseUsageAtSessionStart = (maxOf(systemUsage, dbUsage).coerceAtMost(timeSinceMidnight)) - sessionElapsed
+            baseGlobalUsageAtSessionStart = systemGlobal.coerceAtMost(timeSinceMidnight) - sessionElapsed
             lastUsageFetchTime = currentTime
         }
 
@@ -1321,7 +1332,7 @@ class AppUsageMonitorService : Service() {
 
             dailyUsageCache.clear()
             tempUsageMap.forEach { (pkg, time) ->
-                val cappedTime = if (time > timeSinceMidnight + 5000) timeSinceMidnight else time
+                val cappedTime = if (time > timeSinceMidnight) timeSinceMidnight else time
                 if (cappedTime > 0) dailyUsageCache[pkg] = cappedTime
             }
             usageStatsCache = statsList

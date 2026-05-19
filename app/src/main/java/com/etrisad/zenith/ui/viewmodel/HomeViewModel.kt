@@ -572,6 +572,8 @@ class HomeViewModel(
             }
             val filteredTodayUsage = todayDetailed.appUsageMap.filter { (pkg, _) -> 
                 pkg !in excludePackages && pkg in launcherApps 
+            }.mapValues { (_, usage) -> 
+                usage.coerceAtMost(timeSinceMidnight)
             }
             val totalToday = filteredTodayUsage.values.sum().coerceAtMost(timeSinceMidnight)
 

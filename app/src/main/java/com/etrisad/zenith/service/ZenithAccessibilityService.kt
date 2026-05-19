@@ -737,7 +737,7 @@ class ZenithAccessibilityService : AccessibilityService() {
             val timeSinceMidnight = currentTime - todayStart
 
             tempMap.forEach { (pkg, time) ->
-                val cappedTime = if (time > timeSinceMidnight + 5000) timeSinceMidnight else time
+                val cappedTime = if (time > timeSinceMidnight) timeSinceMidnight else time
                 if (cappedTime > 0) dailyUsageCache[pkg] = cappedTime
             }
             lastUsageCacheTime = currentTime

@@ -43,10 +43,7 @@ object ScreenUsageHelper {
 
         val aggregatedStats = usageStatsManager.queryAndAggregateUsageStats(start, end)
         aggregatedStats?.forEach { (pkg, stats) ->
-            if (stats.totalTimeInForeground > 0) {
-                usageMap[pkg] = stats.totalTimeInForeground
-                lastUsedMap[pkg] = stats.lastTimeUsed
-            }
+            lastUsedMap[pkg] = stats.lastTimeUsed
         }
 
         var activePkg: String? = null
@@ -73,6 +70,7 @@ object ScreenUsageHelper {
                         if (segmentStart < segmentEnd) {
                             val duration = segmentEnd - segmentStart
                             if (duration > 100) {
+                                usageMap[p] = (usageMap[p] ?: 0L) + duration
                                 if (duration > 4000) {
                                     sessionCounts[p] = (sessionCounts[p] ?: 0) + 1
                                 }
@@ -101,6 +99,7 @@ object ScreenUsageHelper {
                             if (segmentStart < segmentEnd) {
                                 val duration = segmentEnd - segmentStart
                                 if (duration > 0) {
+                                    usageMap[activePkg!!] = (usageMap[activePkg!!] ?: 0L) + duration
                                     if (duration > 4000) {
                                         sessionCounts[activePkg!!] = (sessionCounts[activePkg!!] ?: 0) + 1
                                     }
@@ -122,6 +121,7 @@ object ScreenUsageHelper {
                         if (segmentStart < segmentEnd) {
                             val duration = segmentEnd - segmentStart
                             if (duration > 100) {
+                                usageMap[pkg] = (usageMap[pkg] ?: 0L) + duration
                                 if (duration > 4000) {
                                     sessionCounts[pkg] = (sessionCounts[pkg] ?: 0) + 1
                                 }
@@ -144,8 +144,7 @@ object ScreenUsageHelper {
             val stats = aggregatedStats?.get(activePkg)
             if (stats != null) {
                 val lastActivity = maxOf(stats.lastTimeUsed, stats.lastTimeVisible)
-                
-                if (lastActivity in segmentStart until segmentEnd && (currentTime - lastActivity) > 60000) {
+                if (lastActivity in (segmentStart + 1) until segmentEnd && (currentTime - lastActivity) > 60000) {
                     segmentEnd = lastActivity
                 }
             }
@@ -153,6 +152,7 @@ object ScreenUsageHelper {
             if (segmentStart < segmentEnd) {
                 val duration = segmentEnd - segmentStart
                 if (duration > 100) {
+                    usageMap[activePkg!!] = (usageMap[activePkg!!] ?: 0L) + duration
                     if (duration > 4000) {
                         sessionCounts[activePkg!!] = (sessionCounts[activePkg!!] ?: 0) + 1
                     }
@@ -160,14 +160,6 @@ object ScreenUsageHelper {
                         addHourlyUsage(hourlyMap, activePkg!!, segmentStart, segmentEnd, cal)
                     }
                 }
-            }
-        }
-
-        if (isScreenOn && activePkg != null) {
-            val totalInAggr = usageMap[activePkg!!] ?: 0L
-            val currentSessionExtra = (end - maxOf(activeStartTime, start)).coerceAtLeast(0L)
-            if (currentSessionExtra > 0) {
-                usageMap[activePkg!!] = maxOf(totalInAggr, currentSessionExtra)
             }
         }
 
