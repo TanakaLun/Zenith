@@ -54,7 +54,6 @@ fun UsageHistoryCard(
     val effectiveSelectedDate = selectedDateMillis ?: internalSelectedDate
     
     val dateFormat = remember { SimpleDateFormat("dd", Locale.getDefault()) }
-    val todayDate = remember { dateFormat.format(System.currentTimeMillis()) }
     
     val selectedUsage = remember(history, effectiveSelectedDate) {
         history.find { it.date == effectiveSelectedDate }
@@ -86,17 +85,19 @@ fun UsageHistoryCard(
                             .togetherWith(fadeOut(animationSpec = spring(stiffness = Spring.StiffnessLow)) +
                                     slideOutVertically { -it / 2 })
                     },
-                    label = "SelectedUsageAnim"
+                    label = "SelectedUsageAnim",
+                    modifier = Modifier.height(24.dp)
                 ) { usage ->
-                    if (usage != null && dateFormat.format(usage.date) != todayDate) {
+                    if (usage != null) {
                         Text(
                             text = formatDuration(usage.totalTime),
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.ExtraBold,
-                            color = MaterialTheme.colorScheme.primary
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.wrapContentHeight()
                         )
                     } else {
-                        Spacer(modifier = Modifier.height(20.dp))
+                        Spacer(modifier = Modifier.fillMaxHeight())
                     }
                 }
             }
