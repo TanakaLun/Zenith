@@ -544,12 +544,16 @@ fun MainScreen(
                                     targetRoute == Screen.Bedtime.route ||
                                     targetRoute == Screen.DatabaseDebug.route ||
                                     targetRoute == Screen.DataRepairment.route ||
+                                    targetRoute == Screen.FontTest.route ||
+                                    targetRoute == Screen.GSFlexCustomizer.route ||
                                     targetRoute?.startsWith("app_detail") == true
                         val isInitialDeep =
                             initialRoute == Screen.UsageStats.route ||
                                     initialRoute == Screen.Bedtime.route ||
                                     initialRoute == Screen.DatabaseDebug.route ||
                                     initialRoute == Screen.DataRepairment.route ||
+                                    initialRoute == Screen.FontTest.route ||
+                                    initialRoute == Screen.GSFlexCustomizer.route ||
                                     initialRoute?.startsWith("app_detail") == true
 
                         val animationSpec = spring<IntOffset>(
@@ -588,6 +592,8 @@ fun MainScreen(
                                     targetRoute == Screen.Bedtime.route ||
                                     targetRoute == Screen.DatabaseDebug.route ||
                                     targetRoute == Screen.DataRepairment.route ||
+                                    targetRoute == Screen.FontTest.route ||
+                                    targetRoute == Screen.GSFlexCustomizer.route ||
                                     targetRoute?.startsWith("app_detail") == true
 
                         val animationSpec = spring<IntOffset>(
