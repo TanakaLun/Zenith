@@ -679,7 +679,7 @@ class HomeViewModel(
                     if (app.packageName in shieldPkgs) s += app.totalTimeVisible
                     else if (app.packageName in goalPkgs) g += app.totalTimeVisible
                 }
-                val currentTotal = if (isSelectedToday) totalToday else (selectedDayHistory.find { it.packageName == "TOTAL" }?.usageTimeMillis ?: allAppsUsage.sumOf { it.totalTimeVisible })
+                val currentTotal = selectedDayTotal
                 val o = (currentTotal - (s + g)).coerceAtLeast(0L)
                 Triple(s, g, o)
             } else {
@@ -816,6 +816,10 @@ class HomeViewModel(
                 ?: globalFallbackMap[yesterdayDateStr]?.find { it.packageName == "TOTAL" }?.usageTimeMillis
                 ?: 0L
 
+            val todayDateStr = dateFormat.format(Date(todayStart))
+            val actualTodayDbTotal = allHistory.find { it.date == todayDateStr && it.packageName == "TOTAL" }?.usageTimeMillis ?: 0L
+            val actualTodayTotal = maxOf(totalToday, actualTodayDbTotal)
+
             val history = (0 until 21).map { i ->
                 val dStart = getMidnight(i)
                 val dateStr = dateFormat.format(Date(dStart))
@@ -823,7 +827,7 @@ class HomeViewModel(
                 val dbEntry = globalHistory.find { it.date == dateStr }
                 val hasSystemData = globalFallbackMap[dateStr] != null
                 val dayTotal = if (i == 0) {
-                    totalToday
+                    actualTodayTotal
                 } else {
                     dbEntry?.usageTimeMillis 
                         ?: if (preferSystemUsageHistory) {
@@ -840,8 +844,8 @@ class HomeViewModel(
             }
 
             val percentageChange = when {
-                totalYesterday > 0 -> ((totalToday - totalYesterday).toFloat() / totalYesterday) * 100
-                totalToday > 0     -> 100f
+                totalYesterday > 0 -> ((actualTodayTotal - totalYesterday).toFloat() / totalYesterday) * 100
+                actualTodayTotal > 0     -> 100f
                 else               -> 0f
             }
 
@@ -933,7 +937,7 @@ class HomeViewModel(
             ) }
 
             viewModelScope.launch {
-                userPreferencesRepository.setLastKnownDailyUsage(totalToday, dateFormat.format(Date(now)))
+                userPreferencesRepository.setLastKnownDailyUsage(actualTodayTotal, dateFormat.format(Date(now)))
             }
         }
     }
