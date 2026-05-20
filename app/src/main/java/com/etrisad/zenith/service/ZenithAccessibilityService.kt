@@ -977,7 +977,7 @@ class ZenithAccessibilityService : AccessibilityService() {
         
         if (isBedtimeOrWindDown) {
             if (packageName in bedtimeWhitelistedPackages && packageName !in restrictedPackages) {
-                return true
+                if (prefs?.mindfulGatewayEnabled != true) return true
             }
         } else {
             if (packageName in whitelistedPackages) return true
