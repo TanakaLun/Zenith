@@ -402,6 +402,17 @@ class HomeViewModel(
         shieldRepository.getHourlyUsageForDate(today)
     }
 
+    fun onRefresh() {
+        viewModelScope.launch {
+            val prefs = userPreferencesRepository.userPreferencesFlow.first()
+            if (prefs.smartRepairOnRefresh) {
+                resetCarryover()
+            } else {
+                syncDataNow()
+            }
+        }
+    }
+
     fun syncDataNow() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }

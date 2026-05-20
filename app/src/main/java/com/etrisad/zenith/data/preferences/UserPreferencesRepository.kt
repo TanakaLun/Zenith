@@ -85,6 +85,7 @@ class UserPreferencesRepository(private val context: Context) {
         val PREFER_SYSTEM_USAGE_HISTORY = booleanPreferencesKey("prefer_system_usage_history")
         val ONBOARDING_STATS_COMPLETED = booleanPreferencesKey("onboarding_stats_completed")
         val HUD_HIDE_FEATURE_LEARNED = booleanPreferencesKey("hud_hide_feature_learned")
+        val SMART_REPAIR_ON_REFRESH = booleanPreferencesKey("smart_repair_on_refresh")
         val SHORTS_SCREEN_TIME_MS = longPreferencesKey("shorts_screen_time_ms")
         val CUSTOM_DELAY_ENABLED = booleanPreferencesKey("custom_delay_enabled")
         val DELAY_POWER_SAVE = longPreferencesKey("delay_power_save")
@@ -168,6 +169,7 @@ class UserPreferencesRepository(private val context: Context) {
                 preferSystemUsageHistory = preferences[PreferencesKeys.PREFER_SYSTEM_USAGE_HISTORY] ?: true,
                 onboardingStatsCompleted = preferences[PreferencesKeys.ONBOARDING_STATS_COMPLETED] ?: false,
                 hudHideFeatureLearned = preferences[PreferencesKeys.HUD_HIDE_FEATURE_LEARNED] ?: false,
+                smartRepairOnRefresh = preferences[PreferencesKeys.SMART_REPAIR_ON_REFRESH] ?: false,
                 shortsScreenTimeMs = preferences[PreferencesKeys.SHORTS_SCREEN_TIME_MS] ?: 0L,
                 customDelayEnabled = preferences[PreferencesKeys.CUSTOM_DELAY_ENABLED] ?: false,
                 delayPowerSave = preferences[PreferencesKeys.DELAY_POWER_SAVE] ?: 5000L,
@@ -432,6 +434,10 @@ class UserPreferencesRepository(private val context: Context) {
         context.dataStore.edit { preferences -> preferences[PreferencesKeys.HUD_HIDE_FEATURE_LEARNED] = learned }
     }
 
+    suspend fun setSmartRepairOnRefresh(enabled: Boolean) {
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.SMART_REPAIR_ON_REFRESH] = enabled }
+    }
+
     suspend fun setShortsScreenTimeMs(ms: Long) {
         context.dataStore.edit { preferences -> preferences[PreferencesKeys.SHORTS_SCREEN_TIME_MS] = ms }
     }
@@ -561,6 +567,7 @@ data class UserPreferences(
     val preferSystemUsageHistory: Boolean = true,
     val onboardingStatsCompleted: Boolean = false,
     val hudHideFeatureLearned: Boolean = false,
+    val smartRepairOnRefresh: Boolean = false,
     val shortsScreenTimeMs: Long = 0L,
     val customDelayEnabled: Boolean = false,
     val delayPowerSave: Long = 5000L,

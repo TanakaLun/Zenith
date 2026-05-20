@@ -70,11 +70,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 @Composable
 fun UsageStatsScreen(
     viewModel: HomeViewModel,
+    userPreferencesRepository: com.etrisad.zenith.data.preferences.UserPreferencesRepository,
     innerPadding: PaddingValues,
     showDatabaseIndicator: Boolean,
     onAppClick: (String) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val preferences by userPreferencesRepository.userPreferencesFlow.collectAsState(
+        initial = com.etrisad.zenith.data.preferences.UserPreferences()
+    )
     val pullToRefreshState = rememberPullToRefreshState()
     var isManualRefreshing by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -82,6 +86,12 @@ fun UsageStatsScreen(
     LaunchedEffect(uiState.isLoading) {
         if (!uiState.isLoading && isManualRefreshing) {
             isManualRefreshing = false
+            val message = if (preferences.smartRepairOnRefresh) {
+                "Smart Repair complete: Hourly stats recalculated from system logs."
+            } else {
+                "Stats synchronized with system usage."
+            }
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
         } else if (!uiState.isLoading) {
             isManualRefreshing = false
         }
@@ -184,7 +194,7 @@ fun UsageStatsScreen(
         isRefreshing = uiState.isLoading,
         onRefresh = {
             isManualRefreshing = true
-            viewModel.resetCarryover()
+            viewModel.onRefresh()
         },
         state = pullToRefreshState,
         indicator = {

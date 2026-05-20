@@ -296,6 +296,11 @@ fun SettingsScreen(
                 preferencesRepository.setShowDatabaseIndicator(enabled)
             }
         },
+        onSmartRepairOnRefreshChange = { enabled ->
+            coroutineScope.launch {
+                preferencesRepository.setSmartRepairOnRefresh(enabled)
+            }
+        },
         onDeveloperModeEnabledChange = { enabled ->
             coroutineScope.launch {
                 preferencesRepository.setDeveloperModeEnabled(enabled)
@@ -515,6 +520,7 @@ fun SettingsScreenContent(
     onEarlyKickEnabledChange: (Boolean) -> Unit,
     onInterceptAudioFocusEnabledChange: (Boolean) -> Unit,
     onShowDatabaseIndicatorChange: (Boolean) -> Unit,
+    onSmartRepairOnRefreshChange: (Boolean) -> Unit,
     onDeveloperModeEnabledChange: (Boolean) -> Unit,
     onNavigateToDatabaseDebug: () -> Unit,
     onNavigateToDataRepairment: () -> Unit,
@@ -862,6 +868,18 @@ fun SettingsScreenContent(
                         onCheckedChange = onShowDatabaseIndicatorChange,
                         icon = Icons.Outlined.Storage,
                         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
+                    )
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    SettingsToggle(
+                        title = "Smart Repair on Refresh",
+                        description = "Enable resetCarryover() when pulling to refresh on dashboard",
+                        checked = preferences.smartRepairOnRefresh,
+                        onCheckedChange = onSmartRepairOnRefreshChange,
+                        icon = Icons.Outlined.AutoFixHigh,
+                        shape = RoundedCornerShape(8.dp)
                     )
                 }
 

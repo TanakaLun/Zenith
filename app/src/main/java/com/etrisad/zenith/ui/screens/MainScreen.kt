@@ -682,6 +682,7 @@ fun MainScreen(
                     composable(Screen.UsageStats.route) {
                         UsageStatsScreen(
                             viewModel = homeViewModel,
+                            userPreferencesRepository = userPreferencesRepository,
                             innerPadding = innerPadding,
                             showDatabaseIndicator = preferences.showDatabaseIndicator,
                             onAppClick = { packageName ->

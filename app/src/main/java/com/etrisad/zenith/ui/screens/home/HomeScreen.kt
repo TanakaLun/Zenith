@@ -111,7 +111,7 @@ fun HomeScreen(
         onBedtimeClick = onBedtimeClick,
         onStatsClick = onSeeFullList,
         onDaySelected = { viewModel.selectDate(it) },
-        onRefresh = { viewModel.syncDataNow() }
+        onRefresh = { viewModel.onRefresh() }
     )
 }
 
