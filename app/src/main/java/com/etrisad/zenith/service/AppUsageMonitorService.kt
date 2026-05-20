@@ -438,8 +438,7 @@ class AppUsageMonitorService : Service() {
                         
                         lastCheckedDay = currentDay
                         lastCheckedDayTimestamp = currentTime
-                        
-                        // Give time for Flow collectors to update allShieldsCache from DB
+
                         delay(1000)
                         continue
                     }

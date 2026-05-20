@@ -86,6 +86,42 @@ fun GoalOverlay(
 
     val currentOnGoalDismiss by rememberUpdatedState(onGoalDismiss)
 
+    val combinedStateState = produceState(
+        initialValue = Triple(shield, totalUsageToday, totalGlobalUsageToday),
+        packageName,
+        shield,
+        totalUsageToday,
+        totalGlobalUsageToday
+    ) {
+        val usm = context.getSystemService(android.content.Context.USAGE_STATS_SERVICE) as android.app.usage.UsageStatsManager
+        val now = System.currentTimeMillis()
+        val calendar = Calendar.getInstance().apply {
+            timeInMillis = now
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        val startOfDay = calendar.timeInMillis
+        val timeSinceMidnight = (now - startOfDay).coerceAtLeast(0L)
+
+        val detailedUsage = withContext(Dispatchers.IO) {
+            com.etrisad.zenith.util.ScreenUsageHelper.fetchDetailedUsageToday(usm)
+        }
+        
+        val liveAppUsage = detailedUsage.appUsageMap[packageName] ?: 0L
+
+        value = Triple(
+            shield, 
+            liveAppUsage.coerceAtMost(timeSinceMidnight), 
+            totalGlobalUsageToday.coerceAtMost(timeSinceMidnight)
+        )
+    }
+
+    val currentShield = combinedStateState.value.first
+    val currentTotalUsageToday = combinedStateState.value.second
+    val currentTotalGlobalUsageToday = combinedStateState.value.third
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -132,9 +168,9 @@ fun GoalOverlay(
                         modifier = Modifier.displayCutoutPadding(),
                         appName = appName,
                         appIcon = appIconBitmap,
-                        shield = shield,
-                        totalUsageToday = totalUsageToday,
-                        totalGlobalUsageToday = totalGlobalUsageToday,
+                        shield = currentShield,
+                        totalUsageToday = currentTotalUsageToday,
+                        totalGlobalUsageToday = currentTotalGlobalUsageToday,
                         userPrefs = userPrefs,
                         onGoalDismiss = {
                             scope.launch {
@@ -148,9 +184,9 @@ fun GoalOverlay(
                     PortraitGoalLayout(
                         appName = appName,
                         appIcon = appIconBitmap,
-                        shield = shield,
-                        totalUsageToday = totalUsageToday,
-                        totalGlobalUsageToday = totalGlobalUsageToday,
+                        shield = currentShield,
+                        totalUsageToday = currentTotalUsageToday,
+                        totalGlobalUsageToday = currentTotalGlobalUsageToday,
                         userPrefs = userPrefs,
                         onGoalDismiss = {
                             scope.launch {

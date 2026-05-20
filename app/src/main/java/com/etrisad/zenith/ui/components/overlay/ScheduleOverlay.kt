@@ -29,7 +29,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
-import com.etrisad.zenith.data.local.entity.DailyUsageEntity
 import com.etrisad.zenith.data.local.entity.ScheduleEntity
 import com.etrisad.zenith.data.local.entity.ScheduleMode
 import com.etrisad.zenith.data.preferences.UserPreferences
@@ -37,6 +36,7 @@ import com.etrisad.zenith.data.preferences.UserPreferencesRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -64,16 +64,34 @@ fun ScheduleOverlay(
         value = shieldRepository.allSchedules.first().find { it.id == schedule.id } ?: schedule
     }
 
-    val databaseUsage by produceState(initialValue = emptyList<DailyUsageEntity>()) {
-        value = shieldRepository.getAllUsage().first()
-    }
-    val todayDate = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date()) }
-    val dbGlobalUsage = remember(databaseUsage, todayDate) {
-        databaseUsage.find { it.date == todayDate && it.packageName == "TOTAL" }?.usageTimeMillis ?: 0L
-    }
+    val currentTotalGlobalUsageTodayState = produceState(
+        initialValue = totalGlobalUsageToday,
+        totalGlobalUsageToday
+    ) {
+        val usm = context.getSystemService(android.content.Context.USAGE_STATS_SERVICE) as android.app.usage.UsageStatsManager
+        val now = System.currentTimeMillis()
+        val startOfDay = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val timeSinceMidnight = (now - startOfDay).coerceAtLeast(0L)
 
-    val initialTotalGlobalUsageToday = remember { totalGlobalUsageToday }
-    val currentTotalGlobalUsageToday = remember(dbGlobalUsage) { maxOf(initialTotalGlobalUsageToday, dbGlobalUsage) }
+        val detailedUsage = withContext(kotlinx.coroutines.Dispatchers.IO) {
+            com.etrisad.zenith.util.ScreenUsageHelper.fetchDetailedUsageToday(usm)
+        }
+        
+        var totalToday = 0L
+        detailedUsage.appUsageMap.entries.forEach { entry ->
+            if (entry.key != context.packageName) {
+                totalToday += entry.value
+            }
+        }
+
+        value = totalToday.coerceAtMost(timeSinceMidnight)
+    }
+    val currentTotalGlobalUsageToday = currentTotalGlobalUsageTodayState.value
 
     val userPrefsRepo = remember { UserPreferencesRepository(context) }
     val userPrefs by produceState(initialValue = UserPreferences()) {

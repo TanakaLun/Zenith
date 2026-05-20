@@ -66,10 +66,19 @@ class DailyUsageWorker(context: Context, params: WorkerParameters) : CoroutineWo
         val excludePackages = setOfNotNull(applicationContext.packageName, launcherPackage)
 
         val stats = usm.queryAndAggregateUsageStats(startTime, endTime)
+        val timeSinceMidnight = if (isDateToday) (System.currentTimeMillis() - startTime).coerceAtLeast(0L) else (24 * 60 * 60 * 1000L)
+        
+        val detailedUsage = if (isDateToday) com.etrisad.zenith.util.ScreenUsageHelper.fetchDetailedUsageToday(usm) else null
+
         stats.forEach { (pkg, stat) ->
             if (pkg !in excludePackages && pkg in launcherApps) {
-                val time = stat.totalTimeVisible.coerceAtLeast(stat.totalTimeInForeground)
-                if (time > 0) finalAppUsages[pkg] = time
+                var time = stat.totalTimeVisible.coerceAtLeast(stat.totalTimeInForeground)
+
+                if (isDateToday && detailedUsage != null) {
+                    time = detailedUsage.appUsageMap[pkg] ?: 0L
+                }
+                
+                if (time > 0) finalAppUsages[pkg] = time.coerceAtMost(timeSinceMidnight)
             }
         }
 

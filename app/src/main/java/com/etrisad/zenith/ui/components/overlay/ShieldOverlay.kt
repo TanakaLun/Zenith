@@ -12,7 +12,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material.icons.outlined.Bolt
-import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.Timer
@@ -79,27 +78,42 @@ fun ShieldOverlay(
         }
     }
 
-    val todayDate = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date()) }
-    val combinedState by produceState<Triple<ShieldEntity?, Long, Long>>(
+    val combinedStateState = produceState(
         initialValue = Triple(shield, totalUsageToday, totalGlobalUsageToday),
-        key1 = packageName,
-        key2 = shield
+        packageName,
+        shield,
+        totalUsageToday,
+        totalGlobalUsageToday
     ) {
-        val s = shieldRepository.getShieldByPackageNameFlow(packageName).first()
-        val appUsage = shieldRepository.getUsageByDateAndPackageFlow(todayDate, packageName).first()
-        val globalUsage = shieldRepository.getUsageByDateAndPackageFlow(todayDate, "TOTAL").first()
+        val usm = context.getSystemService(android.content.Context.USAGE_STATS_SERVICE) as android.app.usage.UsageStatsManager
+        val now = System.currentTimeMillis()
+        val calendar = Calendar.getInstance().apply {
+            timeInMillis = now
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        val startOfDay = calendar.timeInMillis
+        val timeSinceMidnight = (now - startOfDay).coerceAtLeast(0L)
 
-        val dbAppUsage = appUsage?.usageTimeMillis ?: 0L
-        val dbGlobalUsage = globalUsage?.usageTimeMillis ?: 0L
+        val detailedUsage = withContext(Dispatchers.IO) {
+            com.etrisad.zenith.util.ScreenUsageHelper.fetchDetailedUsageToday(usm)
+        }
+        
+        val s = shieldRepository.getShieldByPackageNameFlow(packageName).first()
+        val liveAppUsage = detailedUsage.appUsageMap[packageName] ?: 0L
 
         value = Triple(
             s ?: shield, 
-            maxOf(totalUsageToday, dbAppUsage), 
-            maxOf(totalGlobalUsageToday, dbGlobalUsage)
+            liveAppUsage.coerceAtMost(timeSinceMidnight), 
+            totalGlobalUsageToday.coerceAtMost(timeSinceMidnight)
         )
     }
 
-    val (currentShield, currentTotalUsageToday, currentTotalGlobalUsageToday) = combinedState
+    val currentShield = combinedStateState.value.first
+    val currentTotalUsageToday = combinedStateState.value.second
+    val currentTotalGlobalUsageToday = combinedStateState.value.third
     
     var showContent by remember { mutableStateOf(false) }
     var isEmergencyUnlocked by remember { mutableStateOf(false) }
@@ -109,10 +123,10 @@ fun ShieldOverlay(
         value = userPrefsRepo.userPreferencesFlow.first()
     }
 
-    val isDelayEnabled = currentShield?.isDelayAppEnabled == true && currentShield.type == FocusType.SHIELD
+    val isDelayEnabled = currentShield != null && currentShield.isDelayAppEnabled && currentShield.type == FocusType.SHIELD
     
     val initialProgress = remember(packageName, delayDurationSeconds) {
-        if (isDelayEnabled && (currentShield?.lastDelayStartTimestamp ?: 0L) > 0 && delayDurationSeconds > 0) {
+        if (isDelayEnabled && currentShield != null && currentShield.lastDelayStartTimestamp > 0 && delayDurationSeconds > 0) {
             val elapsed = System.currentTimeMillis() - currentShield.lastDelayStartTimestamp
             (elapsed.toFloat() / (delayDurationSeconds * 1000f)).coerceIn(0f, 1f)
         } else {
@@ -122,7 +136,7 @@ fun ShieldOverlay(
 
     val delayProgressAnimatable = remember(packageName) { Animatable(initialProgress) }
     var isDelaying by remember(packageName) { 
-        mutableStateOf(isDelayEnabled && (currentShield?.lastDelayStartTimestamp ?: 0L) != 0L && initialProgress < 1f) 
+        mutableStateOf(isDelayEnabled && currentShield != null && currentShield.lastDelayStartTimestamp != 0L && initialProgress < 1f)
     }
 
     val motivationalMessages = remember {
