@@ -56,6 +56,8 @@ import com.etrisad.zenith.ui.viewmodel.HomeViewModel
 import com.etrisad.zenith.ui.viewmodel.HourlySortType
 import com.etrisad.zenith.ui.viewmodel.HourlyUsageInfo
 import androidx.compose.material.icons.outlined.Sort
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.cos
@@ -75,9 +77,14 @@ fun UsageStatsScreen(
     val uiState by viewModel.uiState.collectAsState()
     val pullToRefreshState = rememberPullToRefreshState()
     var isManualRefreshing by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     LaunchedEffect(uiState.isLoading) {
-        if (!uiState.isLoading) isManualRefreshing = false
+        if (!uiState.isLoading && isManualRefreshing) {
+            isManualRefreshing = false
+        } else if (!uiState.isLoading) {
+            isManualRefreshing = false
+        }
     }
     
     var selectedHour by rememberSaveable { mutableStateOf<Int?>(null) }
@@ -177,7 +184,7 @@ fun UsageStatsScreen(
         isRefreshing = uiState.isLoading,
         onRefresh = {
             isManualRefreshing = true
-            viewModel.syncDataNow()
+            viewModel.resetCarryover()
         },
         state = pullToRefreshState,
         indicator = {
