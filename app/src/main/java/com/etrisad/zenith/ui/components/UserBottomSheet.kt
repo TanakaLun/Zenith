@@ -190,7 +190,7 @@ fun StreakCard(
                 }
                 
                 Surface(
-                    color = MaterialTheme.colorScheme.tertiaryContainer,
+                    color = MaterialTheme.colorScheme.tertiary,
                     shape = sunnyShape,
                     modifier = Modifier.size(64.dp)
                 ) {
