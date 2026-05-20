@@ -405,9 +405,14 @@ class HomeViewModel(
     fun syncDataNow() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-            val syncManager = UsageSyncManager(context, shieldRepository, userPreferencesRepository)
+            
+            val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+            com.etrisad.zenith.util.ScreenUsageHelper.clearCache()
+            repairData(todayStr)
+
+            val syncManager = UsageSyncManager(context!!, shieldRepository, userPreferencesRepository)
             syncManager.syncUsageData()
-            refreshUsageStats()
+            refreshUsageStats(showLoading = false)
         }
     }
 
