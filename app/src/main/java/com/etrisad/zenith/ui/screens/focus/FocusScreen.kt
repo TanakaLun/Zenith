@@ -335,6 +335,14 @@ fun FocusScreenContent(
     onToggleShieldSelection: (String) -> Unit = {},
     onToggleScheduleSelection: (Long) -> Unit = {}
 ) {
+    // Shared minute ticker
+    val nowMillis by produceState(initialValue = System.currentTimeMillis()) {
+        while (true) {
+            delay(60000)
+            value = System.currentTimeMillis()
+        }
+    }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -396,6 +404,7 @@ fun FocusScreenContent(
                             onEdit = { onEditShield(shield) },
                             onClick = { onAppClick(shield.packageName) },
                             onLongClick = { onAppLongClick(shield.packageName) },
+                            nowMillis = nowMillis,
                             isSelectionMode = isSelectionMode,
                             isSelected = shield.packageName in selectedShields,
                             onToggleSelection = { onToggleShieldSelection(shield.packageName) }
@@ -462,6 +471,7 @@ fun FocusScreenContent(
                             onEdit = { onEditShield(shield) },
                             onClick = { onAppClick(shield.packageName) },
                             onLongClick = { onAppLongClick(shield.packageName) },
+                            nowMillis = nowMillis,
                             isSelectionMode = isSelectionMode,
                             isSelected = shield.packageName in selectedShields,
                             onToggleSelection = { onToggleShieldSelection(shield.packageName) }
@@ -844,24 +854,20 @@ fun ShieldConfigItem(
     onEdit: () -> Unit,
     onClick: () -> Unit,
     onLongClick: () -> Unit = {},
+    nowMillis: Long,
     isSelectionMode: Boolean = false,
     isSelected: Boolean = false,
     onToggleSelection: () -> Unit = {}
 ) {
     val haptic = LocalHapticFeedback.current
     val context = LocalContext.current
-    val appIcon = remember(shield.packageName) {
-        try {
-            context.packageManager.getApplicationIcon(shield.packageName)
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-    val nowMillis by produceState(initialValue = System.currentTimeMillis()) {
-        while (true) {
-            delay(60000)
-            value = System.currentTimeMillis()
+    val appIcon by produceState<android.graphics.drawable.Drawable?>(initialValue = null, shield.packageName) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            value = try {
+                context.packageManager.getApplicationIcon(shield.packageName)
+            } catch (_: Exception) {
+                null
+            }
         }
     }
 
@@ -869,7 +875,9 @@ fun ShieldConfigItem(
         shield.isPaused && (shield.pauseEndTimestamp == 0L || nowMillis < shield.pauseEndTimestamp)
     }
 
-    val nextResetTimestamp = shield.lastPeriodResetTimestamp + (shield.refreshPeriodMinutes * 60 * 1000L)
+    val nextResetTimestamp = remember(shield.lastPeriodResetTimestamp, shield.refreshPeriodMinutes) {
+        shield.lastPeriodResetTimestamp + (shield.refreshPeriodMinutes * 60 * 1000L)
+    }
     val remainingResetMillis = (nextResetTimestamp - nowMillis).coerceAtLeast(0L)
     val usesExhausted = remember(shield.currentPeriodUses, shield.maxUsesPerPeriod) {
         shield.currentPeriodUses >= shield.maxUsesPerPeriod && shield.maxUsesPerPeriod > 0
@@ -941,9 +949,10 @@ fun ShieldConfigItem(
                     modifier = Modifier.size(46.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (appIcon != null) {
+                    val icon = appIcon
+                    if (icon != null) {
                         Image(
-                            painter = BitmapPainter(appIcon.toBitmap().asImageBitmap()),
+                            painter = BitmapPainter(icon.toBitmap().asImageBitmap()),
                             contentDescription = null,
                             modifier = Modifier
                                 .size(40.dp)

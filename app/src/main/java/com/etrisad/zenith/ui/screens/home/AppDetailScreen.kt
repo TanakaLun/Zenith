@@ -70,7 +70,7 @@ fun AppDetailScreen(
     )
     val nowMillis by produceState(initialValue = System.currentTimeMillis()) {
         while (true) {
-            delay(1000)
+            delay(30000) // Lower CPU: 30s refresh instead of 1s
             value = System.currentTimeMillis()
         }
     }
@@ -412,6 +412,15 @@ fun AppHeader(
         ColorFilter.colorMatrix(matrix)
     }
 
+    val appIcon by produceState<androidx.compose.ui.graphics.ImageBitmap?>(initialValue = null, icon) {
+        val i = icon
+        if (i != null) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                value = i.toBitmap().asImageBitmap()
+            }
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -419,9 +428,10 @@ fun AppHeader(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(contentAlignment = Alignment.Center) {
-            if (icon != null) {
+            val bitmapIcon = appIcon
+            if (bitmapIcon != null) {
                 Image(
-                    painter = BitmapPainter(icon.toBitmap().asImageBitmap()),
+                    bitmap = bitmapIcon,
                     contentDescription = null,
                     modifier = Modifier
                         .size(80.dp)

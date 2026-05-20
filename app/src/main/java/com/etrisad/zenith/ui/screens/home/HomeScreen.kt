@@ -135,6 +135,14 @@ fun HomeScreenContent(
     val pullToRefreshState = rememberPullToRefreshState()
     var isManualRefreshing by remember { mutableStateOf(false) }
     
+    // Shared minute ticker to avoid multiple timers in LazyColumn items
+    val nowMillis by produceState(initialValue = System.currentTimeMillis()) {
+        while (true) {
+            delay(60000)
+            value = System.currentTimeMillis()
+        }
+    }
+
     LaunchedEffect(uiState.isLoading) {
         if (!uiState.isLoading) isManualRefreshing = false
     }
@@ -306,7 +314,7 @@ fun HomeScreenContent(
                     }
                 }
             } else {
-                shieldList(shields = uiState.activeGoals, formatDuration = formatDuration, onAppClick = onAppClick)
+                shieldList(shields = uiState.activeGoals, formatDuration = formatDuration, nowMillis = nowMillis, onAppClick = onAppClick)
             }
 
             item {
@@ -332,7 +340,7 @@ fun HomeScreenContent(
                     }
                 }
             } else {
-                shieldList(shields = uiState.activeShields, formatDuration = formatDuration, onAppClick = onAppClick)
+                shieldList(shields = uiState.activeShields, formatDuration = formatDuration, nowMillis = nowMillis, onAppClick = onAppClick)
             }
         }
     }
@@ -706,12 +714,18 @@ fun TopAppsSection(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         topApps.take(3).reversed().forEach { app ->
-                            val appIcon = remember(app.icon) {
-                                app.icon?.toBitmap()?.asImageBitmap()
+                            val appIcon by produceState<androidx.compose.ui.graphics.ImageBitmap?>(initialValue = null, app.icon) {
+                                val icon = app.icon
+                                if (icon != null) {
+                                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                        value = icon.toBitmap().asImageBitmap()
+                                    }
+                                }
                             }
-                            if (appIcon != null) {
+                            val icon = appIcon
+                            if (icon != null) {
                                 Image(
-                                    painter = BitmapPainter(appIcon),
+                                    painter = BitmapPainter(icon),
                                     contentDescription = null,
                                     modifier = Modifier
                                         .size(28.dp)
@@ -751,11 +765,13 @@ fun TopAppsSection(
                         }
 
                         val context = LocalContext.current
-                        val appIcon = remember(app.packageName) {
-                            try {
-                                context.packageManager.getApplicationIcon(app.packageName)?.toBitmap()?.asImageBitmap()
-                            } catch (_: Exception) {
-                                null
+                        val appIcon by produceState<androidx.compose.ui.graphics.ImageBitmap?>(initialValue = null, app.packageName) {
+                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                value = try {
+                                    context.packageManager.getApplicationIcon(app.packageName)?.toBitmap()?.asImageBitmap()
+                                } catch (_: Exception) {
+                                    null
+                                }
                             }
                         }
 
@@ -786,9 +802,10 @@ fun TopAppsSection(
                                     )
                                 },
                                 leadingContent = {
-                                    if (appIcon != null) {
+                                    val icon = appIcon
+                                    if (icon != null) {
                                         Image(
-                                            painter = BitmapPainter(appIcon),
+                                            painter = BitmapPainter(icon),
                                             contentDescription = null,
                                             modifier = Modifier
                                                 .size(40.dp)
@@ -964,6 +981,7 @@ fun QuickActionCard(
 fun LazyListScope.shieldList(
     shields: List<ShieldEntity>,
     formatDuration: (Long) -> String,
+    nowMillis: Long,
     onAppClick: (String) -> Unit
 ) {
     itemsIndexed(
@@ -977,7 +995,7 @@ fun LazyListScope.shieldList(
             else -> RoundedCornerShape(8.dp)
         }
         Column(modifier = Modifier.animateItem()) {
-            ShieldItem(shield = shield, shape = shape, formatDuration = formatDuration, onAppClick = onAppClick)
+            ShieldItem(shield = shield, shape = shape, formatDuration = formatDuration, nowMillis = nowMillis, onAppClick = onAppClick)
             if (index < shields.size - 1) {
                 Spacer(modifier = Modifier.height(4.dp))
             }
@@ -991,25 +1009,21 @@ fun ShieldItem(
     shield: ShieldEntity,
     shape: RoundedCornerShape,
     formatDuration: (Long) -> String,
+    nowMillis: Long,
     onAppClick: (String) -> Unit
 ) {
-    val totalLimitMillis = shield.timeLimitMinutes * 60 * 1000L
+    val totalLimitMillis = remember(shield.timeLimitMinutes) { shield.timeLimitMinutes * 60 * 1000L }
     val remainingMillis = shield.remainingTimeMillis.coerceIn(0L, totalLimitMillis)
     val progress = if (totalLimitMillis > 0) remainingMillis.toFloat() / totalLimitMillis else 0f
 
     val context = LocalContext.current
-    val appIcon = remember(shield.packageName) {
-        try {
-            context.packageManager.getApplicationIcon(shield.packageName)?.toBitmap()?.asImageBitmap()
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-    val nowMillis by produceState(initialValue = System.currentTimeMillis()) {
-        while (true) {
-            delay(60000)
-            value = System.currentTimeMillis()
+    val appIcon by produceState<androidx.compose.ui.graphics.ImageBitmap?>(initialValue = null, shield.packageName) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            value = try {
+                context.packageManager.getApplicationIcon(shield.packageName)?.toBitmap()?.asImageBitmap()
+            } catch (_: Exception) {
+                null
+            }
         }
     }
 
@@ -1017,7 +1031,9 @@ fun ShieldItem(
         shield.isPaused && (shield.pauseEndTimestamp == 0L || nowMillis < shield.pauseEndTimestamp)
     }
 
-    val nextResetTimestamp = shield.lastPeriodResetTimestamp + (shield.refreshPeriodMinutes * 60 * 1000L)
+    val nextResetTimestamp = remember(shield.lastPeriodResetTimestamp, shield.refreshPeriodMinutes) {
+        shield.lastPeriodResetTimestamp + (shield.refreshPeriodMinutes * 60 * 1000L)
+    }
     val remainingResetMillis = (nextResetTimestamp - nowMillis).coerceAtLeast(0L)
     val usesExhausted = remember(shield.currentPeriodUses, shield.maxUsesPerPeriod) {
         shield.currentPeriodUses >= shield.maxUsesPerPeriod && shield.maxUsesPerPeriod > 0
@@ -1085,9 +1101,10 @@ fun ShieldItem(
                         modifier = Modifier.size(46.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (appIcon != null) {
+                        val icon = appIcon
+                        if (icon != null) {
                             Image(
-                                painter = BitmapPainter(appIcon),
+                                painter = BitmapPainter(icon),
                                 contentDescription = null,
                                 modifier = Modifier
                                     .size(40.dp)

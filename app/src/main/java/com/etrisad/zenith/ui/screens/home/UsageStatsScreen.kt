@@ -1716,12 +1716,18 @@ fun UsageItem(
                 )
             },
             leadingContent = {
-                val appIcon = remember(app.icon) {
-                    app.icon?.toBitmap()?.asImageBitmap()
+                val appIcon by produceState<androidx.compose.ui.graphics.ImageBitmap?>(initialValue = null, app.icon) {
+                    val icon = app.icon
+                    if (icon != null) {
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            value = icon.toBitmap().asImageBitmap()
+                        }
+                    }
                 }
-                if (appIcon != null) {
+                val icon = appIcon
+                if (icon != null) {
                     Image(
-                        painter = BitmapPainter(appIcon),
+                        painter = BitmapPainter(icon),
                         contentDescription = null,
                         modifier = Modifier
                             .size(40.dp)
