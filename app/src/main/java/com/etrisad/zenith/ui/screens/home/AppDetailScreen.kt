@@ -70,7 +70,7 @@ fun AppDetailScreen(
     )
     val nowMillis by produceState(initialValue = System.currentTimeMillis()) {
         while (true) {
-            delay(30000) // Lower CPU: 30s refresh instead of 1s
+            delay(30000)
             value = System.currentTimeMillis()
         }
     }

@@ -335,7 +335,6 @@ fun FocusScreenContent(
     onToggleShieldSelection: (String) -> Unit = {},
     onToggleScheduleSelection: (Long) -> Unit = {}
 ) {
-    // Shared minute ticker
     val nowMillis by produceState(initialValue = System.currentTimeMillis()) {
         while (true) {
             delay(60000)

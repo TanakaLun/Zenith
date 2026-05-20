@@ -134,8 +134,7 @@ fun HomeScreenContent(
 ) {
     val pullToRefreshState = rememberPullToRefreshState()
     var isManualRefreshing by remember { mutableStateOf(false) }
-    
-    // Shared minute ticker to avoid multiple timers in LazyColumn items
+
     val nowMillis by produceState(initialValue = System.currentTimeMillis()) {
         while (true) {
             delay(60000)

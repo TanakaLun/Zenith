@@ -39,8 +39,7 @@ class ZenithApplication : Application(), ImageLoaderFactory {
         super.onCreate()
         lastUiMode = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
         com.etrisad.zenith.service.UsageSyncWorker.enqueue(this)
-        
-        // Ensure widgets are updated on startup/after update
+
         CoroutineScope(Dispatchers.Main).launch {
             try {
                 AppStreakWidget().updateAll(this@ZenithApplication)
@@ -78,10 +77,8 @@ class ZenithApplication : Application(), ImageLoaderFactory {
         val newUiMode = newConfig.uiMode and Configuration.UI_MODE_NIGHT_MASK
         if (newUiMode != lastUiMode) {
             lastUiMode = newUiMode
-            // Trigger widget update when theme changes
             CoroutineScope(Dispatchers.Main).launch {
                 try {
-                    // Small delay to ensure resources are updated
                     kotlinx.coroutines.delay(300)
                     AppStreakWidget().updateAll(this@ZenithApplication)
                     GlobalStreakWidget().updateAll(this@ZenithApplication)

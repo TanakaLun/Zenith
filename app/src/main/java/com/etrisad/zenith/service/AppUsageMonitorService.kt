@@ -490,7 +490,7 @@ class AppUsageMonitorService : Service() {
                         continue
                     }
 
-                    if (launcherPackages.isEmpty() || currentTime - lastLauncherRefreshTime > 600000) { // Optimize: 10 min refresh
+                    if (launcherPackages.isEmpty() || currentTime - lastLauncherRefreshTime > 600000) {
                         refreshLauncherCache()
                     }
 
@@ -518,13 +518,7 @@ class AppUsageMonitorService : Service() {
                                 val startOfDay = getStartOfDay()
                                 val timeSinceMidnight = (currentTime - startOfDay).coerceAtLeast(0L)
                                 
-                                val shield = currentShieldCache
-                                val dbUsage = if (shield != null && shield.lastUsedTimestamp >= startOfDay) {
-                                    val limitMillis = (shield.timeLimitMinutes * 60 * 1000L)
-                                    (limitMillis - shield.remainingTimeMillis).coerceAtLeast(0L)
-                                } else 0L
-                                
-                                baseUsageAtSessionStart = maxOf(systemUsage, dbUsage).coerceAtMost(timeSinceMidnight)
+                                baseUsageAtSessionStart = systemUsage.coerceAtMost(timeSinceMidnight)
                                 cachedTotalUsage = baseUsageAtSessionStart
                                 baseGlobalUsageAtSessionStart = systemGlobal.coerceAtMost(timeSinceMidnight)
                                 cachedTotalGlobalUsage = baseGlobalUsageAtSessionStart
@@ -795,12 +789,7 @@ class AppUsageMonitorService : Service() {
             val startOfDay = getStartOfDay()
             val timeSinceMidnight = (currentTime - startOfDay).coerceAtLeast(0L)
             
-            val dbUsage = if (shield.lastUsedTimestamp >= startOfDay) {
-                val limitMillis = (shield.timeLimitMinutes * 60 * 1000L)
-                (limitMillis - shield.remainingTimeMillis).coerceAtLeast(0L)
-            } else 0L
-            
-            baseUsageAtSessionStart = (maxOf(systemUsage, dbUsage).coerceAtMost(timeSinceMidnight)) - sessionElapsed
+            baseUsageAtSessionStart = systemUsage.coerceAtMost(timeSinceMidnight) - sessionElapsed
             baseGlobalUsageAtSessionStart = systemGlobal.coerceAtMost(timeSinceMidnight) - sessionElapsed
             lastUsageFetchTime = currentTime
         }

@@ -28,7 +28,6 @@ class DatabaseBackupWorker(
         
         try {
             val app = applicationContext as com.etrisad.zenith.ZenithApplication
-            // Force sync before auto-backup
             try {
                 UsageSyncManager(applicationContext, app.shieldRepository, app.userPreferencesRepository).syncUsageData()
             } catch (_: Exception) {}

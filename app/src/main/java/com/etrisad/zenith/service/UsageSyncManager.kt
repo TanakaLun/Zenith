@@ -276,8 +276,7 @@ class UsageSyncManager(
         if (finalEntities.isNotEmpty()) {
             repository.insertHourlyUsage(finalEntities)
         }
-        
-        // Sync Daily Usage based on the hourly data we just processed
+
         syncDailyFromHourly(buckets.keys)
         preferencesRepository.setLastSyncTimestamp(System.currentTimeMillis())
     }
@@ -285,8 +284,7 @@ class UsageSyncManager(
     private suspend fun syncDailyFromHourly(dates: Set<String>) {
         val now = System.currentTimeMillis()
         val dailyEntities = mutableListOf<com.etrisad.zenith.data.local.entity.DailyUsageEntity>()
-        
-        // Get all shields to categorize usage
+
         val allShields = repository.allShields.first()
         val shieldPkgs = allShields.filter { it.type == com.etrisad.zenith.data.local.entity.FocusType.SHIELD }.map { it.packageName }.toSet()
         val goalPkgs = allShields.filter { it.type == com.etrisad.zenith.data.local.entity.FocusType.GOAL }.map { it.packageName }.toSet()
