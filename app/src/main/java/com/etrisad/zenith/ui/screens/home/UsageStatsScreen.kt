@@ -83,6 +83,12 @@ fun UsageStatsScreen(
     var isManualRefreshing by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
+    LaunchedEffect(Unit) {
+        if (preferences.refreshOnOpenUsageStats) {
+            viewModel.resetCarryover()
+        }
+    }
+
     LaunchedEffect(uiState.isLoading) {
         if (!uiState.isLoading && isManualRefreshing) {
             isManualRefreshing = false

@@ -162,15 +162,12 @@ class AppUsageMonitorService : Service() {
 
     private fun refreshData() {
         serviceScope.launch {
-            // Reload preferences
             currentPreferences = preferencesRepository.userPreferencesFlow.first()
             whitelistedPackages = currentPreferences?.whitelistedPackages ?: emptySet()
             bedtimeWhitelistedPackages = currentPreferences?.bedtimeWhitelistedPackages ?: emptySet()
-            
-            // Reload shields
+
             allShieldsCache = shieldRepository.allShields.first()
-            
-            // Reload schedules
+
             val schedules = shieldRepository.allSchedules.first()
             activeSchedules = schedules.filter { it.isActive }
             parsedSchedulesCache = activeSchedules.map { s ->
@@ -187,14 +184,12 @@ class AppUsageMonitorService : Service() {
             
             updateRestrictedPackages()
             currentPreferences?.let { updateBedtimeStatus(it) }
-            
-            // Clear transient caches to force re-fetch
+
             dailyUsageCache.clear()
             usageStatsCache = null
             lastUsageCacheTime = 0L
             lastUsageFetchTime = 0L
-            
-            // If loop is not active, start it
+
             if (!monitoringLoopActive) {
                 startMonitoring()
             }

@@ -430,6 +430,7 @@ class HomeViewModel(
     }
 
     fun resetCarryover() {
+        triggerServiceRefresh()
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())

@@ -113,16 +113,13 @@ class ZenithAccessibilityService : AccessibilityService() {
     private fun refreshService() {
         serviceScope.launch {
             try {
-                // Reload Preferences
                 val prefs = preferencesRepository.userPreferencesFlow.first()
                 currentPreferences = prefs
                 whitelistedPackages = prefs.whitelistedPackages
                 bedtimeWhitelistedPackages = prefs.bedtimeWhitelistedPackages
-                
-                // Reload Shields
+
                 allShieldsCache = shieldRepository.allShields.first()
-                
-                // Reload Schedules
+
                 val schedules = shieldRepository.allSchedules.first()
                 activeSchedules = schedules.filter { it.isActive }
                 parsedSchedulesCache = activeSchedules.map { s ->
@@ -139,14 +136,12 @@ class ZenithAccessibilityService : AccessibilityService() {
                 
                 updateRestrictedPackages()
                 updateBedtimeStatus(prefs)
-                
-                // Reset usage caches
+
                 usageStatsCache = null
                 lastUsageCacheTime = 0L
                 lastUsageFetchTime = 0L
                 dailyUsageCache.clear()
-                
-                // Force check current package
+
                 lastForegroundApp?.let { pkg ->
                     packageChangeFlow.tryEmit(pkg)
                 }

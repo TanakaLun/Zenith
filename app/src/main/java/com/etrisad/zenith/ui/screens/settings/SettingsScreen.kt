@@ -93,7 +93,8 @@ fun SettingsScreen(
             sessionUsageOverlayEnabled = false,
             sessionUsageOverlaySize = 100,
             sessionUsageOverlayOpacity = 90,
-            whitelistedPackages = emptySet()
+            whitelistedPackages = emptySet(),
+            refreshOnOpenUsageStats = false
         )
     )
     val coroutineScope = rememberCoroutineScope()
@@ -304,6 +305,11 @@ fun SettingsScreen(
         onDeveloperModeEnabledChange = { enabled ->
             coroutineScope.launch {
                 preferencesRepository.setDeveloperModeEnabled(enabled)
+            }
+        },
+        onRefreshOnOpenUsageStatsChange = { enabled ->
+            coroutineScope.launch {
+                preferencesRepository.setRefreshOnOpenUsageStats(enabled)
             }
         },
         onNavigateToDatabaseDebug = {
@@ -521,6 +527,7 @@ fun SettingsScreenContent(
     onInterceptAudioFocusEnabledChange: (Boolean) -> Unit,
     onShowDatabaseIndicatorChange: (Boolean) -> Unit,
     onSmartRepairOnRefreshChange: (Boolean) -> Unit,
+    onRefreshOnOpenUsageStatsChange: (Boolean) -> Unit,
     onDeveloperModeEnabledChange: (Boolean) -> Unit,
     onNavigateToDatabaseDebug: () -> Unit,
     onNavigateToDataRepairment: () -> Unit,
@@ -778,6 +785,18 @@ fun SettingsScreenContent(
                     onClick = onBackup,
                     icon = Icons.Outlined.Backup,
                     shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
+                )
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(4.dp))
+                SettingsToggle(
+                    title = "Sync on Entry",
+                    description = "Refresh usage stats every time you open the stats screen. Enable this if you experience data inconsistency.",
+                    checked = preferences.refreshOnOpenUsageStats,
+                    onCheckedChange = onRefreshOnOpenUsageStatsChange,
+                    icon = Icons.Outlined.Sync,
+                    shape = RoundedCornerShape(8.dp)
                 )
             }
 
