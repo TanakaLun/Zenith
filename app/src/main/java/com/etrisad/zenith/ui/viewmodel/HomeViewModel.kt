@@ -1166,7 +1166,7 @@ class HomeViewModel(
                 refreshUsageStats(showLoading = false)
                 refreshCurrentAppDetailUsage()
 
-                delay(15000)
+                delay(30000) // Lower CPU: 30s refresh instead of 15s
             }
         }
     }

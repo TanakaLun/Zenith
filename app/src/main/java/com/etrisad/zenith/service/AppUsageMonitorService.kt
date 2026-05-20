@@ -490,7 +490,7 @@ class AppUsageMonitorService : Service() {
                         continue
                     }
 
-                    if (launcherPackages.isEmpty() || currentTime - lastLauncherRefreshTime > 60000) {
+                    if (launcherPackages.isEmpty() || currentTime - lastLauncherRefreshTime > 600000) { // Optimize: 10 min refresh
                         refreshLauncherCache()
                     }
 
@@ -537,7 +537,8 @@ class AppUsageMonitorService : Service() {
 
                         if (shouldBypassBlocking(currentApp)) {
                             lastForegroundApp = currentApp
-                            delay(if (isPowerSaveMode) 2000L else 1200L)
+                            val delayTime = if (isPowerSaveMode) 3000L else 1800L
+                            delay(delayTime)
                             continue
                         }
 

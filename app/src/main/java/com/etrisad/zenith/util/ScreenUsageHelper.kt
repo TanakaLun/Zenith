@@ -15,7 +15,7 @@ object ScreenUsageHelper {
 
     private var lastResult: UsageResult? = null
     private var lastQueryTime = 0L
-    private const val CACHE_DURATION = 3000L
+    private const val CACHE_DURATION = 5000L
 
     fun fetchDetailedUsageToday(
         usageStatsManager: UsageStatsManager,
