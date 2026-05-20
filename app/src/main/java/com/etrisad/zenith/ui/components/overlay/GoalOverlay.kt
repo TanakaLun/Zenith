@@ -94,28 +94,31 @@ fun GoalOverlay(
         totalGlobalUsageToday
     ) {
         val usm = context.getSystemService(android.content.Context.USAGE_STATS_SERVICE) as android.app.usage.UsageStatsManager
-        val now = System.currentTimeMillis()
-        val calendar = Calendar.getInstance().apply {
-            timeInMillis = now
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }
-        val startOfDay = calendar.timeInMillis
-        val timeSinceMidnight = (now - startOfDay).coerceAtLeast(0L)
+        while (true) {
+            val now = System.currentTimeMillis()
+            val calendar = Calendar.getInstance().apply {
+                timeInMillis = now
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            val startOfDay = calendar.timeInMillis
+            val timeSinceMidnight = (now - startOfDay).coerceAtLeast(0L)
 
-        val detailedUsage = withContext(Dispatchers.IO) {
-            com.etrisad.zenith.util.ScreenUsageHelper.fetchDetailedUsageToday(usm)
-        }
-        
-        val liveAppUsage = detailedUsage.appUsageMap[packageName] ?: 0L
+            val detailedUsage = withContext(Dispatchers.IO) {
+                com.etrisad.zenith.util.ScreenUsageHelper.fetchDetailedUsageToday(usm)
+            }
+            
+            val liveAppUsage = detailedUsage.appUsageMap[packageName] ?: 0L
 
-        value = Triple(
-            shield, 
-            liveAppUsage.coerceAtMost(timeSinceMidnight), 
-            totalGlobalUsageToday.coerceAtMost(timeSinceMidnight)
-        )
+            value = Triple(
+                shield, 
+                liveAppUsage.coerceAtMost(timeSinceMidnight), 
+                totalGlobalUsageToday.coerceAtMost(timeSinceMidnight)
+            )
+            delay(10000)
+        }
     }
 
     val currentShield = combinedStateState.value.first

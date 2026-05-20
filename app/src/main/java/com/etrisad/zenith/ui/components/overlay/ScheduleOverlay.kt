@@ -69,27 +69,30 @@ fun ScheduleOverlay(
         totalGlobalUsageToday
     ) {
         val usm = context.getSystemService(android.content.Context.USAGE_STATS_SERVICE) as android.app.usage.UsageStatsManager
-        val now = System.currentTimeMillis()
-        val startOfDay = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
-        val timeSinceMidnight = (now - startOfDay).coerceAtLeast(0L)
+        while (true) {
+            val now = System.currentTimeMillis()
+            val startOfDay = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }.timeInMillis
+            val timeSinceMidnight = (now - startOfDay).coerceAtLeast(0L)
 
-        val detailedUsage = withContext(kotlinx.coroutines.Dispatchers.IO) {
-            com.etrisad.zenith.util.ScreenUsageHelper.fetchDetailedUsageToday(usm)
-        }
-        
-        var totalToday = 0L
-        detailedUsage.appUsageMap.entries.forEach { entry ->
-            if (entry.key != context.packageName) {
-                totalToday += entry.value
+            val detailedUsage = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                com.etrisad.zenith.util.ScreenUsageHelper.fetchDetailedUsageToday(usm)
             }
-        }
+            
+            var totalToday = 0L
+            detailedUsage.appUsageMap.entries.forEach { entry ->
+                if (entry.key != context.packageName) {
+                    totalToday += entry.value
+                }
+            }
 
-        value = totalToday.coerceAtMost(timeSinceMidnight)
+            value = totalToday.coerceAtMost(timeSinceMidnight)
+            delay(10000)
+        }
     }
     val currentTotalGlobalUsageToday = currentTotalGlobalUsageTodayState.value
 
