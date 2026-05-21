@@ -117,12 +117,19 @@ class ShieldRepository(
     }
 
     suspend fun updateShield(shield: ShieldEntity) {
-        shieldDao.updateShield(shield)
         val currentList = _allShieldsCache.value.toMutableList()
         val index = currentList.indexOfFirst { it.packageName == shield.packageName }
         if (index != -1) {
             currentList[index] = shield
             _allShieldsCache.value = currentList
+        }
+
+        repositoryScope.launch {
+            try {
+                shieldDao.updateShield(shield)
+            } catch (e: Exception) {
+                android.util.Log.e("ShieldRepo", "Gagal update database: ${e.message}")
+            }
         }
     }
 
