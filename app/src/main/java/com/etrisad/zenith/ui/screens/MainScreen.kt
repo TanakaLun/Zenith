@@ -115,6 +115,7 @@ fun MainScreen(
                 currentRoute == Screen.DataRepairment.route ||
                 currentRoute == Screen.FontTest.route ||
                 currentRoute == Screen.GSFlexCustomizer.route ||
+                currentRoute?.startsWith("settings_category") == true ||
                 currentRoute?.startsWith("app_detail") == true
 
     val enterAlwaysScrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
@@ -256,6 +257,7 @@ fun MainScreen(
                         currentRoute != Screen.DataRepairment.route &&
                         currentRoute != Screen.FontTest.route &&
                         currentRoute != Screen.GSFlexCustomizer.route &&
+                        currentRoute?.startsWith("settings_category") == false &&
                         currentRoute?.startsWith("app_detail") == false
 
             AnimatedVisibility(
@@ -307,6 +309,7 @@ fun MainScreen(
                     scrollBehavior = scrollBehavior,
                     isNavRailVisible = useNavigationRail && !isDeepScreen,
                     userName = preferences.userName,
+                    categoryName = navBackStackEntry?.arguments?.getString("category"),
                     onBack = { navController.popBackStack() },
                     navigationIcon = {
                         AnimatedContent(
@@ -551,6 +554,7 @@ fun MainScreen(
                                     targetRoute == Screen.DataRepairment.route ||
                                     targetRoute == Screen.FontTest.route ||
                                     targetRoute == Screen.GSFlexCustomizer.route ||
+                                    targetRoute?.startsWith("settings_category") == true ||
                                     targetRoute?.startsWith("app_detail") == true
                         val isInitialDeep =
                             initialRoute == Screen.UsageStats.route ||
@@ -559,6 +563,7 @@ fun MainScreen(
                                     initialRoute == Screen.DataRepairment.route ||
                                     initialRoute == Screen.FontTest.route ||
                                     initialRoute == Screen.GSFlexCustomizer.route ||
+                                    initialRoute?.startsWith("settings_category") == true ||
                                     initialRoute?.startsWith("app_detail") == true
 
                         val animationSpec = spring<IntOffset>(
@@ -599,6 +604,7 @@ fun MainScreen(
                                     targetRoute == Screen.DataRepairment.route ||
                                     targetRoute == Screen.FontTest.route ||
                                     targetRoute == Screen.GSFlexCustomizer.route ||
+                                    targetRoute?.startsWith("settings_category") == true ||
                                     targetRoute?.startsWith("app_detail") == true
 
                         val animationSpec = spring<IntOffset>(
@@ -730,6 +736,21 @@ fun MainScreen(
                             innerPadding = innerPadding
                         )
                     }
+                    composable(
+                        route = Screen.SettingsCategory.route,
+                        arguments = listOf(androidx.navigation.navArgument("category") {
+                            type = androidx.navigation.NavType.StringType
+                        })
+                    ) { backStackEntry ->
+                        val category = backStackEntry.arguments?.getString("category") ?: ""
+                        com.etrisad.zenith.ui.screens.settings.SettingsCategoryScreen(
+                            category = category,
+                            preferencesRepository = userPreferencesRepository,
+                            navController = navController,
+                            innerPadding = innerPadding,
+                            onOpenPermissions = { showPermissionSheet = true }
+                        )
+                    }
                 }
 
                 if (!useNavigationRail) {
@@ -740,6 +761,7 @@ fun MainScreen(
                             currentRoute != Screen.DataRepairment.route &&
                             currentRoute != Screen.FontTest.route &&
                             currentRoute != Screen.GSFlexCustomizer.route &&
+                            currentRoute?.startsWith("settings_category") == false &&
                             currentRoute?.startsWith("app_detail") == false
 
                     androidx.compose.animation.AnimatedVisibility(

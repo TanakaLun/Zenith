@@ -1,0 +1,235 @@
+package com.etrisad.zenith.ui.screens.settings
+
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
+import com.etrisad.zenith.ZenithApplication
+import com.etrisad.zenith.data.manager.GitHubUpdateManager
+import com.etrisad.zenith.data.preferences.UserPreferences
+import com.etrisad.zenith.data.preferences.UserPreferencesRepository
+import com.etrisad.zenith.data.remote.model.GitHubRelease
+import com.etrisad.zenith.service.UsageSyncManager
+import com.etrisad.zenith.ui.navigation.Screen
+import com.etrisad.zenith.ui.viewmodel.FocusViewModel
+import com.etrisad.zenith.ui.viewmodel.FocusViewModelFactory
+import com.etrisad.zenith.util.BackupUtils
+import com.etrisad.zenith.worker.BackupManager
+import kotlinx.coroutines.launch
+
+@Composable
+fun SettingsCategoryScreen(
+    category: String,
+    preferencesRepository: UserPreferencesRepository,
+    navController: NavController,
+    innerPadding: PaddingValues,
+    onOpenPermissions: () -> Unit
+) {
+    val preferences by preferencesRepository.userPreferencesFlow.collectAsState(initial = UserPreferences())
+    val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val app = context.applicationContext as ZenithApplication
+
+    val backupManager = remember { BackupManager(context) }
+    val updateManager = remember { GitHubUpdateManager(context) }
+
+    var showGoalTestSheet by remember { mutableStateOf(false) }
+    var showUpdateSheet by remember { mutableStateOf(false) }
+    var latestRelease by remember { mutableStateOf<GitHubRelease?>(null) }
+
+    val focusViewModel: FocusViewModel = viewModel(
+        factory = FocusViewModelFactory(
+            context = context,
+            shieldRepository = app.shieldRepository,
+            preferencesRepository = preferencesRepository
+        )
+    )
+    
+    val backupLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/octet-stream"),
+        onResult = { uri ->
+            uri?.let {
+                coroutineScope.launch {
+                    try {
+                        UsageSyncManager(context, app.shieldRepository, app.userPreferencesRepository).syncUsageData()
+                    } catch (_: Exception) {}
+
+                    BackupUtils.backupDatabase(context, it).onSuccess {
+                        preferencesRepository.setLastBackupTimestamp(System.currentTimeMillis())
+                        Toast.makeText(context, "Backup successful!", Toast.LENGTH_SHORT).show()
+                    }.onFailure { e ->
+                        Toast.makeText(context, "Backup failed: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        }
+    )
+
+    val directoryPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree(),
+        onResult = { uri ->
+            uri?.let {
+                context.contentResolver.takePersistableUriPermission(
+                    it,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                            android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                )
+                coroutineScope.launch {
+                    preferencesRepository.setBackupDirectoryUri(it.toString())
+                    if (preferences.autoBackupEnabled) {
+                        backupManager.scheduleBackup(preferences.backupIntervalHours, it.toString())
+                    }
+                }
+            }
+        }
+    )
+
+    val restoreLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+        onResult = { uri ->
+            uri?.let {
+                coroutineScope.launch {
+                    val metadata = BackupUtils.getBackupMetadata(context, it)
+                    if (metadata != null) {
+                        BackupUtils.restoreDatabase(context, it).onSuccess {
+                            Toast.makeText(context, "Restore successful! Restarting app...", Toast.LENGTH_LONG).show()
+                            BackupUtils.restartApp(context)
+                        }.onFailure { e ->
+                            Toast.makeText(context, "Restore failed: ${e.message}", Toast.LENGTH_LONG).show()
+                        }
+                    } else {
+                        Toast.makeText(context, "Invalid backup file", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+    )
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            contentPadding = PaddingValues(
+                top = innerPadding.calculateTopPadding() + 16.dp,
+                bottom = innerPadding.calculateBottomPadding() + 100.dp
+            )
+        ) {
+            item {
+                when (category.lowercase()) {
+                    "features" -> FeaturesSettings(
+                        preferences = preferences,
+                        onTotalUsagePillEnabledChange = { enabled -> coroutineScope.launch { preferencesRepository.setTotalUsagePillEnabled(enabled) } },
+                        onSessionUsageOverlayEnabledChange = { enabled -> coroutineScope.launch { preferencesRepository.setSessionUsageOverlayEnabled(enabled) } },
+                        onSessionUsageOverlaySizeChange = { size -> coroutineScope.launch { preferencesRepository.setSessionUsageOverlaySize(size) } },
+                        onSessionUsageOverlayOpacityChange = { opacity -> coroutineScope.launch { preferencesRepository.setSessionUsageOverlayOpacity(opacity) } },
+                        onMindfulGatewayEnabledChange = { enabled -> coroutineScope.launch { preferencesRepository.setMindfulGatewayEnabled(enabled) } },
+                        onEarlyKickEnabledChange = { enabled -> coroutineScope.launch { preferencesRepository.setEarlyKickEnabled(enabled) } },
+                        onInterceptAudioFocusEnabledChange = { enabled -> coroutineScope.launch { preferencesRepository.setInterceptAudioFocusEnabled(enabled) } }
+                    )
+                    "appearance" -> AppearanceSettings(
+                        preferences = preferences,
+                        onThemeChange = { theme -> coroutineScope.launch { preferencesRepository.setThemeConfig(theme) } },
+                        onFontChange = { font -> coroutineScope.launch { preferencesRepository.setFontOption(font) } },
+                        onDynamicColorChange = { enabled -> coroutineScope.launch { preferencesRepository.setDynamicColor(enabled) } },
+                        onExpressiveColorsChange = { enabled -> coroutineScope.launch { preferencesRepository.setExpressiveColors(enabled) } },
+                        onFloatingTabBarEnabledChange = { enabled -> coroutineScope.launch { preferencesRepository.setFloatingTabBarEnabled(enabled) } },
+                        onNavigateToGSFlexCustomizer = { navController.navigate(Screen.GSFlexCustomizer.route) }
+                    )
+                    "data management" -> DataManagementSettings(
+                        preferences = preferences,
+                        onAutoBackupEnabledChange = { enabled ->
+                            coroutineScope.launch {
+                                preferencesRepository.setAutoBackupEnabled(enabled)
+                                if (enabled && preferences.backupDirectoryUri.isNotEmpty()) {
+                                    backupManager.scheduleBackup(preferences.backupIntervalHours, preferences.backupDirectoryUri)
+                                } else {
+                                    backupManager.cancelBackup()
+                                }
+                            }
+                        },
+                        onPickBackupDirectory = { directoryPickerLauncher.launch(null) },
+                        onSetBackupInterval = { hours ->
+                            coroutineScope.launch {
+                                preferencesRepository.setBackupIntervalHours(hours)
+                                if (preferences.autoBackupEnabled && preferences.backupDirectoryUri.isNotEmpty()) {
+                                    backupManager.scheduleBackup(hours, preferences.backupDirectoryUri)
+                                }
+                            }
+                        },
+                        onBackup = { backupLauncher.launch("zenith_backup_${System.currentTimeMillis()}.db") },
+                        onRefreshOnOpenUsageStatsChange = { enabled -> coroutineScope.launch { preferencesRepository.setRefreshOnOpenUsageStats(enabled) } },
+                        onRestore = { restoreLauncher.launch(arrayOf("application/octet-stream", "*/*")) }
+                    )
+                    "developer" -> DeveloperSettings(
+                        preferences = preferences,
+                        onShowDatabaseIndicatorChange = { enabled -> coroutineScope.launch { preferencesRepository.setShowDatabaseIndicator(enabled) } },
+                        onSmartRepairOnRefreshChange = { enabled -> coroutineScope.launch { preferencesRepository.setSmartRepairOnRefresh(enabled) } },
+                        onNavigateToDatabaseDebug = { navController.navigate(Screen.DatabaseDebug.route) },
+                        onNavigateToDataRepairment = { navController.navigate(Screen.DataRepairment.route) },
+                        onTestGoalOverlay = { showGoalTestSheet = true },
+                        onTestUpdateSheet = {
+                            coroutineScope.launch {
+                                val release = updateManager.fetchLatestRelease()
+                                if (release != null) {
+                                    latestRelease = release
+                                    showUpdateSheet = true
+                                } else {
+                                    Toast.makeText(context, "Failed to fetch latest release", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        },
+                        onNavigateToFontTest = { navController.navigate(Screen.FontTest.route) },
+                        onCustomDelayEnabledChange = { enabled -> coroutineScope.launch { preferencesRepository.setCustomDelayEnabled(enabled) } },
+                        onSetDelayPowerSave = { delay -> coroutineScope.launch { preferencesRepository.setDelayPowerSave(delay) } },
+                        onSetDelayOverlayShowing = { delay -> coroutineScope.launch { preferencesRepository.setDelayOverlayShowing(delay) } },
+                        onSetDelayGoalNear = { delay -> coroutineScope.launch { preferencesRepository.setDelayGoalNear(delay) } },
+                        onSetDelayGoalMid = { delay -> coroutineScope.launch { preferencesRepository.setDelayGoalMid(delay) } },
+                        onSetDelayGoalFar = { delay -> coroutineScope.launch { preferencesRepository.setDelayGoalFar(delay) } },
+                        onSetDelayShieldVeryFar = { delay -> coroutineScope.launch { preferencesRepository.setDelayShieldVeryFar(delay) } },
+                        onSetDelayShieldFar = { delay -> coroutineScope.launch { preferencesRepository.setDelayShieldFar(delay) } },
+                        onSetDelayShieldMid = { delay -> coroutineScope.launch { preferencesRepository.setDelayShieldMid(delay) } },
+                        onSetDelayShieldNear = { delay -> coroutineScope.launch { preferencesRepository.setDelayShieldNear(delay) } },
+                        onSetDelayDefault = { delay -> coroutineScope.launch { preferencesRepository.setDelayDefault(delay) } },
+                        onResetCustomDelays = { coroutineScope.launch { preferencesRepository.resetCustomDelays() } }
+                    )
+                }
+            }
+        }
+
+        if (showGoalTestSheet) {
+            com.etrisad.zenith.ui.components.AppGoalTestBottomSheet(
+                focusViewModel = focusViewModel,
+                onDismiss = { showGoalTestSheet = false }
+            )
+        }
+
+        if (showUpdateSheet && latestRelease != null) {
+            val isDark = when (preferences.themeConfig) {
+                com.etrisad.zenith.data.preferences.ThemeConfig.FOLLOW_SYSTEM -> androidx.compose.foundation.isSystemInDarkTheme()
+                com.etrisad.zenith.data.preferences.ThemeConfig.LIGHT -> false
+                com.etrisad.zenith.data.preferences.ThemeConfig.DARK -> true
+            }
+            com.etrisad.zenith.ui.components.UpdateBottomSheet(
+                release = latestRelease!!,
+                useExpressiveColors = preferences.expressiveColors,
+                isDark = isDark,
+                onDismiss = { showUpdateSheet = false },
+                onUpdate = {
+                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(latestRelease!!.htmlUrl))
+                    context.startActivity(intent)
+                    showUpdateSheet = false
+                }
+            )
+        }
+    }
+}

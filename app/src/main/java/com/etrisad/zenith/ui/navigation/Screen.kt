@@ -38,6 +38,10 @@ sealed class Screen(
     object FontTest : Screen("font_test", "Font Test", Icons.Filled.Settings, Icons.Outlined.Settings)
 
     object GSFlexCustomizer : Screen("gs_flex_customizer", "GS Flex Customizer", Icons.Filled.Settings, Icons.Outlined.Settings)
+
+    object SettingsCategory : Screen("settings_category/{category}", "Settings", Icons.Filled.Settings, Icons.Outlined.Settings) {
+        fun createRoute(category: String) = "settings_category/$category"
+    }
 }
 
 val navItems = listOf(

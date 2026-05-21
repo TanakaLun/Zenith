@@ -33,6 +33,7 @@ fun ZenithHeader(
     scrollBehavior: TopAppBarScrollBehavior,
     isNavRailVisible: Boolean = false,
     userName: String = "User",
+    categoryName: String? = null,
     onBack: () -> Unit,
     navigationIcon: @Composable (() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {}
@@ -45,6 +46,7 @@ fun ZenithHeader(
         currentRoute == Screen.DataRepairment.route ||
         currentRoute == Screen.FontTest.route ||
         currentRoute == Screen.GSFlexCustomizer.route ||
+        currentRoute?.startsWith("settings_category") == true ||
         currentRoute?.startsWith("app_detail") == true
 
     val sideSlotWidth = 68.dp
@@ -124,6 +126,7 @@ fun ZenithHeader(
                 currentRoute == Screen.DataRepairment.route -> "Data Repairment"
                 currentRoute == Screen.FontTest.route -> "M3 Expressive Editor"
                 currentRoute == Screen.GSFlexCustomizer.route -> "GS Flex Designer"
+                currentRoute?.startsWith("settings_category") == true -> categoryName ?: "Settings"
                 currentRoute?.startsWith("app_detail") == true -> "App Detail"
                 else -> "Zenith"
             }
