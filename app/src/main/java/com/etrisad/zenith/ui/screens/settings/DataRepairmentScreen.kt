@@ -27,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.etrisad.zenith.ui.components.ZenithContainedLoadingIndicator
 import com.etrisad.zenith.ui.viewmodel.HomeViewModel
+import com.etrisad.zenith.data.preferences.UserPreferences
 import com.etrisad.zenith.ui.viewmodel.UsageHistoryGroup
 import com.etrisad.zenith.ui.viewmodel.UsageRecord
 import kotlinx.coroutines.delay
@@ -42,59 +43,97 @@ fun DataRepairmentScreen(
 ) {
     val repairableData by viewModel.repairableData.collectAsState(initial = emptyList())
     val isRepairing by viewModel.isRepairing.collectAsState()
+    val preferences by viewModel.userPreferences.collectAsState(initial = UserPreferences())
     val scope = rememberCoroutineScope()
 
     Box(modifier = Modifier.fillMaxSize()) {
-        if (repairableData.isEmpty()) {
-            Box(
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
+            Card(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer
+                )
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = Icons.Outlined.CheckCircle,
-                        contentDescription = null,
-                        modifier = Modifier.size(64.dp),
-                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        "All data looks good!",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Advanced Repair Mode",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            "Show all dates including today and those with existing records",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = preferences.allowRepairNonUnavailable,
+                        onCheckedChange = { scope.launch { viewModel.setAllowRepairNonUnavailable(it) } }
                     )
                 }
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp),
-                contentPadding = PaddingValues(
-                    top = innerPadding.calculateTopPadding() + 16.dp,
-                    bottom = innerPadding.calculateBottomPadding() + 32.dp
-                )
-            ) {
-                itemsIndexed(
-                    items = repairableData,
-                    key = { _, group -> group.date }
-                ) { index, group ->
-                    val isFirst = index == 0
-                    val isLast = index == repairableData.size - 1
-                    
-                    RepairableGroupCard(
-                        group = group,
-                        formatDuration = { viewModel.formatDuration(it) },
-                        onRepair = { date -> scope.launch { viewModel.repairData(date) } },
-                        isFirst = isFirst,
-                        isLast = isLast,
-                        enabled = !isRepairing
-                    )
-                    
-                    if (!isLast) {
-                        Spacer(modifier = Modifier.height(4.dp))
+
+            if (repairableData.isEmpty()) {
+                Box(
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Outlined.CheckCircle,
+                            contentDescription = null,
+                            modifier = Modifier.size(64.dp),
+                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            "All data looks good!",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    contentPadding = PaddingValues(bottom = 32.dp)
+                ) {
+                    itemsIndexed(
+                        items = repairableData,
+                        key = { _, group -> group.date }
+                    ) { index, group ->
+                        val isFirst = index == 0
+                        val isLast = index == repairableData.size - 1
+                        
+                        RepairableGroupCard(
+                            group = group,
+                            formatDuration = { viewModel.formatDuration(it) },
+                            onRepair = { date -> scope.launch { viewModel.repairData(date) } },
+                            isFirst = isFirst,
+                            isLast = isLast,
+                            enabled = !isRepairing
+                        )
+                        
+                        if (!isLast) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                        }
                     }
                 }
             }
@@ -286,7 +325,20 @@ fun RepairableGroupCard(
                     )
 
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        val liveRecords = group.records.filterIsInstance<UsageRecord.Live>()
+                        val summaryPkgs = setOf("TOTAL", "SHIELD_TOTAL", "GOAL_TOTAL", "OTHER_TOTAL")
+                        val liveRecords = group.records
+                            .filterIsInstance<UsageRecord.Live>()
+                            .filter { it.packageName !in summaryPkgs }
+                        
+                        if (liveRecords.isEmpty()) {
+                            Text(
+                                "No individual app data available",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                        }
+
                         liveRecords.forEachIndexed { index, record ->
                             RepairRecordItem(
                                 packageName = record.packageName,

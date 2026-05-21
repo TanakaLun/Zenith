@@ -1,6 +1,7 @@
 package com.etrisad.zenith.ui.viewmodel
 
 import android.app.usage.UsageStatsManager
+import android.app.usage.UsageEvents
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -12,6 +13,7 @@ import com.etrisad.zenith.data.local.entity.DailyUsageEntity
 import com.etrisad.zenith.data.local.entity.HourlyUsageEntity
 import com.etrisad.zenith.data.repository.ShieldRepository
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
+import com.etrisad.zenith.data.preferences.UserPreferences
 import com.etrisad.zenith.service.UsageSyncManager
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -209,6 +211,10 @@ class HomeViewModel(
                 val liveRecords = mutableListOf<UsageRecord>()
                 dbRecords.forEach { liveRecords.add(UsageRecord.Database(it)) }
                 
+                if (systemRecords.isNotEmpty()) {
+                    liveRecords.addAll(systemRecords)
+                }
+
                 val liveTotal = uiState.value.totalScreenTime
                 val liveShield = uiState.value.shieldUsage
                 val liveGoal = uiState.value.goalUsage
@@ -259,9 +265,15 @@ class HomeViewModel(
                     systemTotalMillis = systemTotal
                 ))
             } else {
+                val combinedRecords = mutableListOf<UsageRecord>()
+                combinedRecords.addAll(dbRecords.map { UsageRecord.Database(it) })
+                if (systemRecords.isNotEmpty()) {
+                    combinedRecords.addAll(systemRecords)
+                }
+
                 groups.add(UsageHistoryGroup(
                     date = dateStr, 
-                    records = dbRecords.map { UsageRecord.Database(it) },
+                    records = combinedRecords,
                     totalTimeMillis = dbTotal,
                     hasDatabaseRecord = true,
                     hasSystemData = systemTotal > 0L,
@@ -280,15 +292,36 @@ class HomeViewModel(
         groups
     }.flowOn(kotlinx.coroutines.Dispatchers.Default)
 
-    val repairableData: Flow<List<UsageHistoryGroup>> = fullUsageHistory.map { groups ->
-        groups.filter { (it.isMissing || !it.hasDatabaseRecord) && it.hasSystemData && !it.isLive }
+    val repairableData: Flow<List<UsageHistoryGroup>> = combine(
+        fullUsageHistory,
+        userPreferencesRepository.userPreferencesFlow
+    ) { groups, prefs ->
+        if (prefs.allowRepairNonUnavailable) {
+            groups.filter { it.hasSystemData }
+        } else {
+            groups.filter { (it.isMissing || !it.hasDatabaseRecord) && it.hasSystemData && !it.isLive }
+        }
     }
 
     private val _isRepairing = MutableStateFlow(false)
     val isRepairing = _isRepairing.asStateFlow()
 
+    val userPreferences: Flow<UserPreferences> = userPreferencesRepository.userPreferencesFlow
+
+    suspend fun setAllowRepairNonUnavailable(enabled: Boolean) {
+        userPreferencesRepository.setAllowRepairNonUnavailable(enabled)
+    }
+
     suspend fun repairData(date: String) {
-        val systemRecords = globalFallbackMap[date] ?: return
+        val prefs = userPreferencesRepository.userPreferencesFlow.first()
+        val dbRecords = allHistory.filter { it.date == date && it.packageName !in setOf("TOTAL", "SHIELD_TOTAL", "GOAL_TOTAL", "OTHER_TOTAL") }
+        
+        val systemRecords = if (prefs.allowRepairNonUnavailable && dbRecords.isNotEmpty()) {
+            dbRecords.map { UsageRecord.Live(it.packageName, it.usageTimeMillis) }
+        } else {
+            globalFallbackMap[date] ?: return
+        }
+
         _isRepairing.value = true
         try {
             val shieldPkgs = allShields.filter { it.type == FocusType.SHIELD }.map { it.packageName }.toSet()
@@ -299,13 +332,15 @@ class HomeViewModel(
             var total = 0L
 
             systemRecords.forEach { record ->
-                shieldRepository.insertDailyUsage(
-                    DailyUsageEntity(
-                        date = date,
-                        packageName = record.packageName,
-                        usageTimeMillis = record.usageTimeMillis
+                if (record.packageName != "TOTAL") {
+                    shieldRepository.insertDailyUsage(
+                        DailyUsageEntity(
+                            date = date,
+                            packageName = record.packageName,
+                            usageTimeMillis = record.usageTimeMillis
+                        )
                     )
-                )
+                }
                 
                 if (record.packageName == "TOTAL") {
                     total = record.usageTimeMillis
@@ -316,7 +351,16 @@ class HomeViewModel(
                 }
             }
             
+            if (total == 0L) {
+                total = if (prefs.allowRepairNonUnavailable && dbRecords.isNotEmpty()) {
+                    allHistory.find { it.date == date && it.packageName == "TOTAL" }?.usageTimeMillis ?: systemRecords.sumOf { it.usageTimeMillis }
+                } else {
+                    systemRecords.sumOf { it.usageTimeMillis }
+                }
+            }
+            
             val oUsage = (total - (sUsage + gUsage)).coerceAtLeast(0L)
+            shieldRepository.insertDailyUsage(DailyUsageEntity(date = date, packageName = "TOTAL", usageTimeMillis = total))
             shieldRepository.insertDailyUsage(DailyUsageEntity(date = date, packageName = "SHIELD_TOTAL", usageTimeMillis = sUsage))
             shieldRepository.insertDailyUsage(DailyUsageEntity(date = date, packageName = "GOAL_TOTAL", usageTimeMillis = gUsage))
             shieldRepository.insertDailyUsage(DailyUsageEntity(date = date, packageName = "OTHER_TOTAL", usageTimeMillis = oUsage))
@@ -504,25 +548,86 @@ class HomeViewModel(
         for (i in 0..daysToRefresh) {
             val start = getMidnight(i)
             val end = if (i == 0) now else getMidnight(i - 1)
-            
             val dateStr = dateFormat.format(Date(start))
-            val stats = usm.queryAndAggregateUsageStats(start, end)
             
+            val usageMap = mutableMapOf<String, Long>()
+            val events = usm.queryEvents(start - (12 * 60 * 60 * 1000L), end)
+            val event = UsageEvents.Event()
+            
+            var activePkg: String? = null
+            var activeStartTime = 0L
+            var isScreenOn = true 
+
+            while (events.hasNextEvent()) {
+                events.getNextEvent(event)
+                val pkg = event.packageName
+                val time = event.timeStamp
+                
+                when (event.eventType) {
+                    UsageEvents.Event.SCREEN_INTERACTIVE -> isScreenOn = true
+                    UsageEvents.Event.SCREEN_NON_INTERACTIVE -> {
+                        isScreenOn = false
+                        activePkg?.let { p ->
+                            val segmentStart = maxOf(activeStartTime, start)
+                            val segmentEnd = minOf(time, end)
+                            if (segmentStart < segmentEnd) {
+                                val duration = segmentEnd - segmentStart
+                                if (duration > 100) usageMap[pkg] = (usageMap[pkg] ?: 0L) + duration
+                            }
+                        }
+                        activePkg = null
+                        activeStartTime = 0L
+                    }
+                    UsageEvents.Event.ACTIVITY_RESUMED,
+                    UsageEvents.Event.MOVE_TO_FOREGROUND -> {
+                        if (isScreenOn) {
+                            if (activePkg != null) {
+                                val segmentStart = maxOf(activeStartTime, start)
+                                val segmentEnd = minOf(time, end)
+                                if (segmentStart < segmentEnd) {
+                                    val duration = segmentEnd - segmentStart
+                                    if (duration > 100) usageMap[activePkg!!] = (usageMap[activePkg!!] ?: 0L) + duration
+                                }
+                            }
+                            activePkg = pkg
+                            activeStartTime = time
+                        }
+                    }
+                    UsageEvents.Event.ACTIVITY_PAUSED,
+                    UsageEvents.Event.MOVE_TO_BACKGROUND -> {
+                        if (activePkg == pkg) {
+                            val segmentStart = maxOf(activeStartTime, start)
+                            val segmentEnd = minOf(time, end)
+                            if (segmentStart < segmentEnd) {
+                                val duration = segmentEnd - segmentStart
+                                if (duration > 100) usageMap[pkg] = (usageMap[pkg] ?: 0L) + duration
+                            }
+                            activePkg = null
+                            activeStartTime = 0L
+                        }
+                    }
+                }
+            }
+            
+            if (activePkg != null && isScreenOn) {
+                val segmentStart = maxOf(activeStartTime, start)
+                val segmentEnd = minOf(now, end)
+                if (segmentStart < segmentEnd) {
+                    usageMap[activePkg!!] = (usageMap[activePkg!!] ?: 0L) + (segmentEnd - segmentStart)
+                }
+            }
+
             val dayRecords = mutableListOf<UsageRecord.Live>()
             var dayTotal = 0L
-            val timeSinceStart = end - start
 
-            stats.forEach { (pkg, stat) ->
+            usageMap.forEach { (pkg, time) ->
                 if (pkg in excludePackages || pkg !in launcherApps) return@forEach
-                var time = stat.totalTimeVisible.coerceAtLeast(stat.totalTimeInForeground)
-                if (i == 0 && time > timeSinceStart + 10000) {
-                    time = timeSinceStart
-                }
                 if (time > 0) {
                     dayTotal += time
                     dayRecords.add(UsageRecord.Live(pkg, time))
                 }
             }
+
             if (dayTotal > 0) {
                 dayRecords.add(UsageRecord.Live("TOTAL", dayTotal))
                 resultMap[dateStr] = dayRecords.sortedByDescending { it.usageTimeMillis }
