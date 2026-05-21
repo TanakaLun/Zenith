@@ -44,29 +44,32 @@
 
 ## Key Features
 
-- **Shield Mode**: Protects you from addictive applications by providing mindful pauses and limiting the number of uses per period.
-- **Goal Pursuit**: Helps you achieve usage time targets for specific applications (e.g., educational or productivity apps).
-- **Delay App**: Forces a time delay (e.g., 5-10 seconds) before protected apps can be opened, allowing the brain a moment to reconsider.
-- **Smart Schedules**: Automatically block or allow applications based on specific time schedules.
-- **Emergency Use**: A hold-to-unlock system for emergency usage when limits are reached, with a restricted quota.
-- **Session HUD**: A floating overlay that transparently shows the remaining time for an active application session.
-- **Expressive Design**: Built with Material Design 3 Expressive guidelines, featuring fluid animations and a modern interface.
+- **Bedtime Mode (New)**: Automate your digital detox with customizable schedules, Wind Down notifications, and automatic Do Not Disturb.
+- **Interactive Widgets (New)**: Keep track of your app streaks and daily focus progress with Material 3 Expressive home screen widgets.
+- **Mindful Gateway**: Proactively interrupt all non-whitelisted apps with a mindful pause to prevent mindless scrolling.
+- **Backup & Restore**: Securely save your settings and schedules with automated periodic backups or manual exports.
+- **Shield Mode**: Protect specific apps with mindful pauses and usage frequency limits.
+- **Goal Pursuit**: Set and achieve target usage times for productive applications.
+- **Session HUD**: A floating, customizable overlay (size & opacity) that shows remaining time for active sessions.
+- **Early Kick**: Optional reminders or early ejection to help you transition out of apps before your limit expires.
+- **Expressive Design**: Fully compliant with Material Design 3 Expressive guidelines, featuring fluid motion, adaptive typography (GSFlex), and floating navigation components.
 
 ## Installation Guide
 
 1. Clone this repository.
-2. Open it in Android Studio Ladybug or a newer version.
+2. Open it in Android Studio Ladybug (2024.2.1) or a newer version.
 3. Ensure Android SDK 33+ is installed.
-4. Build and run on a physical device (recommended as it requires Accessibility Service permissions).
+4. Build and run on a physical device (recommended for proper permission handling).
 
 ## Required Permissions
 
 To function optimally, Zenith requires:
-1. **Accessibility Service**: To instantly detect foreground application changes and manage app interventions.
+1. **Accessibility Service (Optional)**: To instantly detect foreground application changes and manage app interventions.
 2. **Usage Access (PACKAGE_USAGE_STATS)**: To accurately calculate daily application usage statistics.
 3. **Overlay Permission (SYSTEM_ALERT_WINDOW)**: To display Shield intervention screens and the Session HUD over other applications.
-4. **Notification Permission (POST_NOTIFICATIONS)**: To provide persistent updates and alerts regarding your focus status.
-5. **Foreground Service**: To maintain real-time monitoring of app usage for effective digital wellbeing.
+4. **Notification Permission & Listener (Optional)**: To provide focus updates and manage device notifications during Bedtime/Focus modes.
+5. **Battery Optimization Exemption**: To ensure consistent background monitoring and prevent system-level termination.
+6. **Exact Alarms**: To precisely trigger resets, bedtime schedules, and mindful reminders.
 
 ## Special Thanks
 
