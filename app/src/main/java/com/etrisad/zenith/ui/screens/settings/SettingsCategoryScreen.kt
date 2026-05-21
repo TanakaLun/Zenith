@@ -44,7 +44,10 @@ fun SettingsCategoryScreen(
 
     var showGoalTestSheet by remember { mutableStateOf(false) }
     var showUpdateSheet by remember { mutableStateOf(false) }
+    var showRestoreSheet by remember { mutableStateOf(false) }
     var latestRelease by remember { mutableStateOf<GitHubRelease?>(null) }
+    var backupMetadata by remember { mutableStateOf<BackupUtils.BackupMetadata?>(null) }
+    var pendingRestoreUri by remember { mutableStateOf<android.net.Uri?>(null) }
 
     val focusViewModel: FocusViewModel = viewModel(
         factory = FocusViewModelFactory(
@@ -100,12 +103,9 @@ fun SettingsCategoryScreen(
                 coroutineScope.launch {
                     val metadata = BackupUtils.getBackupMetadata(context, it)
                     if (metadata != null) {
-                        BackupUtils.restoreDatabase(context, it).onSuccess {
-                            Toast.makeText(context, "Restore successful! Restarting app...", Toast.LENGTH_LONG).show()
-                            BackupUtils.restartApp(context)
-                        }.onFailure { e ->
-                            Toast.makeText(context, "Restore failed: ${e.message}", Toast.LENGTH_LONG).show()
-                        }
+                        backupMetadata = metadata
+                        pendingRestoreUri = it
+                        showRestoreSheet = true
                     } else {
                         Toast.makeText(context, "Invalid backup file", Toast.LENGTH_SHORT).show()
                     }
@@ -228,6 +228,29 @@ fun SettingsCategoryScreen(
                     val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(latestRelease!!.htmlUrl))
                     context.startActivity(intent)
                     showUpdateSheet = false
+                }
+            )
+        }
+
+        if (showRestoreSheet && backupMetadata != null && pendingRestoreUri != null) {
+            com.etrisad.zenith.ui.components.RestoreConfirmationBottomSheet(
+                preferences = preferences,
+                metadata = backupMetadata!!,
+                onDismiss = {
+                    showRestoreSheet = false
+                    backupMetadata = null
+                    pendingRestoreUri = null
+                },
+                onConfirm = {
+                    coroutineScope.launch {
+                        BackupUtils.restoreDatabase(context, pendingRestoreUri!!).onSuccess {
+                            Toast.makeText(context, "Restore successful! Restarting app...", Toast.LENGTH_LONG).show()
+                            BackupUtils.restartApp(context)
+                        }.onFailure { e ->
+                            Toast.makeText(context, "Restore failed: ${e.message}", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                    showRestoreSheet = false
                 }
             )
         }
