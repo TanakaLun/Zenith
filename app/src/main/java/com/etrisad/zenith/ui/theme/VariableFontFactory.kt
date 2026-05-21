@@ -54,7 +54,7 @@ object VariableFontFactory {
     fun getPresetFontAxes(preset: GSFlexPreset): Triple<FontAxes, FontAxes, FontAxes> {
         return when (preset) {
             GSFlexPreset.ZENITH -> Triple(
-                FontAxes(950f, 85f, 72f, 0f, 0f, 100f),
+                FontAxes(950f, 85f, 30f, 0f, 0f, 100f),
                 FontAxes(700f, 115f, 32f, 0f, 0f, 60f),
                 FontAxes(450f, 100f, 16f, 20f, 0f, 0f)
             )
@@ -64,12 +64,12 @@ object VariableFontFactory {
                 FontAxes(400f, 95f, 16f, 10f, 0f, 0f)
             )
             GSFlexPreset.COMPACT -> Triple(
-                FontAxes(900f, 75f, 72f, 0f, 0f, 30f),
+                FontAxes(900f, 75f, 30f, 0f, 0f, 30f),
                 FontAxes(800f, 85f, 32f, 50f, 0f, 20f),
                 FontAxes(500f, 90f, 16f, 30f, 0f, 10f)
             )
             GSFlexPreset.AIRY -> Triple(
-                FontAxes(300f, 140f, 72f, 0f, 0f, 100f),
+                FontAxes(300f, 130f, 72f, 0f, 0f, 100f),
                 FontAxes(500f, 120f, 32f, 0f, 0f, 100f),
                 FontAxes(400f, 110f, 16f, 0f, 0f, 50f)
             )
