@@ -31,7 +31,7 @@ fun DataManagementSettings(
     onRestore: () -> Unit
 ) {
     Column {
-        PreferenceCategory(title = "Data Management")
+        PreferenceCategory(title = "Backup & Restore")
 
         SettingsToggle(
             title = "Auto Backup",
@@ -72,22 +72,24 @@ fun DataManagementSettings(
         )
 
         Spacer(modifier = Modifier.height(4.dp))
-        SettingsToggle(
-            title = "Sync on Entry",
-            description = "Refresh usage stats every time you open the stats screen. Enable this if you experience data inconsistency.",
-            checked = preferences.refreshOnOpenUsageStats,
-            onCheckedChange = onRefreshOnOpenUsageStatsChange,
-            icon = Icons.Outlined.Sync,
-            shape = RoundedCornerShape(8.dp)
-        )
-
-        Spacer(modifier = Modifier.height(4.dp))
         SettingsActionItem(
             title = "Restore Data",
             summary = "Load data from a previous backup file",
             onClick = onRestore,
             icon = Icons.Outlined.Restore,
             shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+        PreferenceCategory(title = "Sync & Maintenance")
+
+        SettingsToggle(
+            title = "Sync on Entry",
+            description = "Refresh usage stats every time you open the stats screen. Enable this if you experience data inconsistency.",
+            checked = preferences.refreshOnOpenUsageStats,
+            onCheckedChange = onRefreshOnOpenUsageStatsChange,
+            icon = Icons.Outlined.Sync,
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
         )
     }
 }

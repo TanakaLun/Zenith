@@ -23,7 +23,7 @@ fun AppearanceSettings(
     onNavigateToGSFlexCustomizer: () -> Unit
 ) {
     Column {
-        PreferenceCategory(title = "Appearance")
+        PreferenceCategory(title = "Theming")
 
         ThemeSelector(
             selectedTheme = preferences.themeConfig,
@@ -56,17 +56,19 @@ fun AppearanceSettings(
             checked = preferences.expressiveColors,
             onCheckedChange = onExpressiveColorsChange,
             icon = Icons.Outlined.Layers,
-            shape = RoundedCornerShape(8.dp)
+            shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
         )
 
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(16.dp))
+        PreferenceCategory(title = "Layout & Navigation")
+
         SettingsToggle(
             title = "Floating Tab Bar",
             description = "Use the new Material 3 Expressive floating navigation",
             checked = preferences.floatingTabBarEnabled,
             onCheckedChange = onFloatingTabBarEnabledChange,
             icon = Icons.Outlined.Flaky,
-            shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
         )
     }
 }

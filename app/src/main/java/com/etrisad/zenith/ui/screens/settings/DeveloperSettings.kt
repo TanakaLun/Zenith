@@ -39,7 +39,7 @@ fun DeveloperSettings(
 ) {
     if (preferences.developerModeEnabled) {
         Column {
-            PreferenceCategory(title = "Developer")
+            PreferenceCategory(title = "Database & Data")
 
             SettingsToggle(
                 title = "Database Source Indicator",
@@ -75,16 +75,18 @@ fun DeveloperSettings(
                 summary = "Fix missing or incorrect usage history",
                 onClick = onNavigateToDataRepairment,
                 icon = Icons.Outlined.Build,
-                shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
+                shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
             )
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(16.dp))
+            PreferenceCategory(title = "UI & Functional Testing")
+
             SettingsActionItem(
                 title = "Test Goal Overlay",
                 summary = "Immediately trigger the full screen caller overlay",
                 onClick = onTestGoalOverlay,
                 icon = Icons.Outlined.BugReport,
-                shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
+                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
             )
 
             Spacer(modifier = Modifier.height(4.dp))
@@ -102,10 +104,12 @@ fun DeveloperSettings(
                 summary = "Demo variable axes with Google Sans Flex",
                 onClick = onNavigateToFontTest,
                 icon = Icons.Outlined.FontDownload,
-                shape = RoundedCornerShape(8.dp)
+                shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
             )
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(16.dp))
+            PreferenceCategory(title = "Monitoring Intervals")
+
             SettingsToggle(
                 title = "Custom Delay Time",
                 description = "Manually adjust monitoring intervals (Advanced)",
@@ -113,8 +117,8 @@ fun DeveloperSettings(
                 onCheckedChange = onCustomDelayEnabledChange,
                 icon = Icons.Outlined.Timer,
                 shape = if (preferences.customDelayEnabled)
-                    RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
-                else RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
+                    RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
+                else RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
             )
 
             AnimatedVisibility(

@@ -35,7 +35,7 @@ fun FeaturesSettings(
     onInterceptAudioFocusEnabledChange: (Boolean) -> Unit
 ) {
     Column {
-        PreferenceCategory(title = "Features")
+        PreferenceCategory(title = "Interface Overlays")
 
         SettingsToggle(
             title = "Total Usage Pill",
@@ -53,7 +53,7 @@ fun FeaturesSettings(
             checked = preferences.sessionUsageOverlayEnabled,
             onCheckedChange = onSessionUsageOverlayEnabledChange,
             icon = Icons.Outlined.Timer,
-            shape = RoundedCornerShape(8.dp)
+            shape = if (preferences.sessionUsageOverlayEnabled) RoundedCornerShape(8.dp) else RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
         )
 
         AnimatedVisibility(
@@ -68,19 +68,21 @@ fun FeaturesSettings(
                     opacity = preferences.sessionUsageOverlayOpacity,
                     onSizeChange = onSessionUsageOverlaySizeChange,
                     onOpacityChange = onSessionUsageOverlayOpacityChange,
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(16.dp))
+        PreferenceCategory(title = "Advanced Control")
+
         SettingsToggle(
             title = "Mindful Gateway",
             description = "Interrupt every non-whitelisted app with a mindful pause, even without a specific shield",
             checked = preferences.mindfulGatewayEnabled,
             onCheckedChange = onMindfulGatewayEnabledChange,
             icon = Icons.Outlined.AutoFixHigh,
-            shape = RoundedCornerShape(8.dp)
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
         )
 
         Spacer(modifier = Modifier.height(4.dp))
