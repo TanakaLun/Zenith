@@ -2,6 +2,7 @@ package com.etrisad.zenith.ui.viewmodel
 
 import android.app.usage.UsageStatsManager
 import android.app.usage.UsageEvents
+import android.app.usage.UsageStats
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -17,6 +18,7 @@ import com.etrisad.zenith.data.preferences.UserPreferences
 import com.etrisad.zenith.service.UsageSyncManager
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -469,14 +471,13 @@ class HomeViewModel(
                 repairData(todayStr)
 
                 val syncManager = UsageSyncManager(context!!, shieldRepository, userPreferencesRepository)
-                kotlinx.coroutines.withTimeoutOrNull(10000) {
+                kotlinx.coroutines.withTimeoutOrNull(25000) {
                     syncManager.syncUsageData()
                 }
             } catch (e: Exception) {
                 android.util.Log.e("HomeVM", "Sync failed: ${e.message}")
             } finally {
                 refreshUsageStats(showLoading = false)
-                _uiState.update { it.copy(isLoading = false) }
             }
         }
     }
@@ -493,14 +494,13 @@ class HomeViewModel(
                 shieldRepository.deleteHourlyUsageForDate(today)
                 
                 val syncManager = UsageSyncManager(context, shieldRepository, userPreferencesRepository)
-                kotlinx.coroutines.withTimeoutOrNull(10000) {
+                kotlinx.coroutines.withTimeoutOrNull(25000) {
                     syncManager.syncUsageData()
                 }
             } catch (e: Exception) {
                 android.util.Log.e("HomeVM", "Reset carryover failed: ${e.message}")
             } finally {
                 refreshUsageStats(showLoading = false)
-                _uiState.update { it.copy(isLoading = false) }
             }
         }
     }
@@ -643,7 +643,10 @@ class HomeViewModel(
         val fallbackStart = getMidnight(30)
         val now = System.currentTimeMillis()
         
-        val stats = usm.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, fallbackStart, now)
+        val stats = try {
+            usm.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, fallbackStart, now)
+        } catch (_: Exception) { emptyList<UsageStats>() }
+        
         val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
         val result = mutableMapOf<String, Long>()
 
@@ -676,7 +679,7 @@ class HomeViewModel(
     private fun refreshUsageStats(showLoading: Boolean = true) {
         if (showLoading) _uiState.update { it.copy(isLoading = true) }
 
-        if (!showLoading && refreshJob?.isActive == true) return
+        if (!showLoading && refreshJob?.isActive == true && !_uiState.value.isLoading) return
 
         refreshJob?.cancel()
         refreshJob = viewModelScope.launch(kotlinx.coroutines.Dispatchers.Default) {
@@ -894,44 +897,65 @@ class HomeViewModel(
             val allHourlyData = dbHourly + newlyLocked
 
             val hourlyUsage = (0..23).map { hour ->
-                val appsInHour = appTotals.mapNotNull { (pkg, trueTotal) ->
-                    val dbEntry = allHourlyData.find { it.hour == hour && it.packageName == pkg }
-                    
-                    val durationForThisHour = if (dbEntry != null) {
-                        dbEntry.usageTimeMillis
-                    } else {
-                        val lockedHours = allHourlyData.filter { it.packageName == pkg }.map { it.hour }.toSet()
-                        if (hour in lockedHours) {
-                            0L
-                        } else {
-                            val sumLocked = allHourlyData.filter { it.packageName == pkg }.sumOf { it.usageTimeMillis }
-                            val remainingToDistribute = (trueTotal - sumLocked).coerceAtLeast(0L)
-                            val rawUnlockedTotal = (0..23).filter { it !in lockedHours }.sumOf { h -> hourlyAppUsage[h]?.get(pkg) ?: 0L }
-                            val rawHourUsage = hourlyAppUsage[hour]?.get(pkg) ?: 0L
-                            
-                            if (rawUnlockedTotal > 0) {
-                                (remainingToDistribute * (rawHourUsage.toDouble() / rawUnlockedTotal)).toLong()
+                val appsInHour = if (isSelectedToday && hourlyAppUsage.containsKey(hour)) {
+                    val pkgMap = hourlyAppUsage[hour] ?: emptyMap()
+                    pkgMap.mapNotNull { (pkg, duration) ->
+                        if (duration > 0) {
+                            val lastUsed = lastUsedMap[pkg] ?: 0L
+                            val cached = appInfoCache[pkg]
+                            if (cached != null) {
+                                AppUsageInfo(pkg, cached.first, duration, cached.second, lastTimeUsed = lastUsed)
                             } else {
+                                try {
+                                    val appInfo = pm.getApplicationInfo(pkg, 0)
+                                    val label = pm.getApplicationLabel(appInfo).toString()
+                                    val icon = pm.getApplicationIcon(appInfo)
+                                    appInfoCache[pkg] = label to icon
+                                    AppUsageInfo(pkg, label, duration, icon, lastTimeUsed = lastUsed)
+                                } catch (_: Exception) { null }
+                            }
+                        } else null
+                    }
+                } else {
+                    appTotals.mapNotNull { (pkg, trueTotal) ->
+                        val dbEntry = allHourlyData.find { it.hour == hour && it.packageName == pkg }
+                        
+                        val durationForThisHour = if (dbEntry != null) {
+                            dbEntry.usageTimeMillis
+                        } else {
+                            val lockedHours = allHourlyData.filter { it.packageName == pkg }.map { it.hour }.toSet()
+                            if (hour in lockedHours) {
                                 0L
+                            } else {
+                                val sumLocked = allHourlyData.filter { it.packageName == pkg }.sumOf { it.usageTimeMillis }
+                                val remainingToDistribute = (trueTotal - sumLocked).coerceAtLeast(0L)
+                                val rawUnlockedTotal = (0..23).filter { it !in lockedHours }.sumOf { h -> hourlyAppUsage[h]?.get(pkg) ?: 0L }
+                                val rawHourUsage = hourlyAppUsage[hour]?.get(pkg) ?: 0L
+                                
+                                if (rawUnlockedTotal > 0) {
+                                    (remainingToDistribute * (rawHourUsage.toDouble() / rawUnlockedTotal)).toLong()
+                                } else {
+                                    0L
+                                }
                             }
                         }
-                    }
 
-                    if (durationForThisHour > 0) {
-                        val lastUsed = lastUsedMap[pkg] ?: 0L
-                        val cached = appInfoCache[pkg]
-                        if (cached != null) {
-                            AppUsageInfo(pkg, cached.first, durationForThisHour, cached.second, lastTimeUsed = lastUsed)
-                        } else {
-                            try {
-                                val appInfo = pm.getApplicationInfo(pkg, 0)
-                                val label = pm.getApplicationLabel(appInfo).toString()
-                                val icon = pm.getApplicationIcon(appInfo)
-                                appInfoCache[pkg] = label to icon
-                                AppUsageInfo(pkg, label, durationForThisHour, icon, lastTimeUsed = lastUsed)
-                            } catch (_: Exception) { null }
-                        }
-                    } else null
+                        if (durationForThisHour > 0) {
+                            val lastUsed = lastUsedMap[pkg] ?: 0L
+                            val cached = appInfoCache[pkg]
+                            if (cached != null) {
+                                AppUsageInfo(pkg, cached.first, durationForThisHour, cached.second, lastTimeUsed = lastUsed)
+                            } else {
+                                try {
+                                    val appInfo = pm.getApplicationInfo(pkg, 0)
+                                    val label = pm.getApplicationLabel(appInfo).toString()
+                                    val icon = pm.getApplicationIcon(appInfo)
+                                    appInfoCache[pkg] = label to icon
+                                    AppUsageInfo(pkg, label, durationForThisHour, icon, lastTimeUsed = lastUsed)
+                                } catch (_: Exception) { null }
+                            }
+                        } else null
+                    }
                 }.let { list ->
                     when (_uiState.value.hourlySortType) {
                         HourlySortType.USAGE_TIME -> list.sortedByDescending { it.totalTimeVisible }
@@ -940,7 +964,11 @@ class HomeViewModel(
                 }
 
                 val dbHourTotal = allHourlyData.find { it.hour == hour && it.packageName == "TOTAL" }?.usageTimeMillis
-                val hourUsageTotal = dbHourTotal ?: appsInHour.sumOf { it.totalTimeVisible }
+                val hourUsageTotal = if (isSelectedToday && hourlyAppUsage.containsKey(hour)) {
+                    appsInHour.sumOf { it.totalTimeVisible }
+                } else {
+                    dbHourTotal ?: appsInHour.sumOf { it.totalTimeVisible }
+                }
 
                 HourlyUsageInfo(
                     hour = hour,
@@ -1099,7 +1127,6 @@ class HomeViewModel(
             val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
             val pm  = context.packageManager
             val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-            val todayStart = getMidnight(0)
 
             var appName = packageName
             var icon: android.graphics.drawable.Drawable? = null
@@ -1110,21 +1137,30 @@ class HomeViewModel(
             } catch (_: Exception) {}
 
             _appDetailUiState.update { it.copy(appName = appName, icon = icon) }
-            updatePackageFallback(packageName)
+            
+            withContext(kotlinx.coroutines.Dispatchers.IO) {
+                updatePackageFallback(packageName)
+            }
 
-            shieldRepository.getLastNDaysUsageForPackage(packageName, 21).collect { historyFromDb ->
+            combine(
+                shieldRepository.getLastNDaysUsageForPackage(packageName, 21),
+                shieldRepository.getShieldByPackageNameFlow(packageName),
+                userPreferencesRepository.userPreferencesFlow
+            ) { historyFromDb, shield, prefs ->
                 val currentNow = System.currentTimeMillis()
 
                 val detailedUsage = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                    com.etrisad.zenith.util.ScreenUsageHelper.fetchDetailedUsageToday(usm, includeHourly = true)
+                    kotlinx.coroutines.withTimeoutOrNull(5000) {
+                        com.etrisad.zenith.util.ScreenUsageHelper.fetchDetailedUsageToday(usm, includeHourly = true)
+                    }
                 }
-                val sessionCount = detailedUsage.sessionCounts[packageName] ?: 0
+                
+                val currentTodayUsage = detailedUsage?.appUsageMap?.get(packageName) ?: 0L
+                val sessionCount = detailedUsage?.sessionCounts?.get(packageName) ?: 0
                 val appHourlyUsage = MutableList(24) { hour -> 
-                    detailedUsage.hourlyUsageMap[hour]?.get(packageName) ?: 0L 
+                    detailedUsage?.hourlyUsageMap?.get(hour)?.get(packageName) ?: 0L 
                 }
-                val currentTodayUsage = detailedUsage.appUsageMap[packageName] ?: 0L
                 val peakHour = appHourlyUsage.indices.maxByOrNull { appHourlyUsage[it] } ?: -1
-
 
                 val yesterdayCal = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }
                 val yesterdayDateStr = dateFormat.format(yesterdayCal.time)
@@ -1143,7 +1179,7 @@ class HomeViewModel(
                         currentTodayUsage
                     } else {
                         dbEntry?.usageTimeMillis 
-                            ?: if (preferSystemUsageHistory) {
+                            ?: if (prefs.preferSystemUsageHistory) {
                                 detailFallbackMap[dateStr] ?: 0L
                             } else 0L
                     }
@@ -1166,8 +1202,6 @@ class HomeViewModel(
                     else               -> 0f
                 }
 
-                val shield = allShields.find { it.packageName == packageName }
-
                 _appDetailUiState.update { it.copy(
                     packageName      = packageName,
                     appName          = appName,
@@ -1187,7 +1221,7 @@ class HomeViewModel(
                     isPaused         = shield?.isPaused ?: false,
                     pauseEndTimestamp = shield?.pauseEndTimestamp ?: 0L
                 ) }
-            }
+            }.collect()
         }
     }
 
@@ -1321,12 +1355,14 @@ class HomeViewModel(
             val todayStart = getMidnight(0)
             
             val detailedUsage = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                com.etrisad.zenith.util.ScreenUsageHelper.fetchDetailedUsageToday(usm, includeHourly = true)
+                kotlinx.coroutines.withTimeoutOrNull(5000) {
+                    com.etrisad.zenith.util.ScreenUsageHelper.fetchDetailedUsageToday(usm, includeHourly = true)
+                }
             }
-            val currentTodayUsage = detailedUsage.appUsageMap[packageName] ?: 0L
+            val currentTodayUsage = detailedUsage?.appUsageMap?.get(packageName) ?: 0L
             
             val appHourlyUsage = MutableList(24) { hour -> 
-                detailedUsage.hourlyUsageMap[hour]?.get(packageName) ?: 0L 
+                detailedUsage?.hourlyUsageMap?.get(hour)?.get(packageName) ?: 0L
             }
             val peakHour = appHourlyUsage.indices.maxByOrNull { appHourlyUsage[it] } ?: -1
 
@@ -1340,7 +1376,7 @@ class HomeViewModel(
             _appDetailUiState.update { it.copy(
                 todayUsage = currentTodayUsage,
                 percentageChange = percentageChange,
-                totalSessions = detailedUsage.sessionCounts[packageName]?.coerceAtLeast(if (currentTodayUsage > 0) 1 else 0) ?: it.totalSessions,
+                totalSessions = detailedUsage?.sessionCounts?.get(packageName)?.coerceAtLeast(if (currentTodayUsage > 0) 1 else 0) ?: it.totalSessions,
                 hourlyUsage = appHourlyUsage,
                 peakHour = peakHour
             ) }
