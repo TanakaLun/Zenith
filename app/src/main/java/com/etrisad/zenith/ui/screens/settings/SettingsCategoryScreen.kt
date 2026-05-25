@@ -200,7 +200,8 @@ fun SettingsCategoryScreen(
                         onSetDelayShieldMid = { delay -> coroutineScope.launch { preferencesRepository.setDelayShieldMid(delay) } },
                         onSetDelayShieldNear = { delay -> coroutineScope.launch { preferencesRepository.setDelayShieldNear(delay) } },
                         onSetDelayDefault = { delay -> coroutineScope.launch { preferencesRepository.setDelayDefault(delay) } },
-                        onResetCustomDelays = { coroutineScope.launch { preferencesRepository.resetCustomDelays() } }
+                        onResetCustomDelays = { coroutineScope.launch { preferencesRepository.resetCustomDelays() } },
+                        onNavigateToSystemUsageDebug = { navController.navigate(Screen.SystemUsageDebug.route) }
                     )
                 }
             }

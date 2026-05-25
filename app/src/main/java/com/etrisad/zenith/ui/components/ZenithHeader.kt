@@ -46,6 +46,7 @@ fun ZenithHeader(
         currentRoute == Screen.DataRepairment.route ||
         currentRoute == Screen.FontTest.route ||
         currentRoute == Screen.GSFlexCustomizer.route ||
+        currentRoute == Screen.SystemUsageDebug.route ||
         currentRoute?.startsWith("settings_category") == true ||
         currentRoute?.startsWith("app_detail") == true
 
@@ -126,6 +127,7 @@ fun ZenithHeader(
                 currentRoute == Screen.DataRepairment.route -> "Data Repairment"
                 currentRoute == Screen.FontTest.route -> "M3 Expressive Editor"
                 currentRoute == Screen.GSFlexCustomizer.route -> "GS Flex Designer"
+                currentRoute == Screen.SystemUsageDebug.route -> "System Usage Fetch"
                 currentRoute?.startsWith("settings_category") == true -> categoryName ?: "Settings"
                 currentRoute?.startsWith("app_detail") == true -> "App Detail"
                 else -> "Zenith"

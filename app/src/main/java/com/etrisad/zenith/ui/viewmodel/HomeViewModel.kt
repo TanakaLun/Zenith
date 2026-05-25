@@ -310,6 +310,105 @@ class HomeViewModel(
 
     val userPreferences: Flow<UserPreferences> = userPreferencesRepository.userPreferencesFlow
 
+    private val _systemOnlyUsageHistory = MutableStateFlow<List<DailyUsage>>(emptyList())
+    val systemOnlyUsageHistory: StateFlow<List<DailyUsage>> = _systemOnlyUsageHistory.asStateFlow()
+
+    fun fetchSystemOnlyUsageHistory() {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.Default) {
+            val usm = context!!.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+            val (launcherApps, launcherPackage) = getLauncherInfo()
+            val excludePackages = setOfNotNull(context.packageName, launcherPackage)
+            
+            val now = System.currentTimeMillis()
+            val history = mutableListOf<DailyUsage>()
+
+            for (i in 0 until 21) {
+                val start = getMidnight(i)
+                val end = if (i == 0) now else getMidnight(i - 1)
+                
+                val events = usm.queryEvents(start - (12 * 60 * 60 * 1000L), end)
+                val event = UsageEvents.Event()
+                
+                val usageMap = mutableMapOf<String, Long>()
+                var activePkg: String? = null
+                var activeStartTime = 0L
+                var isScreenOn = true
+
+                while (events.hasNextEvent()) {
+                    events.getNextEvent(event)
+                    val pkg = event.packageName
+                    val time = event.timeStamp
+                    
+                    when (event.eventType) {
+                        UsageEvents.Event.SCREEN_INTERACTIVE -> isScreenOn = true
+                        UsageEvents.Event.SCREEN_NON_INTERACTIVE -> {
+                            isScreenOn = false
+                            activePkg?.let { p ->
+                                val segmentStart = maxOf(activeStartTime, start)
+                                val segmentEnd = minOf(time, end)
+                                if (segmentStart < segmentEnd) {
+                                    usageMap[p] = (usageMap[p] ?: 0L) + (segmentEnd - segmentStart)
+                                }
+                            }
+                            activePkg = null
+                            activeStartTime = 0L
+                        }
+                        UsageEvents.Event.ACTIVITY_RESUMED,
+                        UsageEvents.Event.MOVE_TO_FOREGROUND -> {
+                            if (isScreenOn) {
+                                if (activePkg != null) {
+                                    val segmentStart = maxOf(activeStartTime, start)
+                                    val segmentEnd = minOf(time, end)
+                                    if (segmentStart < segmentEnd) {
+                                        usageMap[activePkg!!] = (usageMap[activePkg!!] ?: 0L) + (segmentEnd - segmentStart)
+                                    }
+                                }
+                                activePkg = pkg
+                                activeStartTime = time
+                            }
+                        }
+                        UsageEvents.Event.ACTIVITY_PAUSED,
+                        UsageEvents.Event.MOVE_TO_BACKGROUND -> {
+                            if (activePkg == pkg) {
+                                val segmentStart = maxOf(activeStartTime, start)
+                                val segmentEnd = minOf(time, end)
+                                if (segmentStart < segmentEnd) {
+                                    usageMap[pkg] = (usageMap[pkg] ?: 0L) + (segmentEnd - segmentStart)
+                                }
+                                activePkg = null
+                                activeStartTime = 0L
+                            }
+                        }
+                    }
+                }
+                
+                if (activePkg != null && isScreenOn) {
+                    val segmentStart = maxOf(activeStartTime, start)
+                    val segmentEnd = minOf(now, end)
+                    if (segmentStart < segmentEnd) {
+                        usageMap[activePkg!!] = (usageMap[activePkg!!] ?: 0L) + (segmentEnd - segmentStart)
+                    }
+                }
+
+                var dayTotal = 0L
+                usageMap.forEach { (pkg, time) ->
+                    if (pkg !in excludePackages && pkg in launcherApps) {
+                        dayTotal += time
+                    }
+                }
+                
+                history.add(DailyUsage(
+                    date = start,
+                    totalTime = dayTotal,
+                    hasDatabaseRecord = false,
+                    hasSystemData = true,
+                    isLive = i == 0
+                ))
+            }
+            _systemOnlyUsageHistory.value = history.reversed()
+        }
+    }
+
     suspend fun setAllowRepairNonUnavailable(enabled: Boolean) {
         userPreferencesRepository.setAllowRepairNonUnavailable(enabled)
     }

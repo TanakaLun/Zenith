@@ -35,7 +35,8 @@ fun DeveloperSettings(
     onSetDelayShieldMid: (Long) -> Unit,
     onSetDelayShieldNear: (Long) -> Unit,
     onSetDelayDefault: (Long) -> Unit,
-    onResetCustomDelays: () -> Unit
+    onResetCustomDelays: () -> Unit,
+    onNavigateToSystemUsageDebug: () -> Unit
 ) {
     if (preferences.developerModeEnabled) {
         Column {
@@ -66,6 +67,15 @@ fun DeveloperSettings(
                 summary = "View and manage all recorded usage data",
                 onClick = onNavigateToDatabaseDebug,
                 icon = Icons.Outlined.SdStorage,
+                shape = RoundedCornerShape(8.dp)
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+            SettingsActionItem(
+                title = "View System Usage Fetch",
+                summary = "View 1:1 usage history duplication from system only",
+                onClick = onNavigateToSystemUsageDebug,
+                icon = Icons.Outlined.Analytics,
                 shape = RoundedCornerShape(8.dp)
             )
 

@@ -126,6 +126,7 @@ fun MainScreen(
                 currentRoute == Screen.DataRepairment.route ||
                 currentRoute == Screen.FontTest.route ||
                 currentRoute == Screen.GSFlexCustomizer.route ||
+                currentRoute == Screen.SystemUsageDebug.route ||
                 currentRoute?.startsWith("settings_category") == true ||
                 currentRoute?.startsWith("app_detail") == true
 
@@ -262,17 +263,18 @@ fun MainScreen(
     Row(
         modifier = Modifier.fillMaxSize()
     ) {
-        if (useNavigationRail) {
-            val showNavRail =
-                currentRoute != Screen.UsageStats.route &&
-                        currentRoute != Screen.Bedtime.route &&
-                        currentRoute != Screen.DatabaseDebug.route &&
-                        currentRoute != Screen.DataRepairment.route &&
-                        currentRoute != Screen.FontTest.route &&
-                        currentRoute != Screen.GSFlexCustomizer.route &&
-                        currentRoute?.startsWith("settings_category") == false &&
-                        currentRoute?.startsWith("app_detail") == false
+        val showNavRail =
+            currentRoute != Screen.UsageStats.route &&
+                    currentRoute != Screen.Bedtime.route &&
+                    currentRoute != Screen.DatabaseDebug.route &&
+                    currentRoute != Screen.DataRepairment.route &&
+                    currentRoute != Screen.FontTest.route &&
+                    currentRoute != Screen.GSFlexCustomizer.route &&
+                    currentRoute != Screen.SystemUsageDebug.route &&
+                    currentRoute?.startsWith("settings_category") == false &&
+                    currentRoute?.startsWith("app_detail") == false
 
+        if (useNavigationRail) {
             AnimatedVisibility(
                 visible = showNavRail,
                 enter = slideInHorizontally(initialOffsetX = { -it }) + expandHorizontally(expandFrom = Alignment.Start),
@@ -567,6 +569,7 @@ fun MainScreen(
                                     targetRoute == Screen.DataRepairment.route ||
                                     targetRoute == Screen.FontTest.route ||
                                     targetRoute == Screen.GSFlexCustomizer.route ||
+                                    targetRoute == Screen.SystemUsageDebug.route ||
                                     targetRoute?.startsWith("settings_category") == true ||
                                     targetRoute?.startsWith("app_detail") == true
                         val isInitialDeep =
@@ -576,6 +579,7 @@ fun MainScreen(
                                     initialRoute == Screen.DataRepairment.route ||
                                     initialRoute == Screen.FontTest.route ||
                                     initialRoute == Screen.GSFlexCustomizer.route ||
+                                    initialRoute == Screen.SystemUsageDebug.route ||
                                     initialRoute?.startsWith("settings_category") == true ||
                                     initialRoute?.startsWith("app_detail") == true
 
@@ -617,15 +621,27 @@ fun MainScreen(
                                     targetRoute == Screen.DataRepairment.route ||
                                     targetRoute == Screen.FontTest.route ||
                                     targetRoute == Screen.GSFlexCustomizer.route ||
+                                    targetRoute == Screen.SystemUsageDebug.route ||
                                     targetRoute?.startsWith("settings_category") == true ||
                                     targetRoute?.startsWith("app_detail") == true
+
+                        val isInitialDeep =
+                            initialRoute == Screen.UsageStats.route ||
+                                    initialRoute == Screen.Bedtime.route ||
+                                    initialRoute == Screen.DatabaseDebug.route ||
+                                    initialRoute == Screen.DataRepairment.route ||
+                                    initialRoute == Screen.FontTest.route ||
+                                    initialRoute == Screen.GSFlexCustomizer.route ||
+                                    initialRoute == Screen.SystemUsageDebug.route ||
+                                    initialRoute?.startsWith("settings_category") == true ||
+                                    initialRoute?.startsWith("app_detail") == true
 
                         val animationSpec = spring<IntOffset>(
                             dampingRatio = Spring.DampingRatioNoBouncy,
                             stiffness = Spring.StiffnessLow
                         )
 
-                        if (isTargetDeep) {
+                        if (isTargetDeep || (isInitialDeep && !isTargetDeep)) {
                             slideOutHorizontally(
                                 targetOffsetX = { -it / 3 },
                                 animationSpec = animationSpec
@@ -735,6 +751,13 @@ fun MainScreen(
                             innerPadding = innerPadding
                         )
                     }
+                    composable(Screen.SystemUsageDebug.route) {
+                        com.etrisad.zenith.ui.screens.settings.SystemUsageDebugScreen(
+                            viewModel = homeViewModel,
+                            innerPadding = innerPadding,
+                            onBack = { navController.popBackStack() }
+                        )
+                    }
                     composable(
                         route = Screen.AppDetail.route,
                         arguments = listOf(androidx.navigation.navArgument("packageName") {
@@ -774,6 +797,7 @@ fun MainScreen(
                             currentRoute != Screen.DataRepairment.route &&
                             currentRoute != Screen.FontTest.route &&
                             currentRoute != Screen.GSFlexCustomizer.route &&
+                            currentRoute != Screen.SystemUsageDebug.route &&
                             currentRoute?.startsWith("settings_category") == false &&
                             currentRoute?.startsWith("app_detail") == false
 
