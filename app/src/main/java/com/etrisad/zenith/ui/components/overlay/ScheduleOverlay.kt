@@ -294,42 +294,17 @@ fun PortraitScheduleLayout(
     onCloseApp: () -> Unit
 ) {
     Box(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .statusBarsPadding()
-                .padding(top = 16.dp, end = 20.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                Icons.Outlined.Bolt,
-                null,
-                modifier = Modifier.size(14.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(
-                text = "Emergency: ${schedule.emergencyUseCount}",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+        OverlayDragHandleWithIndicators(
+            emergencyCount = schedule.emergencyUseCount
+        )
 
         Column(
             modifier = Modifier
-                .padding(24.dp)
+                .padding(bottom = 24.dp, start = 24.dp, end = 24.dp, top = 24.dp)
                 .fillMaxWidth()
                 .navigationBarsPadding(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Box(
-                modifier = Modifier
-                    .width(40.dp)
-                    .height(4.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.outlineVariant)
-            )
-
             Spacer(modifier = Modifier.height(24.dp))
 
             Box(

@@ -35,6 +35,7 @@ import com.etrisad.zenith.ui.components.ZenithButton
 import com.etrisad.zenith.ui.components.ZenithButtonSize
 import com.etrisad.zenith.ui.components.ZenithButtonType
 import com.etrisad.zenith.ui.components.overlay.CloseAppTextButton
+import com.etrisad.zenith.ui.components.overlay.OverlayDragHandleWithIndicators
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -176,17 +177,11 @@ fun BedtimeOverlayContent(
                     modifier = Modifier
                         .fillMaxSize()
                         .let { if (isLandscape) it.displayCutoutPadding() else it }
-                        .padding(24.dp)
+                        .padding(bottom = 24.dp, start = 24.dp, end = 24.dp, top = 0.dp)
                         .navigationBarsPadding(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .width(40.dp)
-                            .height(4.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.outlineVariant)
-                    )
+                    OverlayDragHandleWithIndicators()
 
                     Box(
                         modifier = Modifier

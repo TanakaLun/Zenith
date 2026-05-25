@@ -218,18 +218,12 @@ fun PortraitGoalLayout(
 ) {
     Column(
         modifier = Modifier
-            .padding(24.dp)
+            .padding(bottom = 24.dp, start = 24.dp, end = 24.dp, top = 0.dp)
             .fillMaxWidth()
             .navigationBarsPadding(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box(
-            modifier = Modifier
-                .width(40.dp)
-                .height(4.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.outlineVariant)
-        )
+        OverlayDragHandleWithIndicators()
 
         Spacer(modifier = Modifier.height(24.dp))
 

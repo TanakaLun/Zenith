@@ -31,6 +31,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
 import com.etrisad.zenith.ui.components.overlay.CloseAppTextButton
+import com.etrisad.zenith.ui.components.overlay.OverlayDragHandleWithIndicators
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -166,18 +167,12 @@ fun WindDownOverlayContent(
                 Column(
                     modifier = Modifier
                         .let { if (isLandscape) it.displayCutoutPadding() else it }
-                        .padding(24.dp)
+                        .padding(bottom = 24.dp, start = 24.dp, end = 24.dp, top = 0.dp)
                         .fillMaxWidth()
                         .navigationBarsPadding(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .width(40.dp)
-                            .height(4.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.outlineVariant)
-                    )
+                    OverlayDragHandleWithIndicators()
 
                     Spacer(modifier = Modifier.height(24.dp))
 
