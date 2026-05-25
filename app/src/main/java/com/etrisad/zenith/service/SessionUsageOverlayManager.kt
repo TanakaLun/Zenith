@@ -104,74 +104,86 @@ class SessionUsageOverlayManager(private val context: Context) {
         initialSeconds: Int = 0,
         onSessionEnd: () -> Unit = {}
     ) {
-        if (activeSessions.any { it.packageName == packageName }) return
+        synchronized(activeSessions) {
+            if (activeSessions.any { it.packageName == packageName }) return
 
-        if (activeSessions.size >= MaxHuds) {
-            hideHUD(activeSessions.firstOrNull()?.packageName)
-        }
+            if (activeSessions.size >= MaxHuds) {
+                hideHUD(activeSessions.firstOrNull()?.packageName)
+            }
 
-        val totalSeconds = durationMinutes * 60
-        val session = Session(
-            packageName, totalSeconds, size, opacity, isGoal, onSessionEnd,
-            104, 204 + (activeSessions.size * 50),
-            initialSeconds = initialSeconds
-        )
-        activeSessions.add(session)
+            val totalSeconds = durationMinutes * 60
+            val session = Session(
+                packageName, totalSeconds, size, opacity, isGoal, onSessionEnd,
+                104, 204 + (activeSessions.size * 50),
+                initialSeconds = initialSeconds
+            )
+            activeSessions.add(session)
 
-        val isForeground = currentForegroundPackage.contains(packageName) ||
-                packageName.contains(currentForegroundPackage)
-        if (isForeground && session.hudInstance == null) {
-            session.hudInstance = createHUDInstance(session)
-        }
+            val isForeground = currentForegroundPackage.contains(packageName) ||
+                    packageName.contains(currentForegroundPackage)
+            if (isForeground && session.hudInstance == null) {
+                session.hudInstance = createHUDInstance(session)
+            }
 
-        session.timerJob = scope.launch {
-            var lastUpdateMillis = System.currentTimeMillis()
-            while (true) {
-                if (!isGoal && session.secondsLeftState.intValue <= 0) break
-                if (isGoal && session.secondsElapsedState.intValue >= session.totalSeconds) break
+            session.timerJob = scope.launch {
+                var lastUpdateMillis = System.currentTimeMillis()
+                while (true) {
+                    if (!isGoal && session.secondsLeftState.intValue <= 0) break
+                    if (isGoal && session.secondsElapsedState.intValue >= session.totalSeconds) break
 
-                val updateInterval = if (isGoal) {
-                    val remainingSeconds = (session.totalSeconds - session.lastReportedUsageSeconds).coerceAtLeast(0)
-                    when {
-                        remainingSeconds < 60 -> 10000L
-                        remainingSeconds < 300 -> 15000L
-                        remainingSeconds < 900 -> 30000L
-                        else -> 50000L
+                    val updateInterval = if (isGoal) {
+                        val remainingSeconds = (session.totalSeconds - session.lastReportedUsageSeconds).coerceAtLeast(0)
+                        when {
+                            remainingSeconds < 60 -> 10000L
+                            remainingSeconds < 300 -> 15000L
+                            remainingSeconds < 900 -> 30000L
+                            else -> 50000L
+                        }
+                    } else {
+                        val remainingMillis = session.secondsLeftState.intValue * 1000L
+                        when {
+                            remainingMillis > 3600000 -> 80000L
+                            remainingMillis > 600000 -> 50000L
+                            remainingMillis > 300000 -> 30000L
+                            remainingMillis > 60000 -> 15000L
+                            else -> 10000L
+                        }
                     }
-                } else {
-                    val remainingMillis = session.secondsLeftState.intValue * 1000L
-                    when {
-                        remainingMillis > 3600000 -> 80000L
-                        remainingMillis > 600000 -> 50000L
-                        remainingMillis > 300000 -> 30000L
-                        remainingMillis > 60000 -> 15000L
-                        else -> 10000L
+
+                    delay(updateInterval)
+
+                    if (session.backgroundTimestamp != 0L &&
+                        System.currentTimeMillis() - session.backgroundTimestamp > 180000L) {
+                        hideHUD(session.packageName)
+                        return@launch
+                    }
+
+                    val now = System.currentTimeMillis()
+                    val elapsedMillis = now - lastUpdateMillis
+                    if (elapsedMillis >= 1000) {
+                        val secondsToProcess = (elapsedMillis / 1000).toInt()
+                        if (!isGoal) {
+                            session.secondsLeftState.intValue = (session.secondsLeftState.intValue - secondsToProcess).coerceAtLeast(0)
+                        }
+                        lastUpdateMillis = now - (elapsedMillis % 1000)
                     }
                 }
-
-                delay(updateInterval)
-
-                if (session.backgroundTimestamp != 0L &&
-                    System.currentTimeMillis() - session.backgroundTimestamp > 180000L) {
+                
+                if (session.hudInstance == null) {
                     hideHUD(session.packageName)
-                    return@launch
-                }
-
-                val now = System.currentTimeMillis()
-                val elapsedMillis = now - lastUpdateMillis
-                if (elapsedMillis >= 1000) {
-                    val secondsToProcess = (elapsedMillis / 1000).toInt()
-                    if (!isGoal) {
-                        session.secondsLeftState.intValue = (session.secondsLeftState.intValue - secondsToProcess).coerceAtLeast(0)
-                    }
-                    lastUpdateMillis = now - (elapsedMillis % 1000)
+                } else if (!isGoal) {
+                    hideHUD(session.packageName)
                 }
             }
-            
-            if (session.hudInstance == null) {
-                hideHUD(session.packageName)
-            } else if (!isGoal) {
-                hideHUD(session.packageName)
+        }
+    }
+
+    fun destroyAllHUDs() {
+        synchronized(activeSessions) {
+            activeSessions.forEach { session ->
+                session.hudInstance?.let { destroyHUDInstance(it) }
+                session.hudInstance = null
+                session.isVisibleState.value = false
             }
         }
     }
@@ -323,8 +335,13 @@ class SessionUsageOverlayManager(private val context: Context) {
                 if (isForeground) {
                     session.backgroundTimestamp = 0L
                     session.isVisibleState.value = true
-                    if (session.hudInstance == null && !session.isTemporarilyHiddenState.value && ((!session.isGoal && session.secondsLeftState.intValue > 0) || (session.isGoal && session.secondsElapsedState.intValue < session.totalSeconds))) {
-                        session.hudInstance = createHUDInstance(session)
+                    
+                    synchronized(session) {
+                        if (session.hudInstance == null && !session.isTemporarilyHiddenState.value && 
+                            ((!session.isGoal && session.secondsLeftState.intValue > 0) || 
+                             (session.isGoal && session.secondsElapsedState.intValue < session.totalSeconds))) {
+                            session.hudInstance = createHUDInstance(session)
+                        }
                     }
                 } else {
                     if (session.isVisibleState.value) {

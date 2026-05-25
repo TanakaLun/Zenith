@@ -540,7 +540,12 @@ class AppUsageMonitorService : Service() {
                     }
 
                     if (currentApp != null) {
-                        overlayManager.checkAndHide(currentApp)
+                        if (launcherPackages.contains(currentApp) || currentApp == packageName) {
+                            overlayManager.hideOverlay()
+                            sessionUsageOverlayManager.destroyAllHUDs()
+                        } else {
+                            overlayManager.checkAndHide(currentApp)
+                        }
                     } else if (lastForegroundApp != null && !InterceptOverlayManager.isShowing) {
                         overlayManager.hideOverlay()
                     }
@@ -1684,11 +1689,13 @@ class AppUsageMonitorService : Service() {
         
         if (isBedtimeOrWindDown) {
             if (packageName in bedtimeWhitelistedPackages && packageName !in restrictedPackages) {
-                if (prefs?.mindfulGatewayEnabled != true) return true
+                return true
             }
         } else {
             if (packageName in whitelistedPackages) return true
         }
+
+        if (isKeyboardApp(packageName)) return true
 
         if (packageName in CRITICAL_SYSTEM_PACKAGES) return true
         if (launcherPackages.contains(packageName) || 
@@ -1710,6 +1717,15 @@ class AppUsageMonitorService : Service() {
         }
 
         return false
+    }
+
+    private fun isKeyboardApp(packageName: String): Boolean {
+        return try {
+            val imm = getSystemService(android.view.inputmethod.InputMethodManager::class.java)
+            imm.enabledInputMethodList.any { it.packageName == packageName }
+        } catch (_: Exception) {
+            false
+        }
     }
 
     private fun updateRestrictedPackages() {

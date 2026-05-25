@@ -130,6 +130,10 @@ class InterceptOverlayManager(
         onCloseApp: () -> Unit,
         onGoalDismiss: () -> Unit
     ) {
+        if (isShowing && currentPackage == packageName) return
+        isShowing = true
+        currentPackage = packageName
+
         if (Looper.myLooper() != Looper.getMainLooper()) {
             mainHandler.post {
                 showOverlay(packageName, appName, shield, totalUsageToday, totalGlobalUsageToday, delayDurationSeconds, onAllowUse, onCloseApp, onGoalDismiss)
@@ -137,13 +141,7 @@ class InterceptOverlayManager(
             return
         }
 
-        if (isShowing && currentPackage == packageName && overlayView != null) {
-            return
-        }
-
         if (overlayView != null) {
-            isShowing = true
-            currentPackage = packageName
             updateOverlayContent(packageName, appName, shield, totalUsageToday, totalGlobalUsageToday, delayDurationSeconds, onAllowUse, onCloseApp, onGoalDismiss)
             return
         }
@@ -221,15 +219,15 @@ class InterceptOverlayManager(
         onAllowUse: (Int, Boolean) -> Unit,
         onCloseApp: () -> Unit
     ) {
+        if (isShowing && currentPackage == packageName) return
+        
         if (Looper.myLooper() != Looper.getMainLooper()) {
             mainHandler.post {
                 showScheduleOverlay(packageName, appName, schedule, totalGlobalUsageToday, onAllowUse, onCloseApp)
             }
             return
         }
-        if (isShowing && currentPackage == packageName && overlayView != null) {
-            return
-        }
+        
         if (isShowing || overlayView != null) hideOverlay()
         
         isShowing = true
@@ -296,13 +294,15 @@ class InterceptOverlayManager(
         appName: String,
         onCloseApp: () -> Unit
     ) {
+        if (isShowing && currentPackage == packageName) return
+
         if (Looper.myLooper() != Looper.getMainLooper()) {
             mainHandler.post {
                 showBedtimeOverlay(packageName, appName, onCloseApp)
             }
             return
         }
-        if (isShowing && currentPackage == packageName && overlayView != null) return
+        
         if (isShowing || overlayView != null) hideOverlay()
         
         isShowing = true
@@ -355,47 +355,15 @@ class InterceptOverlayManager(
         onAllowUse: (Int) -> Unit,
         onCloseApp: () -> Unit
     ) {
+        if (isShowing && currentPackage == packageName) return
+
         if (Looper.myLooper() != Looper.getMainLooper()) {
             mainHandler.post {
                 showWindDownOverlay(packageName, appName, sessionUsed, onAllowUse, onCloseApp)
             }
             return
         }
-        if (isShowing && currentPackage == packageName && overlayView != null) {
-            overlayView?.setContent {
-                val userPrefs by preferencesRepository.userPreferencesFlow.collectAsState(initial = null)
-                val darkTheme = when (userPrefs?.themeConfig) {
-                    com.etrisad.zenith.data.preferences.ThemeConfig.LIGHT -> false
-                    com.etrisad.zenith.data.preferences.ThemeConfig.DARK -> true
-                    else -> androidx.compose.foundation.isSystemInDarkTheme()
-                }
 
-                ZenithTheme(
-                    darkTheme = darkTheme,
-                    fontOption = userPrefs?.fontOption ?: com.etrisad.zenith.data.preferences.FontOption.SYSTEM,
-                    dynamicColor = userPrefs?.dynamicColor ?: true,
-                    expressiveColors = userPrefs?.expressiveColors ?: false,
-                    gsFlexSettings = userPrefs?.gsFlexSettings ?: GSFlexSettings()
-                ) {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        WindDownOverlayContent(
-                            packageName = packageName,
-                            appName = appName,
-                            sessionUsed = sessionUsed,
-                            onAllowUse = { minutes ->
-                                onAllowUse(minutes)
-                                hideOverlay()
-                            },
-                            onCloseApp = {
-                                onCloseApp()
-                                hideOverlay()
-                            }
-                        )
-                    }
-                }
-            }
-            return
-        }
         if (isShowing || overlayView != null) hideOverlay()
 
         isShowing = true
