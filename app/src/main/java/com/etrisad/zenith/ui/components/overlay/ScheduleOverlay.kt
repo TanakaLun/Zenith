@@ -33,6 +33,7 @@ import com.etrisad.zenith.data.local.entity.ScheduleEntity
 import com.etrisad.zenith.data.local.entity.ScheduleMode
 import com.etrisad.zenith.data.preferences.UserPreferences
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
+import com.etrisad.zenith.ui.components.ZenithButtonSize
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -420,7 +421,7 @@ fun PortraitScheduleLayout(
                 }
             }
 
-            CloseAppTextButton(onCloseApp, autoKickProgress)
+            CloseAppTextButton(onCloseApp, autoKickProgress, size = ZenithButtonSize.ExtraLarge)
         }
     }
 }
@@ -594,7 +595,7 @@ fun LandscapeScheduleLayout(
                 }
                 Spacer(modifier = Modifier.weight(1f))
 
-                CloseAppTextButton(onCloseApp, autoKickProgress)
+                CloseAppTextButton(onCloseApp, autoKickProgress, size = ZenithButtonSize.Large)
             }
         }
     }

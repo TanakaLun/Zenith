@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
 import com.etrisad.zenith.data.preferences.UserPreferences
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
+import com.etrisad.zenith.ui.components.ZenithButtonSize
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -273,7 +274,8 @@ fun BedtimeOverlayContent(
                                 onCloseApp()
                             }
                         },
-                        autoKickProgress = { exitProgress }
+                        autoKickProgress = { exitProgress },
+                        size = if (isLandscape) ZenithButtonSize.Large else ZenithButtonSize.ExtraLarge
                     )
                 }
             }

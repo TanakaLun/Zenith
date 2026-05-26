@@ -336,7 +336,11 @@ fun EmergencyButton(onEmergencyUse: () -> Unit, onHoldingChange: (Boolean) -> Un
 }
 
 @Composable
-fun CloseAppTextButton(onCloseApp: () -> Unit, autoKickProgress: () -> Float = { 0f }) {
+fun CloseAppTextButton(
+    onCloseApp: () -> Unit,
+    autoKickProgress: () -> Float = { 0f },
+    size: ZenithButtonSize = ZenithButtonSize.ExtraLarge
+) {
     ZenithButton(
         onClick = onCloseApp,
         text = "Close App",
@@ -344,7 +348,7 @@ fun CloseAppTextButton(onCloseApp: () -> Unit, autoKickProgress: () -> Float = {
         contentColor = MaterialTheme.colorScheme.error,
         backgroundProgressProvider = autoKickProgress,
         fillMaxWidth = true,
-        size = ZenithButtonSize.ExtraLarge
+        size = size
     )
 }
 

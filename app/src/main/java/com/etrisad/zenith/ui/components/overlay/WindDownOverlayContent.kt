@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
+import com.etrisad.zenith.ui.components.ZenithButtonSize
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.ceil
@@ -289,7 +290,8 @@ fun WindDownOverlayContent(
                                 onCloseApp()
                             }
                         },
-                        autoKickProgress = { autoKickProgress.value }
+                        autoKickProgress = { autoKickProgress.value },
+                        size = if (isLandscape) ZenithButtonSize.Large else ZenithButtonSize.ExtraLarge
                     )
                 }
             }

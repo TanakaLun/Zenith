@@ -33,6 +33,7 @@ import com.etrisad.zenith.data.local.entity.FocusType
 import com.etrisad.zenith.data.local.entity.ShieldEntity
 import com.etrisad.zenith.data.preferences.UserPreferences
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
+import com.etrisad.zenith.ui.components.ZenithButtonSize
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -822,7 +823,7 @@ fun ShieldSection(
 
     Spacer(modifier = Modifier.height(24.dp))
 
-    CloseAppTextButton(onCloseApp, autoKickProgress)
+    CloseAppTextButton(onCloseApp, autoKickProgress, size = ZenithButtonSize.ExtraLarge)
 }
 
 
@@ -906,7 +907,7 @@ fun ShieldLandscapeContent(
                 EmergencyButton(onEmergencyUse = onEmergencyClick, onHoldingChange = onEmergencyHoldingChange)
             }
             Spacer(modifier = Modifier.weight(1f))
-            CloseAppTextButton(onCloseApp, autoKickProgress)
+            CloseAppTextButton(onCloseApp, autoKickProgress, size = ZenithButtonSize.Large)
         }
     } else {
         if (isDelaying) {
@@ -917,7 +918,7 @@ fun ShieldLandscapeContent(
                 Spacer(modifier = Modifier.weight(1f))
                 DelayInProgressSection(randomMessage, delayProgressAnimatable, delayDurationSeconds)
                 Spacer(modifier = Modifier.weight(1f))
-                CloseAppTextButton(onCloseApp, autoKickProgress)
+                CloseAppTextButton(onCloseApp, autoKickProgress, size = ZenithButtonSize.Large)
             }
         } else {
             Column(
@@ -934,7 +935,7 @@ fun ShieldLandscapeContent(
                 Spacer(modifier = Modifier.height(12.dp))
                 DurationButtonsGrid(if (isEmergencyUnlocked) null else displayRemainingMinutes, onAllowUse)
                 Spacer(modifier = Modifier.weight(1f))
-                CloseAppTextButton(onCloseApp, autoKickProgress)
+                CloseAppTextButton(onCloseApp, autoKickProgress, size = ZenithButtonSize.Large)
             }
         }
     }
