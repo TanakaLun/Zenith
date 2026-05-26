@@ -31,10 +31,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Date
-import java.util.Locale
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 
 class AppUsageMonitorService : Service() {
 
@@ -64,13 +66,13 @@ class AppUsageMonitorService : Service() {
     private val systemAppCache = mutableMapOf<String, Boolean>()
     private var lastLauncherRefreshTime = 0L
     private var currentPreferences: UserPreferences? = null
-    private var allShieldsCache = listOf<ShieldEntity>()
+    private var allShieldsCache = emptyMap<String, ShieldEntity>()
     private var goalShieldsCache = listOf<ShieldEntity>()
-    private var restrictedPackages = emptySet<String>()
-    private var hasGlobalAllowSchedule = false
-    private var launcherAppsCache = emptySet<String>()
-    private var defaultLauncherPackage: String? = null
-    private var lastLauncherAppsRefreshTime = 0L
+    private val systemZone by lazy { ZoneId.systemDefault() }
+    private val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+    private var lastCheckedDayDate: LocalDate? = null
+    private var keyboardPackages = emptySet<String>()
+    private var lastKeyboardRefreshTime = 0L
 
     private var isBedtimeActive = false
     private var isWindDownActive = false
@@ -83,6 +85,12 @@ class AppUsageMonitorService : Service() {
     private var lastCheckedDayTimestamp = 0L
     private var isScreenOn = true
     private var isPowerSaveMode = false
+
+    private var restrictedPackages = emptySet<String>()
+    private var hasGlobalAllowSchedule = false
+    private var launcherAppsCache = emptySet<String>()
+    private var defaultLauncherPackage: String? = null
+    private var lastLauncherAppsRefreshTime = 0L
 
     private var previouslyActiveScheduleIds = setOf<Long>()
 
@@ -181,7 +189,7 @@ class AppUsageMonitorService : Service() {
                         shieldRepository.allShields.first()
                     }
                     if (shields != null) {
-                        allShieldsCache = shields
+                        allShieldsCache = shields.associateBy { it.packageName }
                     }
 
                     val schedules = kotlinx.coroutines.withTimeoutOrNull(3000) {
@@ -264,8 +272,7 @@ class AppUsageMonitorService : Service() {
             baseGlobalUsageAtSessionStart = 0L
             lastHUDUpdateTime = 0L
             
-            val calendar = Calendar.getInstance()
-            lastCheckedDay = calendar.get(Calendar.DAY_OF_YEAR)
+            lastCheckedDayDate = LocalDate.now()
             lastCheckedDayTimestamp = currentTime
         }
     }
@@ -274,15 +281,15 @@ class AppUsageMonitorService : Service() {
         super.onCreate()
         val app = application as com.etrisad.zenith.ZenithApplication
         shieldRepository = app.shieldRepository
-        preferencesRepository = UserPreferencesRepository(this)
+        preferencesRepository = UserPreferencesRepository(applicationContext)
         overlayManager = InterceptOverlayManager(this, preferencesRepository)
         sessionUsageOverlayManager = SessionUsageOverlayManager(this)
 
         serviceScope.launch {
             shieldRepository.allShields.collect { shields ->
-                allShieldsCache = shields
+                allShieldsCache = shields.associateBy { it.packageName }
                 lastForegroundApp?.let { currentPkg ->
-                    currentShieldCache = shields.find { it.packageName == currentPkg }
+                    currentShieldCache = allShieldsCache[currentPkg]
                 }
                 goalShieldsCache = shields.filter { 
                     it.type == FocusType.GOAL && it.goalReminderPeriodMinutes > 0 
@@ -337,7 +344,7 @@ class AppUsageMonitorService : Service() {
         isScreenOn = powerManager.isInteractive
         isPowerSaveMode = powerManager.isPowerSaveMode
         
-        lastCheckedDay = Calendar.getInstance().get(Calendar.DAY_OF_YEAR)
+        lastCheckedDayDate = LocalDate.now()
 
         serviceScope.launch {
             currentPreferences = preferencesRepository.userPreferencesFlow.first()
@@ -380,8 +387,8 @@ class AppUsageMonitorService : Service() {
 
                         val overlayGoals = triggeredGoals.filter { it.isGoalCallerEnabled }
                         if (overlayGoals.isNotEmpty()) {
-                            val calendar = Calendar.getInstance()
-                            val hour = calendar.get(Calendar.HOUR_OF_DAY)
+                        val now = LocalTime.now()
+                            val hour = now.hour
                             val isNightTime = hour >= 22 || hour < 5
 
                             if ((!isBedtimeActive || hour >= 6) && !isNightTime) {
@@ -467,7 +474,6 @@ class AppUsageMonitorService : Service() {
         }
     }
 
-    private var lastCheckedDay = -1
     private val notifiedGoals = mutableSetOf<String>()
 
     private fun startMonitoring() {
@@ -485,10 +491,9 @@ class AppUsageMonitorService : Service() {
                     lastLoopTick = System.currentTimeMillis()
                     val currentTime = System.currentTimeMillis()
 
-                    val calendar = java.util.Calendar.getInstance()
-                    val currentDay = calendar.get(Calendar.DAY_OF_YEAR)
+                    val today = LocalDate.now()
 
-                    if (lastCheckedDay != -1 && currentDay != lastCheckedDay) {
+                    if (lastCheckedDayDate != null && today != lastCheckedDayDate) {
                         withContext(Dispatchers.IO) {
                             updateStreaks()
                             shieldRepository.resetAllRemainingTimes()
@@ -511,7 +516,7 @@ class AppUsageMonitorService : Service() {
                         baseGlobalUsageAtSessionStart = 0L
                         lastHUDUpdateTime = 0L
                         
-                        lastCheckedDay = currentDay
+                        lastCheckedDayDate = today
                         lastCheckedDayTimestamp = currentTime
 
                         delay(1000)
@@ -521,7 +526,8 @@ class AppUsageMonitorService : Service() {
                     if (currentTime - lastCheckedDayTimestamp > 60000) {
                         currentPreferences?.let { updateBedtimeStatus(it) }
 
-                        val currentMinutes = calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE)
+                        val nowTime = LocalTime.now()
+                        val currentMinutes = nowTime.hour * 60 + nowTime.minute
                         
                         checkSchedulesTransition(currentMinutes)
                         lastCheckedDayTimestamp = currentTime
@@ -570,13 +576,13 @@ class AppUsageMonitorService : Service() {
                         if (isNewSession) {
                             lastForegroundApp?.let { prevPkg ->
                                 try {
-                                    allShieldsCache.find { it.packageName == prevPkg }?.let { prevShield ->
+                                    allShieldsCache[prevPkg]?.let { prevShield ->
                                         updateShieldInDatabase(prevShield, force = true)
                                     }
                                 } catch (_: Exception) {}
                             }
 
-                            currentShieldCache = allShieldsCache.find { it.packageName == currentApp }
+                            currentShieldCache = allShieldsCache[currentApp]
                             
                             com.etrisad.zenith.util.ScreenUsageHelper.clearCache()
                             lastUsageFetchTime = 0L
@@ -677,7 +683,7 @@ class AppUsageMonitorService : Service() {
                                             onSessionEnd = {
                                                 allowedApps.remove(currentApp)
                                                 serviceScope.launch {
-                                                    val s = allShieldsCache.find { it.packageName == currentApp } ?: shieldRepository.getShieldByPackageName(currentApp)
+                                                    val s = allShieldsCache[currentApp] ?: shieldRepository.getShieldByPackageName(currentApp)
                                                     if (s != null) {
                                                         val updated = s.copy(lastSessionEndTimestamp = System.currentTimeMillis())
                                                         shieldRepository.updateShield(updated)
@@ -1077,7 +1083,7 @@ class AppUsageMonitorService : Service() {
         val shield = if (currentShieldCache?.packageName == targetPackageName) {
             currentShieldCache
         } else {
-            allShieldsCache.find { it.packageName == targetPackageName }
+            allShieldsCache[targetPackageName]
         }
         
         val prefs = currentPreferences ?: return
@@ -1235,8 +1241,8 @@ class AppUsageMonitorService : Service() {
     private suspend fun checkDayChangeOnStartup() {
         val prefs = preferencesRepository.userPreferencesFlow.first()
         val lastCheckStr = prefs.lastStreakCheckDate
-        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        val todayStr = dateFormat.format(Date())
+        val today = LocalDate.now()
+        val todayStr = dateFormatter.format(today)
 
         if (lastCheckStr.isNotEmpty() && lastCheckStr != todayStr) {
             updateStreaks()
@@ -1251,7 +1257,7 @@ class AppUsageMonitorService : Service() {
             preferencesRepository.setLastStreakCheckDate(todayStr)
         }
         
-        lastCheckedDay = Calendar.getInstance().get(Calendar.DAY_OF_YEAR)
+        lastCheckedDayDate = today
     }
 
     private suspend fun updateStreaks() {
@@ -1260,32 +1266,18 @@ class AppUsageMonitorService : Service() {
         
         if (shields.isEmpty() && prefs.screenTimeTargetMinutes <= 0) return
 
-        val currentTime = System.currentTimeMillis()
-        val calendar = Calendar.getInstance()
-        calendar.timeInMillis = currentTime
-        val todayYear = calendar.get(Calendar.YEAR).toLong()
-        val todayDayOfYear = calendar.get(Calendar.DAY_OF_YEAR).toLong()
-        
-        calendar.add(Calendar.DAY_OF_YEAR, -1)
-        calendar.set(Calendar.HOUR_OF_DAY, 0)
-        calendar.set(Calendar.MINUTE, 0)
-        calendar.set(Calendar.SECOND, 0)
-        calendar.set(Calendar.MILLISECOND, 0)
-        val startTime = calendar.timeInMillis
-
-        calendar.set(Calendar.HOUR_OF_DAY, 23)
-        calendar.set(Calendar.MINUTE, 59)
-        calendar.set(Calendar.SECOND, 59)
-        calendar.set(Calendar.MILLISECOND, 999)
-        val endTime = calendar.timeInMillis
+        val now = LocalDate.now()
+        val yesterday = now.minusDays(1)
+        val startTime = yesterday.atStartOfDay(systemZone).toInstant().toEpochMilli()
+        val endTime = yesterday.atTime(LocalTime.MAX).atZone(systemZone).toInstant().toEpochMilli()
 
         val usageMap = try {
             usageStatsManager.queryAndAggregateUsageStats(startTime, endTime)
         } catch (_: Exception) { null }
         
-        val lastUpdateCalendar = Calendar.getInstance().apply { timeInMillis = prefs.globalLastStreakUpdateTimestamp }
-        val isGlobalAlreadyUpdated = lastUpdateCalendar.get(Calendar.YEAR).toLong() == todayYear &&
-                                   lastUpdateCalendar.get(Calendar.DAY_OF_YEAR).toLong() == todayDayOfYear
+        val lastUpdateDate = Instant.ofEpochMilli(prefs.globalLastStreakUpdateTimestamp)
+            .atZone(systemZone).toLocalDate()
+        val isGlobalAlreadyUpdated = lastUpdateDate == now
 
         if (usageMap != null && !isGlobalAlreadyUpdated && prefs.screenTimeTargetMinutes > 0) {
             var totalUsageYesterday = 0L
@@ -1301,16 +1293,16 @@ class AppUsageMonitorService : Service() {
             if (totalUsageYesterday <= targetMillis) {
                 val newStreak = prefs.globalCurrentStreak + 1
                 val newBest = maxOf(prefs.globalBestStreak, newStreak)
-                preferencesRepository.updateGlobalStreak(newStreak, newBest, currentTime)
+                preferencesRepository.updateGlobalStreak(newStreak, newBest, System.currentTimeMillis())
             } else {
-                preferencesRepository.updateGlobalStreak(0, prefs.globalBestStreak, currentTime)
+                preferencesRepository.updateGlobalStreak(0, prefs.globalBestStreak, System.currentTimeMillis())
             }
         }
 
         shields.forEach { shield ->
-            val shieldUpdateCalendar = Calendar.getInstance().apply { timeInMillis = shield.lastStreakUpdateTimestamp }
-            val isAlreadyUpdatedToday = shieldUpdateCalendar.get(Calendar.YEAR).toLong() == todayYear &&
-                                       shieldUpdateCalendar.get(Calendar.DAY_OF_YEAR).toLong() == todayDayOfYear
+            val lastShieldUpdateDate = Instant.ofEpochMilli(shield.lastStreakUpdateTimestamp)
+                .atZone(systemZone).toLocalDate()
+            val isAlreadyUpdatedToday = lastShieldUpdateDate == now
             
             if (isAlreadyUpdatedToday) return@forEach
 
@@ -1338,18 +1330,17 @@ class AppUsageMonitorService : Service() {
                 shieldRepository.updateShield(shield.copy(
                     currentStreak = newStreak,
                     bestStreak = newBest,
-                    lastStreakUpdateTimestamp = currentTime
+                    lastStreakUpdateTimestamp = System.currentTimeMillis()
                 ))
             } else {
                 shieldRepository.updateShield(shield.copy(
                     currentStreak = 0,
-                    lastStreakUpdateTimestamp = currentTime
+                    lastStreakUpdateTimestamp = System.currentTimeMillis()
                 ))
             }
         }
 
-        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        preferencesRepository.setLastStreakCheckDate(dateFormat.format(Date(currentTime)))
+        preferencesRepository.setLastStreakCheckDate(dateFormatter.format(now))
     }
 
     private fun getTotalGlobalUsageToday(): Long {
@@ -1452,12 +1443,7 @@ class AppUsageMonitorService : Service() {
     }
 
     private fun getStartOfDay(): Long {
-        return Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
+        return LocalDate.now().atStartOfDay(systemZone).toInstant().toEpochMilli()
     }
 
     private fun goToHomeScreen() {
@@ -1468,16 +1454,11 @@ class AppUsageMonitorService : Service() {
     }
 
     private fun updateBedtimeStatus(prefs: UserPreferences) {
-        val currentTime = System.currentTimeMillis()
-        val calendar = Calendar.getInstance().apply { timeInMillis = currentTime }
-        val currentDay = calendar.get(Calendar.DAY_OF_WEEK)
-        val currentMinutes = calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE)
+        val now = Instant.now().atZone(systemZone)
+        val currentDay = now.dayOfWeek.let { if (it == java.time.DayOfWeek.SUNDAY) 1 else it.value + 1 }
+        val currentMinutes = now.hour * 60 + now.minute
         
-        val yesterdayCalendar = Calendar.getInstance().apply {
-            timeInMillis = currentTime
-            add(Calendar.DAY_OF_YEAR, -1)
-        }
-        val yesterdayDay = yesterdayCalendar.get(Calendar.DAY_OF_WEEK)
+        val yesterdayDay = now.minusDays(1).dayOfWeek.let { if (it == java.time.DayOfWeek.SUNDAY) 1 else it.value + 1 }
 
         val startMinutes = cachedBedtimeStartMinutes
         val endMinutes = cachedBedtimeEndMinutes
@@ -1592,10 +1573,8 @@ class AppUsageMonitorService : Service() {
             return false
         }
 
-        val now = System.currentTimeMillis()
-        val calendar = Calendar.getInstance().apply { timeInMillis = now }
-        val currentTotalMinutes = calendar.get(java.util.Calendar.HOUR_OF_DAY) * 60 + 
-                                 calendar.get(java.util.Calendar.MINUTE)
+        val nowTime = LocalTime.now()
+        val currentTotalMinutes = nowTime.hour * 60 + nowTime.minute
         
         for (ps in parsedSchedulesCache) {
             val isInInterval = if (ps.startMinutes <= ps.endMinutes) {
@@ -1651,7 +1630,7 @@ class AppUsageMonitorService : Service() {
                 sessionUsed = sessionUsed,
                 onAllowUse = { minutes ->
                     val currentTime = System.currentTimeMillis()
-                    val shield = allShieldsCache.find { it.packageName == packageName }
+                    val shield = allShieldsCache[packageName]
                     if (shield != null) {
                         val limitMillis = shield.timeLimitMinutes * 60 * 1000L
                         lastAllowedRemainingTime[packageName] = (limitMillis - getTotalUsageToday(packageName)).coerceAtLeast(0L)
@@ -1733,16 +1712,19 @@ class AppUsageMonitorService : Service() {
     }
 
     private fun isKeyboardApp(packageName: String): Boolean {
-        return try {
-            val imm = getSystemService(android.view.inputmethod.InputMethodManager::class.java)
-            imm.enabledInputMethodList.any { it.packageName == packageName }
-        } catch (_: Exception) {
-            false
+        val currentTime = System.currentTimeMillis()
+        if (keyboardPackages.isEmpty() || currentTime - lastKeyboardRefreshTime > 300000) {
+            try {
+                val imm = getSystemService(android.view.inputmethod.InputMethodManager::class.java)
+                keyboardPackages = imm.enabledInputMethodList.map { it.packageName }.toSet()
+                lastKeyboardRefreshTime = currentTime
+            } catch (_: Exception) {}
         }
+        return packageName in keyboardPackages
     }
 
     private fun updateRestrictedPackages() {
-        val shieldPkgs = allShieldsCache.map { it.packageName }.toSet()
+        val shieldPkgs = allShieldsCache.keys
         val schedulePkgs = activeSchedules.filter { it.mode == com.etrisad.zenith.data.local.entity.ScheduleMode.BLOCK }
             .flatMap { it.packageNames }.toSet()
         hasGlobalAllowSchedule = activeSchedules.any { it.mode == com.etrisad.zenith.data.local.entity.ScheduleMode.ALLOW }
@@ -1764,7 +1746,7 @@ class AppUsageMonitorService : Service() {
                 onAllowUse = { minutes, isEmergency ->
                     serviceScope.launch {
                         if (isEmergency) {
-                            val shield = allShieldsCache.find { it.packageName == packageName }
+                            val shield = allShieldsCache[packageName]
                             if (shield != null) {
                                 val limitMillis = shield.timeLimitMinutes * 60 * 1000L
                                 lastAllowedRemainingTime[packageName] = (limitMillis - getTotalUsageToday(packageName)).coerceAtLeast(0L)
