@@ -708,7 +708,8 @@ class AppUsageMonitorService : Service() {
                         }
 
                         val isBedtimeBlocking = isBedtimeActive || (isWindDownActive && currentPreferences?.bedtimeWindDownEnabled == true)
-                        val shouldCheckSchedules = (isBedtimeBlocking && currentApp !in bedtimeWhitelistedPackages) || (allowedUntilVal == null || currentTime > allowedUntilVal)
+                        val isSessionActive = allowedUntilVal?.let { it > currentTime } ?: false
+                        val shouldCheckSchedules = !isSessionActive && ((isBedtimeBlocking && currentApp !in bedtimeWhitelistedPackages) || allowedUntilVal == null || currentTime > allowedUntilVal)
 
                         if (!isAppPaused && shouldCheckSchedules && !InterceptOverlayManager.isShowing) {
                             if (checkSchedules(currentApp)) {
@@ -829,8 +830,9 @@ class AppUsageMonitorService : Service() {
         
         if (!isAppPaused) {
             val allowedUntil = allowedApps[currentApp]
+            val isSessionActive = allowedUntil?.let { it > currentTime } ?: false
             val isBedtimeBlocking = isBedtimeActive || (isWindDownActive && currentPreferences?.bedtimeWindDownEnabled == true)
-            val shouldCheckSchedules = (isBedtimeBlocking && currentApp !in bedtimeWhitelistedPackages) || (allowedUntil == null || currentTime > allowedUntil)
+            val shouldCheckSchedules = !isSessionActive && ((isBedtimeBlocking && currentApp !in bedtimeWhitelistedPackages) || (allowedUntil == null || currentTime > allowedUntil))
 
             if (shouldCheckSchedules && !InterceptOverlayManager.isShowing) {
                 if (checkSchedules(currentApp)) return
@@ -1555,6 +1557,9 @@ class AppUsageMonitorService : Service() {
     private fun checkSchedules(packageName: String): Boolean {
         if (shouldBypassBlocking(packageName)) return false
         
+        val allowedUntil = allowedApps[packageName] ?: 0L
+        if (System.currentTimeMillis() < allowedUntil) return false
+
         val prefs = currentPreferences
 
         if (isBedtimeActive) {

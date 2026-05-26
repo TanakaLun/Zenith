@@ -105,6 +105,15 @@ fun WindDownOverlayContent(
                 )
             )
             isDelaying = false
+        } else if (!isDelaying && !sessionUsed) {
+            delay(2000)
+            autoKickProgress.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = 5000, easing = LinearEasing)
+            )
+            showContent = false
+            delay(400)
+            onCloseApp()
         }
     }
 

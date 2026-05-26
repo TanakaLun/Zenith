@@ -278,8 +278,9 @@ class ZenithAccessibilityService : AccessibilityService() {
         
         if (!isAppPaused) {
             val allowedUntil = allowedApps[currentApp] ?: 0L
+            val isSessionActive = currentTime < allowedUntil
             val isBedtimeBlocking = isBedtimeActive || (isWindDownActive && (currentPreferences?.bedtimeWindDownEnabled == true))
-            val shouldCheckSchedules = (isBedtimeBlocking && currentApp !in bedtimeWhitelistedPackages) || currentTime > allowedUntil
+            val shouldCheckSchedules = !isSessionActive && ((isBedtimeBlocking && currentApp !in bedtimeWhitelistedPackages) || currentTime > allowedUntil)
 
             if (shouldCheckSchedules && !InterceptOverlayManager.isShowing) {
                 val isScheduled = checkSchedules(currentApp)
@@ -722,6 +723,9 @@ class ZenithAccessibilityService : AccessibilityService() {
     private fun checkSchedules(packageName: String): Boolean {
         if (shouldBypassBlocking(packageName)) return false
         
+        val allowedUntil = allowedApps[packageName] ?: 0L
+        if (System.currentTimeMillis() < allowedUntil) return false
+
         val prefs = currentPreferences ?: return false
 
         if (isBedtimeActive) {
