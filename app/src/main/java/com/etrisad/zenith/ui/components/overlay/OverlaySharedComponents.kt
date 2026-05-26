@@ -75,8 +75,7 @@ fun BedtimeAlertPill(
         val m = remaining % 60
         
         val formattedTime = if (h > 0) "${h}h ${m}m" else "${m}m"
-        
-        // Determine if it's currently bedtime
+
         val isBedtime = if (startMinutes <= endMinutes) {
             currentMinutes in startMinutes until endMinutes
         } else {
