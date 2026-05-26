@@ -33,7 +33,9 @@ import com.etrisad.zenith.data.local.entity.FocusType
 import com.etrisad.zenith.data.local.entity.ShieldEntity
 import com.etrisad.zenith.data.preferences.UserPreferences
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
+import com.etrisad.zenith.ui.components.ZenithButton
 import com.etrisad.zenith.ui.components.ZenithButtonSize
+import com.etrisad.zenith.ui.components.ZenithButtonType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -618,16 +620,32 @@ fun LandscapeInterceptLayout(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Outlined.Timer, null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(text = "$currentUses/$maxUses uses", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Outlined.Bolt, null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(text = "Emergency: ${shield.emergencyUseCount}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
+                        ZenithButton(
+                            onClick = { },
+                            text = "$currentUses/$maxUses",
+                            icon = Icons.Outlined.Timer,
+                            type = ZenithButtonType.Tonal,
+                            size = ZenithButtonSize.Small,
+                            isDisableWeight = true,
+                            isDisableExpand = true,
+                            backgroundProgressProvider = { ((maxUses - currentUses).toFloat() / maxUses.toFloat()).coerceIn(0f, 1f) },
+                            modifier = Modifier.widthIn(max = 110.dp),
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            contentColor = MaterialTheme.colorScheme.primary
+                        )
+                        ZenithButton(
+                            onClick = { },
+                            text = "${shield.emergencyUseCount}",
+                            icon = Icons.Outlined.Bolt,
+                            type = ZenithButtonType.Tonal,
+                            size = ZenithButtonSize.Small,
+                            isDisableWeight = true,
+                            isDisableExpand = true,
+                            backgroundProgressProvider = { (shield.emergencyUseCount.toFloat() / 3f).coerceIn(0f, 1f) },
+                            modifier = Modifier.widthIn(max = 110.dp),
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
                     }
                     Spacer(modifier = Modifier.height(16.dp))
                 }

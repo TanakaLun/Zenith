@@ -88,6 +88,8 @@ fun ZenithButton(
     interactionSource: MutableInteractionSource? = null,
     isFirst: Boolean = true,
     isLast: Boolean = true,
+    isDisableWeight: Boolean = false,
+    isDisableExpand: Boolean = false,
     contentScaleEnabled: Boolean = true,
     content: @Composable (RowScope.() -> Unit)? = null
 ) {
@@ -119,6 +121,8 @@ fun ZenithButton(
         customShape = shape,
         isFirst = isFirst,
         isLast = isLast,
+        isDisableWeight = isDisableWeight,
+        isDisableExpand = isDisableExpand,
         contentScaleEnabled = contentScaleEnabled,
         content = content
     )
@@ -151,6 +155,8 @@ fun RowScope.ZenithButtonWeighted(
     isFirst: Boolean = true,
     isLast: Boolean = true,
     shape: Shape? = null,
+    isDisableWeight: Boolean = false,
+    isDisableExpand: Boolean = false,
     contentScaleEnabled: Boolean = true,
     content: @Composable (RowScope.() -> Unit)? = null
 ) {
@@ -171,6 +177,8 @@ fun RowScope.ZenithButtonWeighted(
         label = "wAnim"
     )
 
+    val finalModifier = if (isDisableWeight) modifier else modifier.weight(animatedWeight)
+
     ZenithButtonCore(
         onClick = {
             scope.launch {
@@ -180,7 +188,7 @@ fun RowScope.ZenithButtonWeighted(
             }
             onClick()
         },
-        modifier = modifier.weight(animatedWeight),
+        modifier = finalModifier,
         type = type,
         size = size,
         text = text,
@@ -204,6 +212,8 @@ fun RowScope.ZenithButtonWeighted(
         customShape = shape,
         isFirst = isFirst,
         isLast = isLast,
+        isDisableWeight = isDisableWeight,
+        isDisableExpand = isDisableExpand,
         contentScaleEnabled = contentScaleEnabled,
         content = content
     )
@@ -237,6 +247,8 @@ private fun ZenithButtonCore(
     isFirst: Boolean,
     isLast: Boolean,
     customShape: Shape?,
+    isDisableWeight: Boolean = false,
+    isDisableExpand: Boolean = false,
     contentScaleEnabled: Boolean,
     content: @Composable (RowScope.() -> Unit)?
 ) {
@@ -311,7 +323,7 @@ private fun ZenithButtonCore(
     
     val exPad by animateDpAsState(
         targetValue = when {
-            !contentScaleEnabled -> 0.dp
+            isDisableExpand || !contentScaleEnabled -> 0.dp
             visualPressed -> 16.dp
             selected -> 8.dp
             else -> 0.dp
@@ -399,25 +411,33 @@ private fun ZenithButtonCore(
         interactionSource = coreInteractionSource
     ) {
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .drawBehind {
-                    val p = animatedProgressState.value
-                    if (p > 0f) {
-                        drawRect(
-                            brush = progressBrush, 
-                            size = this.size.copy(width = this.size.width * p)
-                        )
-                    }
-                }
-                .padding(horizontal = resPadH + exPad),
+            modifier = Modifier.then(if (fillMaxWidth) Modifier.fillMaxSize() else Modifier),
             contentAlignment = Alignment.Center
         ) {
-            AnimatedContent(
-                targetState = isLoading || isDelaying,
-                transitionSpec = { fadeIn(spring(stiffness = Spring.StiffnessLow)) togetherWith fadeOut(spring(stiffness = Spring.StiffnessLow)) },
-                label = "cSwitch"
-            ) { loadingOrDelay ->
+            val p = animatedProgressState.value
+            if (p > 0f) {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .drawBehind {
+                            drawRect(
+                                brush = progressBrush,
+                                size = this.size.copy(width = this.size.width * p)
+                            )
+                        }
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .padding(horizontal = resPadH + exPad),
+                contentAlignment = Alignment.Center
+            ) {
+                AnimatedContent(
+                    targetState = isLoading || isDelaying,
+                    transitionSpec = { fadeIn(spring(stiffness = Spring.StiffnessLow)) togetherWith fadeOut(spring(stiffness = Spring.StiffnessLow)) },
+                    label = "cSwitch"
+                ) { loadingOrDelay ->
                 if (loadingOrDelay) {
                     if (loadingProgress == null && !isDelaying) {
                         LoadingIndicator(color = animatedContentColor, modifier = Modifier.size(resH * 0.6f))
@@ -493,6 +513,7 @@ private fun ZenithButtonCore(
             }
         }
     }
+}
 }
 
 @Composable

@@ -155,23 +155,19 @@ fun OverlayDragHandleWithIndicators(
     ) {
         Box(modifier = Modifier.weight(1f)) {
             if (currentUses != null && maxUses != null) {
-                Row(
-                    modifier = Modifier.padding(start = 24.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Outlined.Timer,
-                        null,
-                        modifier = Modifier.size(14.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "$currentUses/$maxUses uses",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                ZenithButton(
+                    onClick = { },
+                    text = "$currentUses/$maxUses",
+                    icon = Icons.Outlined.Timer,
+                    type = ZenithButtonType.Tonal,
+                    size = ZenithButtonSize.Small,
+                    modifier = Modifier.padding(start = 16.dp).widthIn(max = 110.dp),
+                    isDisableWeight = true,
+                    isDisableExpand = true,
+                    backgroundProgressProvider = { ((maxUses - currentUses).toFloat() / maxUses.toFloat()).coerceIn(0f, 1f) },
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    contentColor = MaterialTheme.colorScheme.primary
+                )
             }
         }
 
@@ -185,23 +181,19 @@ fun OverlayDragHandleWithIndicators(
 
         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
             if (emergencyCount != null) {
-                Row(
-                    modifier = Modifier.padding(end = 24.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Outlined.Bolt,
-                        null,
-                        modifier = Modifier.size(14.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "Emergency: $emergencyCount",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                ZenithButton(
+                    onClick = { },
+                    text = "$emergencyCount",
+                    icon = Icons.Outlined.Bolt,
+                    type = ZenithButtonType.Tonal,
+                    size = ZenithButtonSize.Small,
+                    modifier = Modifier.padding(end = 16.dp).widthIn(max = 110.dp),
+                    isDisableWeight = true,
+                    isDisableExpand = true,
+                    backgroundProgressProvider = { (emergencyCount.toFloat() / 3f).coerceIn(0f, 1f) },
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    contentColor = MaterialTheme.colorScheme.error
+                )
             }
         }
     }
