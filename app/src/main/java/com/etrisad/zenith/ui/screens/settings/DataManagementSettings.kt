@@ -13,12 +13,18 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.documentfile.provider.DocumentFile
 import com.etrisad.zenith.data.preferences.UserPreferences
-import com.etrisad.zenith.ui.components.ZenithToggleButtonGroup
-import com.etrisad.zenith.ui.components.ZenithToggleOption
-import com.etrisad.zenith.ui.components.ZenithButtonSize
+import com.etrisad.zenith.ui.components.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.*
 
 @Composable
 fun DataManagementSettings(
@@ -26,6 +32,7 @@ fun DataManagementSettings(
     onAutoBackupEnabledChange: (Boolean) -> Unit,
     onPickBackupDirectory: () -> Unit,
     onSetBackupInterval: (Int) -> Unit,
+    onBackupNow: () -> Unit,
     onBackup: () -> Unit,
     onRefreshOnOpenUsageStatsChange: (Boolean) -> Unit,
     onRestore: () -> Unit
@@ -57,6 +64,7 @@ fun DataManagementSettings(
                     lastBackupTimestamp = preferences.lastBackupTimestamp,
                     onPickDirectory = onPickBackupDirectory,
                     onSetInterval = onSetBackupInterval,
+                    onBackupNow = onBackupNow,
                     shape = RoundedCornerShape(8.dp)
                 )
             }
@@ -101,8 +109,28 @@ fun AutoBackupSettings(
     lastBackupTimestamp: Long,
     onPickDirectory: () -> Unit,
     onSetInterval: (Int) -> Unit,
+    onBackupNow: () -> Unit,
     shape: Shape = RoundedCornerShape(8.dp)
 ) {
+    val context = LocalContext.current
+    var isLocationValid by remember { mutableStateOf(true) }
+
+    LaunchedEffect(directoryUri) {
+        if (directoryUri.isNotEmpty()) {
+            isLocationValid = withContext(Dispatchers.IO) {
+                try {
+                    val uri = android.net.Uri.parse(directoryUri)
+                    val file = DocumentFile.fromTreeUri(context, uri)
+                    file?.exists() == true && file.canWrite()
+                } catch (e: Exception) {
+                    false
+                }
+            }
+        } else {
+            isLocationValid = true
+        }
+    }
+
     val readablePath = remember(directoryUri) {
         if (directoryUri.isEmpty()) "Not selected"
         else {
@@ -123,8 +151,10 @@ fun AutoBackupSettings(
     val lastBackupText = remember(lastBackupTimestamp) {
         if (lastBackupTimestamp == 0L) "Never"
         else {
-            val sdf = java.text.SimpleDateFormat("MMM d, yyyy HH:mm", java.util.Locale.getDefault())
-            sdf.format(java.util.Date(lastBackupTimestamp))
+            val formatter = DateTimeFormatter.ofPattern("MMM d, yyyy HH:mm")
+                .withLocale(Locale.getDefault())
+                .withZone(ZoneId.systemDefault())
+            formatter.format(Instant.ofEpochMilli(lastBackupTimestamp))
         }
     }
 
@@ -175,11 +205,19 @@ fun AutoBackupSettings(
                     Column(modifier = Modifier.weight(1f)) {
                         Text("Backup Location", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
                         Text(
-                            text = readablePath,
+                            text = if (directoryUri.isNotEmpty() && !isLocationValid) "Location inaccessible" else readablePath,
                             style = MaterialTheme.typography.bodySmall,
-                            color = if (directoryUri.isEmpty()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = if (directoryUri.isEmpty() || !isLocationValid) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        )
+                    }
+                    if (!isLocationValid && directoryUri.isNotEmpty()) {
+                        Icon(
+                            imageVector = Icons.Outlined.ErrorOutline,
+                            contentDescription = "Error",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(20.dp).padding(end = 4.dp)
                         )
                     }
                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
@@ -239,6 +277,18 @@ fun AutoBackupSettings(
                 onToggle = { index -> onSetInterval(intervals[index]) },
                 size = ZenithButtonSize.Medium,
                 isInsideContainer = true
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            ZenithButton(
+                onClick = onBackupNow,
+                text = "Backup Now",
+                icon = Icons.Outlined.CloudUpload,
+                type = ZenithButtonType.Tonal,
+                size = ZenithButtonSize.Medium,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = directoryUri.isNotEmpty() && isLocationValid
             )
         }
     }

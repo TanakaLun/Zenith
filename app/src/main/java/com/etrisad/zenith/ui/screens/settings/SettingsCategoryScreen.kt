@@ -166,6 +166,12 @@ fun SettingsCategoryScreen(
                                 }
                             }
                         },
+                        onBackupNow = {
+                            if (preferences.backupDirectoryUri.isNotEmpty()) {
+                                backupManager.runBackupNow(preferences.backupDirectoryUri)
+                                Toast.makeText(context, "Backup started...", Toast.LENGTH_SHORT).show()
+                            }
+                        },
                         onBackup = { backupLauncher.launch("zenith_backup_${System.currentTimeMillis()}.db") },
                         onRefreshOnOpenUsageStatsChange = { enabled -> coroutineScope.launch { preferencesRepository.setRefreshOnOpenUsageStats(enabled) } },
                         onRestore = { restoreLauncher.launch(arrayOf("application/octet-stream", "*/*")) }
@@ -244,7 +250,19 @@ fun SettingsCategoryScreen(
                 },
                 onConfirm = {
                     coroutineScope.launch {
+                        val currentBackupUri = preferences.backupDirectoryUri
+                        val currentBackupInterval = preferences.backupIntervalHours
+                        val currentAutoBackupEnabled = preferences.autoBackupEnabled
+
                         BackupUtils.restoreDatabase(context, pendingRestoreUri!!).onSuccess {
+                            preferencesRepository.setBackupDirectoryUri(currentBackupUri)
+                            preferencesRepository.setBackupIntervalHours(currentBackupInterval)
+                            preferencesRepository.setAutoBackupEnabled(currentAutoBackupEnabled)
+
+                            if (currentAutoBackupEnabled && currentBackupUri.isNotEmpty()) {
+                                backupManager.scheduleBackup(currentBackupInterval, currentBackupUri)
+                            }
+
                             Toast.makeText(context, "Restore successful! Restarting app...", Toast.LENGTH_LONG).show()
                             BackupUtils.restartApp(context)
                         }.onFailure { e ->

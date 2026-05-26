@@ -13,9 +13,8 @@ import com.etrisad.zenith.util.BackupUtils
 import com.etrisad.zenith.service.UsageSyncManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 class DatabaseBackupWorker(
     context: Context,
@@ -32,8 +31,14 @@ class DatabaseBackupWorker(
                 UsageSyncManager(applicationContext, app.shieldRepository, app.userPreferencesRepository).syncUsageData()
             } catch (_: Exception) {}
 
-            val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-            val backupFolder = DocumentFile.fromTreeUri(applicationContext, directoryUri) ?: return@withContext Result.failure()
+            val formatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")
+            val timestamp = LocalDateTime.now().format(formatter)
+            val backupFolder = DocumentFile.fromTreeUri(applicationContext, directoryUri)
+            
+            if (backupFolder == null || !backupFolder.exists() || !backupFolder.canWrite()) {
+                sendNotification("Backup Failed", "Backup location is not accessible.")
+                return@withContext Result.failure()
+            }
 
             val fileName = "AutoBackup_$timestamp.zip"
             val targetFile = backupFolder.createFile("application/zip", fileName) ?: return@withContext Result.failure()
