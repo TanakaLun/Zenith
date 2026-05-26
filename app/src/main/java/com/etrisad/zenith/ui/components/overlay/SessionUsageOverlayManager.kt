@@ -158,7 +158,7 @@ class SessionUsageOverlayManager(private val context: Context) {
                     delay(updateInterval)
 
                     if (session.backgroundTimestamp != 0L &&
-                        System.currentTimeMillis() - session.backgroundTimestamp > 180000L) {
+                        System.currentTimeMillis() - session.backgroundTimestamp > 300000L) {
                         hideHUD(session.packageName)
                         return@launch
                     }

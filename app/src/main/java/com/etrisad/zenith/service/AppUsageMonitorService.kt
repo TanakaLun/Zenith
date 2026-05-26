@@ -336,6 +336,8 @@ class AppUsageMonitorService : Service() {
         registerReceiver(screenStateReceiver, filter)
         isScreenOn = powerManager.isInteractive
         isPowerSaveMode = powerManager.isPowerSaveMode
+        
+        lastCheckedDay = Calendar.getInstance().get(Calendar.DAY_OF_YEAR)
 
         serviceScope.launch {
             currentPreferences = preferencesRepository.userPreferencesFlow.first()
@@ -582,25 +584,25 @@ class AppUsageMonitorService : Service() {
                             sessionStartTime = currentTime
                             currentSessionPackage = currentApp
 
-                            baseUsageAtSessionStart = 0L
-                            cachedTotalUsage = 0L
-                            baseGlobalUsageAtSessionStart = 0L
-                            cachedTotalGlobalUsage = 0L
-
                             val startOfDay = getStartOfDay()
                             val timeSinceMidnight = (currentTime - startOfDay).coerceAtLeast(0L)
 
-                            serviceScope.launch {
-                                try {
-                                    val detailedUsage = com.etrisad.zenith.util.ScreenUsageHelper.fetchDetailedUsageToday(usageStatsManager)
-                                    val systemUsage = detailedUsage.appUsageMap[currentApp] ?: 0L
-                                    val systemGlobal = getFilteredGlobalUsage(detailedUsage.appUsageMap)
-                                    
-                                    baseUsageAtSessionStart = systemUsage.coerceAtMost(timeSinceMidnight)
-                                    cachedTotalUsage = baseUsageAtSessionStart
-                                    baseGlobalUsageAtSessionStart = systemGlobal.coerceAtMost(timeSinceMidnight)
-                                    cachedTotalGlobalUsage = baseGlobalUsageAtSessionStart
-                                } catch (_: Exception) {}
+                            try {
+                                val detailedUsage = withContext(Dispatchers.IO) {
+                                    com.etrisad.zenith.util.ScreenUsageHelper.fetchDetailedUsageToday(usageStatsManager)
+                                }
+                                val systemUsage = detailedUsage.appUsageMap[currentApp] ?: 0L
+                                val systemGlobal = getFilteredGlobalUsage(detailedUsage.appUsageMap)
+                                
+                                baseUsageAtSessionStart = systemUsage.coerceAtMost(timeSinceMidnight)
+                                cachedTotalUsage = baseUsageAtSessionStart
+                                baseGlobalUsageAtSessionStart = systemGlobal.coerceAtMost(timeSinceMidnight)
+                                cachedTotalGlobalUsage = baseGlobalUsageAtSessionStart
+                            } catch (_: Exception) {
+                                baseUsageAtSessionStart = 0L
+                                cachedTotalUsage = 0L
+                                baseGlobalUsageAtSessionStart = 0L
+                                cachedTotalGlobalUsage = 0L
                             }
 
                             if (!shouldBypassBlocking(currentApp)) {
@@ -1845,8 +1847,6 @@ class AppUsageMonitorService : Service() {
         if (level >= TRIM_MEMORY_MODERATE) {
             currentShieldCache = null
             lastUsageFetchTime = 0L
-            allowedApps.clear()
-            lastAllowedRemainingTime.clear()
             systemAppCache.clear()
             launcherPackages = emptySet()
             usageStatsCache = null
