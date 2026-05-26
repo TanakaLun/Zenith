@@ -41,6 +41,9 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -214,16 +217,64 @@ fun HomeScreenContent(
                 val selectedUsage = remember(uiState.dailyUsageHistory, uiState.selectedDateMillis) {
                     uiState.dailyUsageHistory.find { it.date == uiState.selectedDateMillis }
                 }
-                val showWarning = selectedUsage != null && 
+                val isFreshInstall = remember(uiState.dailyUsageHistory) {
+                    uiState.dailyUsageHistory.none { it.hasDatabaseRecord }
+                }
+
+                val showSystemWarning = selectedUsage != null && 
                                  !selectedUsage.hasDatabaseRecord && 
                                  selectedUsage.hasSystemData && 
                                  !selectedUsage.isLive
 
+                val showFreshInstallWarning = selectedUsage != null && 
+                                             selectedUsage.isLive && 
+                                             isFreshInstall
+
                 AnimatedVisibility(
-                    visible = showWarning,
+                    visible = showSystemWarning || showFreshInstallWarning,
                     enter = expandVertically(animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)) + fadeIn(),
                     exit = shrinkVertically(animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)) + fadeOut()
                 ) {
+                    val containerColor = if (showFreshInstallWarning) {
+                        MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f)
+                    } else {
+                        MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.8f)
+                    }
+                    
+                    val contentColor = if (showFreshInstallWarning) {
+                        MaterialTheme.colorScheme.onSecondaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onTertiaryContainer
+                    }
+
+                    val icon = if (showFreshInstallWarning) Icons.Outlined.Analytics else Icons.Outlined.Info
+                    
+                    val message = if (showFreshInstallWarning) {
+                        buildAnnotatedString {
+                            append("Today's data may be ")
+                            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+                                append("inaccurate")
+                            }
+                            append(" because Zenith is still collecting your usage patterns. We recommend using Zenith for at least ")
+                            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+                                append("3 days")
+                            }
+                            append(" for more accurate tracking and insights.")
+                        }
+                    } else {
+                        buildAnnotatedString {
+                            append("The data for the selected day is taken directly from the usage system and may ")
+                            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+                                append("not be entirely accurate")
+                            }
+                            append(". So take it with a ")
+                            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+                                append("grain of salt")
+                            }
+                            append(".")
+                        }
+                    }
+
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -231,7 +282,7 @@ fun HomeScreenContent(
                             .clip(RoundedCornerShape(8.dp)),
                         shape = RoundedCornerShape(8.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.8f)
+                            containerColor = containerColor
                         )
                     ) {
                         Row(
@@ -239,16 +290,16 @@ fun HomeScreenContent(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                imageVector = Icons.Outlined.Info,
+                                imageVector = icon,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                tint = contentColor,
                                 modifier = Modifier.size(20.dp)
                             )
                             Spacer(modifier = Modifier.width(12.dp))
                             Text(
-                                text = "The data for the selected day is taken directly from the usage system and may not be entirely accurate. So take it with a grain of salt.",
+                                text = message,
                                 style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                color = contentColor,
                                 fontWeight = FontWeight.Medium
                             )
                         }
