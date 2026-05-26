@@ -245,20 +245,25 @@ class ZenithAccessibilityService : AccessibilityService() {
             return
         }
 
-        if (InterceptOverlayManager.isShowing && InterceptOverlayManager.currentPackage != packageName) {
-            return
-        }
-
         serviceScope.launch(Dispatchers.Main) {
+            overlayManager.checkAndHide(packageName)
             packageChangeFlow.tryEmit(packageName)
         }
     }
 
     private suspend fun handlePackageChange(currentApp: String) {
-
         if (currentApp == lastForegroundApp && currentShieldCache != null) return
         
         lastForegroundApp = currentApp
+        
+        if (shouldBypassBlocking(currentApp)) {
+            currentShieldCache = null
+            serviceScope.launch(Dispatchers.Main) {
+                overlayManager.hideOverlay()
+            }
+            return
+        }
+
         val shield = allShieldsCache.find { it.packageName == currentApp }
         currentShieldCache = shield
 
@@ -521,28 +526,34 @@ class ZenithAccessibilityService : AccessibilityService() {
                             val currentPrefs = preferencesRepository.userPreferencesFlow.first()
                             if (currentPrefs.sessionUsageOverlayEnabled) {
                                 val isGoal = shieldWithTimestamp.type == FocusType.GOAL
-                                serviceScope.launch(Dispatchers.Main) {
-                                    sessionUsageOverlayManager.showHUD(
-                                        targetPackageName,
-                                        minutes,
-                                        currentPrefs.sessionUsageOverlaySize,
-                                        currentPrefs.sessionUsageOverlayOpacity,
-                                        isGoal = isGoal,
-                                        initialSeconds = if (isGoal) (getTotalUsageToday(targetPackageName) / 1000).toInt() else 0,
-                                        onSessionEnd = {
-                                            allowedApps[targetPackageName] = 0L
-                                            serviceScope.launch {
-                                                val s = currentShieldCache ?: mindfulGatewayStates[targetPackageName] ?: shieldRepository.getShieldByPackageName(targetPackageName)
-                                                if (s?.isAutoQuitEnabled == true) {
-                                                    if (lastForegroundApp == targetPackageName) {
-                                                        goToHomeScreen()
+                                val limitMillis = (shieldWithTimestamp.timeLimitMinutes) * 60 * 1000L
+                                val currentUsage = getTotalUsageToday(targetPackageName)
+
+                                if (isGoal && (currentUsage >= limitMillis || notifiedGoals.contains(targetPackageName)) && limitMillis > 0) {
+                                } else {
+                                    serviceScope.launch(Dispatchers.Main) {
+                                        sessionUsageOverlayManager.showHUD(
+                                            targetPackageName,
+                                            if (isGoal) shieldWithTimestamp.timeLimitMinutes else minutes,
+                                            currentPrefs.sessionUsageOverlaySize,
+                                            currentPrefs.sessionUsageOverlayOpacity,
+                                            isGoal = isGoal,
+                                            initialSeconds = if (isGoal) (currentUsage / 1000).toInt() else 0,
+                                            onSessionEnd = {
+                                                allowedApps[targetPackageName] = 0L
+                                                serviceScope.launch {
+                                                    val s = currentShieldCache ?: mindfulGatewayStates[targetPackageName] ?: shieldRepository.getShieldByPackageName(targetPackageName)
+                                                    if (s?.isAutoQuitEnabled == true) {
+                                                        if (lastForegroundApp == targetPackageName) {
+                                                            goToHomeScreen()
+                                                        }
+                                                    } else {
+                                                        checkIfAppIsShielded(targetPackageName)
                                                     }
-                                                } else {
-                                                    checkIfAppIsShielded(targetPackageName)
                                                 }
                                             }
-                                        }
-                                    )
+                                        )
+                                    }
                                 }
                             }
                         }

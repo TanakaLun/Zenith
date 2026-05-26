@@ -659,9 +659,11 @@ class AppUsageMonitorService : Service() {
                                 val isGoal = shield?.type == FocusType.GOAL
 
                                 val limitMillis = (shield?.timeLimitMinutes ?: 0) * 60 * 1000L
-                                if (!(isGoal && cachedTotalUsage >= limitMillis && limitMillis > 0)) {
+                                val currentUsage = if (isGoal) getTotalUsageToday(currentApp) else cachedTotalUsage
+                                
+                                if (!(isGoal && (currentUsage >= limitMillis || notifiedGoals.contains(currentApp)) && limitMillis > 0)) {
                                     val duration = if (isGoal) shield?.timeLimitMinutes ?: 0 else remainingMinutes
-                                    val currentUsageSeconds = (cachedTotalUsage / 1000).toInt()
+                                    val currentUsageSeconds = (currentUsage / 1000).toInt()
                                     withContext(Dispatchers.Main) {
                                         sessionUsageOverlayManager.showHUD(
                                             currentApp,
@@ -1182,7 +1184,7 @@ class AppUsageMonitorService : Service() {
                                         val limitMillisOnHUD = (shieldWithTimestamp.timeLimitMinutes) * 60 * 1000L
                                         val currentUsage = getTotalUsageToday(targetPackageName)
 
-                                        if (isGoal && currentUsage >= limitMillisOnHUD && limitMillisOnHUD > 0) {
+                                        if (isGoal && (currentUsage >= limitMillisOnHUD || notifiedGoals.contains(targetPackageName)) && limitMillisOnHUD > 0) {
                                         } else {
                                             val duration = if (isGoal) shieldWithTimestamp.timeLimitMinutes else minutes
                                             val currentUsageSeconds = (currentUsage / 1000).toInt()
@@ -1812,12 +1814,15 @@ class AppUsageMonitorService : Service() {
                 if (reusableEvent.eventType == UsageEvents.Event.MOVE_TO_FOREGROUND || 
                     reusableEvent.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
 
-                    val className = reusableEvent.className ?: ""
-                    if (className.contains("Notification", ignoreCase = true) || 
-                        className.contains("Toast", ignoreCase = true) ||
-                        className.contains("Tooltip", ignoreCase = true)) continue
-                    
-                    foundPackage = reusableEvent.packageName
+                    val pkg = reusableEvent.packageName
+                    if (pkg != null) {
+                        val className = reusableEvent.className ?: ""
+                        if (className.contains("Notification", ignoreCase = true) || 
+                            className.contains("Toast", ignoreCase = true) ||
+                            className.contains("Tooltip", ignoreCase = true)) continue
+                        
+                        foundPackage = pkg
+                    }
                 }
                 lastEventQueryTime = reusableEvent.timeStamp
             }
@@ -1827,10 +1832,6 @@ class AppUsageMonitorService : Service() {
             lastEventQueryTime = time
         }
 
-        if (foundPackage == null) {
-            return lastForegroundApp
-        }
-        
         return foundPackage
     }
 
