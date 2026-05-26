@@ -104,23 +104,29 @@ class FocusViewModel(
     }
 
     private fun updateShieldedLists() {
-        val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as android.app.usage.UsageStatsManager
+        viewModelScope.launch {
+            val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as android.app.usage.UsageStatsManager
 
-        val accurateUsageMap = com.etrisad.zenith.util.ScreenUsageHelper.fetchAppUsageTodayTillNow(usm)
+            val accurateUsageMap = withContext(Dispatchers.IO) {
+                com.etrisad.zenith.util.ScreenUsageHelper.fetchAppUsageTodayTillNow(usm)
+            }
 
-        val liveShields = allShields.map { shield ->
-            val usage = accurateUsageMap[shield.packageName] ?: 0L
-            val limitMillis = shield.timeLimitMinutes * 60 * 1000L
-            shield.copy(remainingTimeMillis = (limitMillis - usage).coerceAtLeast(0L))
+            val liveShields = allShields.map { shield ->
+                val usage = accurateUsageMap[shield.packageName] ?: 0L
+                val limitMillis = shield.timeLimitMinutes * 60 * 1000L
+                shield.copy(remainingTimeMillis = (limitMillis - usage).coerceAtLeast(0L))
+            }
+
+            val shields = liveShields.filter { it.type == FocusType.SHIELD }
+            val goals = liveShields.filter { it.type == FocusType.GOAL }
+
+            _uiState.update { currentState ->
+                currentState.copy(
+                    activeShields = sortShields(shields, currentState.shieldSortType),
+                    activeGoals = sortShields(goals, currentState.goalSortType)
+                )
+            }
         }
-
-        val shields = liveShields.filter { it.type == FocusType.SHIELD }
-        val goals = liveShields.filter { it.type == FocusType.GOAL }
-
-        _uiState.value = _uiState.value.copy(
-            activeShields = sortShields(shields, _uiState.value.shieldSortType),
-            activeGoals = sortShields(goals, _uiState.value.goalSortType)
-        )
     }
 
     private fun startRealTimeUpdates() {
@@ -204,7 +210,6 @@ class FocusViewModel(
 
     private fun getTopUsedApps(limit: Int): List<AppInfo> {
         val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as android.app.usage.UsageStatsManager
-        val pm = context.packageManager
 
         val accurateUsageMap = com.etrisad.zenith.util.ScreenUsageHelper.fetchAppUsageTodayTillNow(usm)
         
@@ -222,18 +227,24 @@ class FocusViewModel(
     }
 
     fun selectAppForFocus(app: AppInfo?, type: FocusType) {
-        val usage = if (app != null) {
-            getUsageTodayForPackage(app.packageName)
-        } else 0L
+        viewModelScope.launch {
+            val usage = if (app != null) {
+                withContext(Dispatchers.IO) {
+                    getUsageTodayForPackage(app.packageName)
+                }
+            } else 0L
 
-        _uiState.value = _uiState.value.copy(
-            selectedAppForFocus = app,
-            selectedFocusType = type,
-            isSettingsSheetOpen = app != null,
-            selectedAppUsageToday = usage,
-            isSchedulePickerOpen = false,
-            isScheduleSettingsOpen = false
-        )
+            _uiState.update {
+                it.copy(
+                    selectedAppForFocus = app,
+                    selectedFocusType = type,
+                    isSettingsSheetOpen = app != null,
+                    selectedAppUsageToday = usage,
+                    isSchedulePickerOpen = false,
+                    isScheduleSettingsOpen = false
+                )
+            }
+        }
     }
 
     fun openSchedulePicker(resetSelection: Boolean = true) {
@@ -418,20 +429,26 @@ class FocusViewModel(
 
     fun editShield(shield: ShieldEntity) {
         viewModelScope.launch {
-            val appInfo = try {
-                val pm = context.packageManager
-                val app = pm.getApplicationInfo(shield.packageName, 0)
-                AppInfo(shield.packageName, shield.appName, pm.getApplicationIcon(app))
-            } catch (e: Exception) {
-                AppInfo(shield.packageName, shield.appName, null)
+            val appInfo = withContext(Dispatchers.IO) {
+                try {
+                    val pm = context.packageManager
+                    val app = pm.getApplicationInfo(shield.packageName, 0)
+                    AppInfo(shield.packageName, shield.appName, pm.getApplicationIcon(app))
+                } catch (e: Exception) {
+                    AppInfo(shield.packageName, shield.appName, null)
+                }
             }
-            val usage = getUsageTodayForPackage(shield.packageName)
-            _uiState.value = _uiState.value.copy(
-                selectedAppForFocus = appInfo,
-                selectedFocusType = shield.type,
-                isSettingsSheetOpen = true,
-                selectedAppUsageToday = usage
-            )
+            val usage = withContext(Dispatchers.IO) {
+                getUsageTodayForPackage(shield.packageName)
+            }
+            _uiState.update {
+                it.copy(
+                    selectedAppForFocus = appInfo,
+                    selectedFocusType = shield.type,
+                    isSettingsSheetOpen = true,
+                    selectedAppUsageToday = usage
+                )
+            }
         }
     }
 

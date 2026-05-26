@@ -1,9 +1,11 @@
 package com.etrisad.zenith.util
 
 import android.app.usage.UsageEvents
-import android.app.usage.UsageStats
 import android.app.usage.UsageStatsManager
-import java.util.Calendar
+import java.time.Duration
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 
 object ScreenUsageHelper {
     data class UsageResult(
@@ -26,14 +28,7 @@ object ScreenUsageHelper {
             return lastResult!!
         }
 
-        val calendar = Calendar.getInstance().apply {
-            timeInMillis = currentTime
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }
-        val start = calendar.timeInMillis
+        val start = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
         val end = currentTime
 
         val usageMap = mutableMapOf<String, Long>()
@@ -53,7 +48,6 @@ object ScreenUsageHelper {
         val event = UsageEvents.Event()
         
         var isScreenOn = true 
-        val cal = Calendar.getInstance()
 
         while (events.hasNextEvent()) {
             events.getNextEvent(event)
@@ -76,7 +70,7 @@ object ScreenUsageHelper {
                                 }
 
                                 if (includeHourly) {
-                                    addHourlyUsage(hourlyMap, p, segmentStart, segmentEnd, cal)
+                                    addHourlyUsage(hourlyMap, p, segmentStart, segmentEnd)
                                 }
                             }
                         }
@@ -104,7 +98,7 @@ object ScreenUsageHelper {
                                         sessionCounts[activePkg!!] = (sessionCounts[activePkg!!] ?: 0) + 1
                                     }
                                     if (includeHourly) {
-                                        addHourlyUsage(hourlyMap, activePkg!!, segmentStart, segmentEnd, cal)
+                                        addHourlyUsage(hourlyMap, activePkg!!, segmentStart, segmentEnd)
                                     }
                                 }
                             }
@@ -126,7 +120,7 @@ object ScreenUsageHelper {
                                     sessionCounts[pkg] = (sessionCounts[pkg] ?: 0) + 1
                                 }
                                 if (includeHourly) {
-                                    addHourlyUsage(hourlyMap, pkg, segmentStart, segmentEnd, cal)
+                                    addHourlyUsage(hourlyMap, pkg, segmentStart, segmentEnd)
                                 }
                             }
                         }
@@ -157,7 +151,7 @@ object ScreenUsageHelper {
                         sessionCounts[activePkg!!] = (sessionCounts[activePkg!!] ?: 0) + 1
                     }
                     if (includeHourly) {
-                        addHourlyUsage(hourlyMap, activePkg!!, segmentStart, segmentEnd, cal)
+                        addHourlyUsage(hourlyMap, activePkg!!, segmentStart, segmentEnd)
                     }
                 }
             }
@@ -173,22 +167,18 @@ object ScreenUsageHelper {
         hourlyMap: MutableMap<Int, MutableMap<String, Long>>,
         packageName: String,
         start: Long,
-        end: Long,
-        cal: Calendar
+        end: Long
     ) {
-        var current = start
-        while (current < end) {
-            cal.timeInMillis = current
-            val hour = cal.get(Calendar.HOUR_OF_DAY)
+        val zoneId = ZoneId.systemDefault()
+        var current = Instant.ofEpochMilli(start).atZone(zoneId)
+        val endTime = Instant.ofEpochMilli(end).atZone(zoneId)
+        
+        while (current.isBefore(endTime)) {
+            val hour = current.hour
+            val nextHour = current.plusHours(1).withMinute(0).withSecond(0).withNano(0)
+            val segmentEnd = if (nextHour.isBefore(endTime)) nextHour else endTime
             
-            cal.add(Calendar.HOUR_OF_DAY, 1)
-            cal.set(Calendar.MINUTE, 0)
-            cal.set(Calendar.SECOND, 0)
-            cal.set(Calendar.MILLISECOND, 0)
-            val nextHourStart = cal.timeInMillis
-            
-            val segmentEnd = minOf(end, nextHourStart)
-            val duration = segmentEnd - current
+            val duration = Duration.between(current, segmentEnd).toMillis()
             if (duration > 0) {
                 val pkgMap = hourlyMap.getOrPut(hour) { mutableMapOf() }
                 pkgMap[packageName] = (pkgMap[packageName] ?: 0L) + duration

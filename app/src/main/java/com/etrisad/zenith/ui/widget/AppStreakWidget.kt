@@ -48,7 +48,9 @@ import androidx.glance.action.clickable
 import androidx.glance.background
 import com.etrisad.zenith.MainActivity
 import com.etrisad.zenith.data.local.entity.FocusType
-import java.util.Calendar
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import androidx.compose.runtime.remember
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -184,11 +186,8 @@ class AppStreakWidget : GlanceAppWidget() {
 
     private fun isToday(timestamp: Long): Boolean {
         if (timestamp == 0L) return false
-        val cal = Calendar.getInstance()
-        val todayDay = cal.get(Calendar.DAY_OF_YEAR)
-        val todayYear = cal.get(Calendar.YEAR)
-        cal.timeInMillis = timestamp
-        return cal.get(Calendar.DAY_OF_YEAR) == todayDay && cal.get(Calendar.YEAR) == todayYear
+        val date = Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()).toLocalDate()
+        return date == LocalDate.now()
     }
 
     private fun createShapeBitmap(
