@@ -58,8 +58,10 @@ import com.etrisad.zenith.ui.viewmodel.HourlyUsageInfo
 import androidx.compose.material.icons.outlined.Sort
 import android.widget.Toast
 import androidx.compose.ui.platform.LocalContext
-import java.text.SimpleDateFormat
-import java.util.*
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -113,6 +115,10 @@ fun UsageStatsScreen(
         val (reg, low) = uiState.allAppsUsage.partition { it.totalTimeVisible >= 60000L }
         Triple(reg, low, low.sumOf { it.totalTimeVisible })
     }
+    
+    val totalAppsCount = remember(regularApps.size, lowUsageApps.size, totalLowUsageTime, isOtherAppsExpanded) {
+        regularApps.size + (if (totalLowUsageTime > 0) (if (isOtherAppsExpanded) 1 + lowUsageApps.size else 1) else 0)
+    }
 
     val hourlyAppsData = remember(uiState.hourlyUsage, selectedHour) {
         val hourData = uiState.hourlyUsage.find { it.hour == selectedHour }
@@ -154,15 +160,14 @@ fun UsageStatsScreen(
     val otherUsage = uiState.otherUsage
 
     val isBedtimeHour = remember(uiState.selectedDateMillis, uiState.bedtimeEnabled, uiState.bedtimeStartTime, uiState.bedtimeEndTime, uiState.bedtimeDays) {
-        val cal = Calendar.getInstance()
-        cal.timeInMillis = uiState.selectedDateMillis
-        val todayDay = cal.get(Calendar.DAY_OF_WEEK)
+        val zoneId = ZoneId.systemDefault()
+        val date = Instant.ofEpochMilli(uiState.selectedDateMillis).atZone(zoneId).toLocalDate()
+
+        val todayDay = if (date.dayOfWeek.value == 7) 1 else date.dayOfWeek.value + 1
+        val yesterdayDay = if (date.minusDays(1).dayOfWeek.value == 7) 1 else date.minusDays(1).dayOfWeek.value + 1
         
-        cal.add(Calendar.DAY_OF_YEAR, -1)
-        val yesterdayDay = cal.get(Calendar.DAY_OF_WEEK)
-        
-        val startH = uiState.bedtimeStartTime.split(":").firstOrNull()?.toIntOrNull() ?: 22
-        val endH = uiState.bedtimeEndTime.split(":").firstOrNull()?.toIntOrNull() ?: 7
+        val startH = uiState.bedtimeStartTime.substringBefore(':').toIntOrNull() ?: 22
+        val endH = uiState.bedtimeEndTime.substringBefore(':').toIntOrNull() ?: 7
         
         val todayActive = uiState.bedtimeEnabled && todayDay in uiState.bedtimeDays
         val yesterdayActive = uiState.bedtimeEnabled && yesterdayDay in uiState.bedtimeDays
@@ -634,15 +639,14 @@ fun UsageStatsScreen(
             items = regularApps,
             key = { _, app -> "regular-${app.packageName}" }
         ) { index, app ->
-            val total = regularApps.size + (if (totalLowUsageTime > 0) (if (isOtherAppsExpanded) 1 + lowUsageApps.size else 1) else 0)
             Column(modifier = Modifier.animateItem()) {
                 UsageItem(
                     app = app,
                     type = appTypes[app.packageName] ?: "OTHER",
                     formatDuration = viewModel::formatDuration,
                     index = index,
-                    total = total,
-                    onClick = { onAppClick(app.packageName) }
+                    total = totalAppsCount,
+                    onClick = remember(app.packageName, onAppClick) { { onAppClick(app.packageName) } }
                 )
                 Spacer(modifier = Modifier.height(4.dp))
             }
@@ -650,13 +654,12 @@ fun UsageStatsScreen(
 
         if (totalLowUsageTime > 0) {
             val otherIndex = regularApps.size
-            val total = regularApps.size + (if (isOtherAppsExpanded) 1 + lowUsageApps.size else 1)
             
             item(key = "other_apps_header") {
                 Column(modifier = Modifier.animateItem()) {
                     GroupedCard(
                         index = otherIndex,
-                        total = total,
+                        total = totalAppsCount,
                         onClick = { isOtherAppsExpanded = !isOtherAppsExpanded }
                     ) {
                         ListItem(
@@ -728,8 +731,8 @@ fun UsageStatsScreen(
                             type = appTypes[app.packageName] ?: "OTHER",
                             formatDuration = viewModel::formatDuration,
                             index = otherIndex + 1 + index,
-                            total = total,
-                            onClick = { onAppClick(app.packageName) }
+                            total = totalAppsCount,
+                            onClick = remember(app.packageName, onAppClick) { { onAppClick(app.packageName) } }
                         )
                         if (index < lowUsageApps.size - 1) {
                             Spacer(modifier = Modifier.height(4.dp))
@@ -757,6 +760,29 @@ fun ZenithDashboard(
     highlightedCategory: String?,
     onCategoryClick: (String) -> Unit
 ) {
+    val rawTotal = remember(shieldUsage, goalUsage, otherUsage) {
+        (shieldUsage + goalUsage + otherUsage).toFloat().coerceAtLeast(1f)
+    }
+    val minAngleThreshold = 20f
+
+    val shieldIsVisible = remember(shieldUsage, rawTotal, highlightedCategory) {
+        (shieldUsage.toFloat() / rawTotal) * 360f >= minAngleThreshold || highlightedCategory == "SHIELD"
+    }
+    val goalIsVisible = remember(goalUsage, rawTotal, highlightedCategory) {
+        (goalUsage.toFloat() / rawTotal) * 360f >= minAngleThreshold || highlightedCategory == "GOAL"
+    }
+    val otherIsVisible = remember(otherUsage, rawTotal, highlightedCategory) {
+        (otherUsage.toFloat() / rawTotal) * 360f >= minAngleThreshold || highlightedCategory == "OTHER"
+    }
+
+    val visibleTotal = remember(shieldIsVisible, goalIsVisible, otherIsVisible, shieldUsage, goalUsage, otherUsage) {
+        (
+            (if (shieldIsVisible) shieldUsage else 0L) +
+            (if (goalIsVisible) goalUsage else 0L) +
+            (if (otherIsVisible) otherUsage else 0L)
+        ).toFloat().coerceAtLeast(1f)
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -768,19 +794,6 @@ fun ZenithDashboard(
                 .weight(1.1f)
                 .fillMaxHeight()
         ) {
-            val rawTotal = (shieldUsage + goalUsage + otherUsage).toFloat().coerceAtLeast(1f)
-            val minAngleThreshold = 20f
-
-            val shieldIsVisible = (shieldUsage.toFloat() / rawTotal) * 360f >= minAngleThreshold || highlightedCategory == "SHIELD"
-            val goalIsVisible = (goalUsage.toFloat() / rawTotal) * 360f >= minAngleThreshold || highlightedCategory == "GOAL"
-            val otherIsVisible = (otherUsage.toFloat() / rawTotal) * 360f >= minAngleThreshold || highlightedCategory == "OTHER"
-
-            val visibleTotal = (
-                (if (shieldIsVisible) shieldUsage else 0L) +
-                (if (goalIsVisible) goalUsage else 0L) +
-                (if (otherIsVisible) otherUsage else 0L)
-            ).toFloat().coerceAtLeast(1f)
-
             val animShieldAngle by animateFloatAsState(
                 targetValue = if (shieldIsVisible) (shieldUsage.toFloat() / visibleTotal) * 360f else 0f,
                 animationSpec = spring(stiffness = Spring.StiffnessLow),
@@ -1100,18 +1113,20 @@ fun HourlyStatsContent(
     accentColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.primary,
     showDatabaseIndicator: Boolean = false
 ) {
-    val maxUsage = hourlyUsage.maxOfOrNull { it.usageTimeMillis }?.coerceAtLeast(1L) ?: 1L
+    val maxUsage = remember(hourlyUsage) { hourlyUsage.maxOfOrNull { it.usageTimeMillis }?.coerceAtLeast(1L) ?: 1L }
     
-    val bedtimeSettings = remember(dateMillis, bedtimeEnabled, bedtimeStartTime, bedtimeEndTime, bedtimeDays) {
-        val cal = Calendar.getInstance()
-        cal.timeInMillis = dateMillis
-        val todayDay = cal.get(Calendar.DAY_OF_WEEK)
+    val isBedtimeHour = remember(dateMillis, bedtimeEnabled, bedtimeStartTime, bedtimeEndTime, bedtimeDays) {
+        val zoneId = ZoneId.systemDefault()
+        val date = Instant.ofEpochMilli(dateMillis).atZone(zoneId).toLocalDate()
         
-        cal.add(Calendar.DAY_OF_YEAR, -1)
-        val yesterdayDay = cal.get(Calendar.DAY_OF_WEEK)
+        val javaTodayDay = date.dayOfWeek.value
+        val todayDay = if (javaTodayDay == 7) 1 else javaTodayDay + 1
         
-        val startH = bedtimeStartTime.split(":").firstOrNull()?.toIntOrNull() ?: 22
-        val endH = bedtimeEndTime.split(":").firstOrNull()?.toIntOrNull() ?: 7
+        val javaYesterdayDay = date.minusDays(1).dayOfWeek.value
+        val yesterdayDay = if (javaYesterdayDay == 7) 1 else javaYesterdayDay + 1
+        
+        val startH = bedtimeStartTime.substringBefore(':').toIntOrNull() ?: 22
+        val endH = bedtimeEndTime.substringBefore(':').toIntOrNull() ?: 7
         
         val todayActive = bedtimeEnabled && todayDay in bedtimeDays
         val yesterdayActive = bedtimeEnabled && yesterdayDay in bedtimeDays
@@ -1125,7 +1140,12 @@ fun HourlyStatsContent(
         }
     }
     
-    val isBedtimeHour = bedtimeSettings
+    val currentHourOnce = remember(dateMillis) {
+        val zoneId = ZoneId.systemDefault()
+        val today = LocalDate.now(zoneId)
+        val targetDate = Instant.ofEpochMilli(dateMillis).atZone(zoneId).toLocalDate()
+        if (today == targetDate) LocalTime.now(zoneId).hour else -1
+    }
     
     Column(modifier = Modifier.padding(16.dp)) {
         Row(
@@ -1191,17 +1211,9 @@ fun HourlyStatsContent(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.Bottom
         ) {
-            val isToday = remember(dateMillis) {
-                val cal = Calendar.getInstance()
-                cal.set(Calendar.HOUR_OF_DAY, 0)
-                cal.set(Calendar.MINUTE, 0)
-                cal.set(Calendar.SECOND, 0)
-                cal.set(Calendar.MILLISECOND, 0)
-                dateMillis == cal.timeInMillis
-            }
             hourlyUsage.forEach { hourInfo ->
                 val isSelected = selectedHour == hourInfo.hour
-                val isCurrentHour = isToday && hourInfo.hour == Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+                val isCurrentHour = hourInfo.hour == currentHourOnce
                 
                 val barHeight = (hourInfo.usageTimeMillis.toFloat() / maxUsage).coerceIn(0.05f, 1f)
                 val animatedHeight by animateFloatAsState(
@@ -1507,6 +1519,7 @@ fun GoalHeatmapItem(
     selectedDateMillis: Long,
     onDayClick: (Long) -> Unit
 ) {
+    val last14Days = remember(history) { history.takeLast(14) }
     GroupedCard(index = index, total = total) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
@@ -1519,22 +1532,23 @@ fun GoalHeatmapItem(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                val last14Days = history.takeLast(14)
                 last14Days.forEach { day ->
                     val isMet = day.totalTime > 0 && day.totalTime <= targetMillis
                     val isSelected = day.date == selectedDateMillis
                     
-                    val proximity = if (targetMillis > 0) (day.totalTime.toFloat() / targetMillis).coerceIn(0f, 1f) else 0f
-                    val targetMetAlpha = (1f - (proximity * 0.6f)).coerceAtLeast(0.4f)
-                    
-                    val targetColor = when {
+                    val targetMetAlpha = remember(day.totalTime, targetMillis) {
+                        val proximity = if (targetMillis > 0) (day.totalTime.toFloat() / targetMillis).coerceIn(0f, 1f) else 0f
+                        (1f - (proximity * 0.6f)).coerceAtLeast(0.4f)
+                    }
+
+                    val finalTargetColor = when {
                         day.totalTime == 0L -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
                         isMet -> MaterialTheme.colorScheme.tertiary.copy(alpha = targetMetAlpha)
                         else -> MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
                     }
                     
                     val animatedColor by animateColorAsState(
-                        targetValue = targetColor,
+                        targetValue = finalTargetColor,
                         animationSpec = spring(stiffness = Spring.StiffnessLow),
                         label = "HeatmapColor"
                     )
@@ -1658,21 +1672,27 @@ fun WeeklyStatsDoubleCard(
                             Text("-", style = MaterialTheme.typography.bodyMedium)
                         } else {
                             targetApps.take(3).forEach { app ->
-                                val appIcon = remember(app.icon) {
-                                    app.icon?.toBitmap()?.asImageBitmap()
-                                }
-                                if (appIcon != null) {
-                                    Image(
-                                        painter = BitmapPainter(appIcon),
-                                        contentDescription = null,
-                                        modifier = Modifier
-                                            .size(32.dp)
-                                            .clip(CircleShape)
-                                            .background(MaterialTheme.colorScheme.surface)
-                                            .padding(2.dp)
-                                            .clip(CircleShape),
-                                        contentScale = ContentScale.Crop
-                                    )
+                                key(app.packageName) {
+                                    val appIcon by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, app.icon) {
+                                        app.icon?.let { icon ->
+                                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                                value = icon.toBitmap().asImageBitmap()
+                                            }
+                                        }
+                                    }
+                                    if (appIcon != null) {
+                                        Image(
+                                            painter = BitmapPainter(appIcon!!),
+                                            contentDescription = null,
+                                            modifier = Modifier
+                                                .size(32.dp)
+                                                .clip(CircleShape)
+                                                .background(MaterialTheme.colorScheme.surface)
+                                                .padding(2.dp)
+                                                .clip(CircleShape),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                    }
                                 }
                             }
                         }
