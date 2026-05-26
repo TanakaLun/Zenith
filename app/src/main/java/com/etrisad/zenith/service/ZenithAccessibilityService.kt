@@ -534,7 +534,9 @@ class ZenithAccessibilityService : AccessibilityService() {
                                             serviceScope.launch {
                                                 val s = currentShieldCache ?: mindfulGatewayStates[targetPackageName] ?: shieldRepository.getShieldByPackageName(targetPackageName)
                                                 if (s?.isAutoQuitEnabled == true) {
-                                                    goToHomeScreen()
+                                                    if (lastForegroundApp == targetPackageName) {
+                                                        goToHomeScreen()
+                                                    }
                                                 } else {
                                                     checkIfAppIsShielded(targetPackageName)
                                                 }
@@ -898,7 +900,9 @@ class ZenithAccessibilityService : AccessibilityService() {
                                                     currentShieldCache = updated
 
                                                     if (updated.isAutoQuitEnabled) {
-                                                        goToHomeScreen()
+                                                        if (lastForegroundApp == packageName) {
+                                                            goToHomeScreen()
+                                                        }
                                                     } else {
                                                         checkIfAppIsShielded(packageName)
                                                     }

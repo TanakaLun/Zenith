@@ -582,6 +582,11 @@ class AppUsageMonitorService : Service() {
                             sessionStartTime = currentTime
                             currentSessionPackage = currentApp
 
+                            baseUsageAtSessionStart = 0L
+                            cachedTotalUsage = 0L
+                            baseGlobalUsageAtSessionStart = 0L
+                            cachedTotalGlobalUsage = 0L
+
                             val startOfDay = getStartOfDay()
                             val timeSinceMidnight = (currentTime - startOfDay).coerceAtLeast(0L)
 
@@ -675,7 +680,9 @@ class AppUsageMonitorService : Service() {
                                                         currentShieldCache = updated
 
                                                         if (updated.isAutoQuitEnabled) {
-                                                            goToHomeScreen()
+                                                            if (getForegroundApp() == currentApp) {
+                                                                goToHomeScreen()
+                                                            }
                                                         } else {
                                                             checkIfAppIsShielded(currentApp)
                                                         }
@@ -1193,7 +1200,9 @@ class AppUsageMonitorService : Service() {
                                                         serviceScope.launch {
                                                             val s = currentShieldCache ?: mindfulGatewayStates[targetPackageName] ?: shieldRepository.getShieldByPackageName(targetPackageName)
                                                             if (s?.isAutoQuitEnabled == true) {
-                                                                goToHomeScreen()
+                                                                if (getForegroundApp() == targetPackageName) {
+                                                                    goToHomeScreen()
+                                                                }
                                                             } else {
                                                                 checkIfAppIsShielded(targetPackageName)
                                                             }
