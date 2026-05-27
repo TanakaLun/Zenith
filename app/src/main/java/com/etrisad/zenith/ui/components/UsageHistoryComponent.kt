@@ -309,7 +309,7 @@ fun UsageGraph(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(bottom = 32.dp, start = 44.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        horizontalArrangement = Arrangement.SpaceAround,
                         verticalAlignment = Alignment.Bottom
                     ) {
                         pageData.forEach { usage ->
@@ -399,9 +399,9 @@ fun UsageGraph(
                         modifier = Modifier
                             .fillMaxWidth()
                             .align(Alignment.BottomStart)
-                            .padding(start = 32.dp)
+                            .padding(start = 44.dp)
                             .height(26.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly
+                        horizontalArrangement = Arrangement.SpaceAround
                     ) {
                         pageData.forEach { usage ->
                             val isSelected = selectedDateMillis == usage.date
@@ -422,26 +422,30 @@ fun UsageGraph(
                                 animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessLow)
                             )
 
-                            Column(
+                            Box(
                                 modifier = Modifier.weight(1f),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
+                                contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    text = dayFormat.format(usage.date).first().toString(),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    textAlign = TextAlign.Center
-                                )
-                                Box(
-                                    modifier = Modifier
-                                        .padding(top = 2.dp)
-                                        .width(animatedWidth)
-                                        .height(if (showDatabaseIndicator) 2.dp else 0.dp)
-                                        .clip(CircleShape)
-                                        .background(if (showDatabaseIndicator) animatedIndicatorColor else Color.Transparent)
-                                )
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Text(
+                                        text = dayFormat.format(usage.date).first().toString(),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        textAlign = TextAlign.Center
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .padding(top = 2.dp)
+                                            .width(animatedWidth.coerceAtMost(8.dp))
+                                            .height(if (showDatabaseIndicator) 2.dp else 0.dp)
+                                            .clip(CircleShape)
+                                            .background(if (showDatabaseIndicator) animatedIndicatorColor else Color.Transparent)
+                                    )
+                                }
                             }
                         }
                     }
