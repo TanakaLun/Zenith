@@ -908,7 +908,7 @@ fun ShieldLandscapeContent(
     onAllowUse: (Int) -> Unit,
     onCloseApp: () -> Unit
 ) {
-    val displayRemainingMinutes = if (shield != null) {
+    val displayRemainingMinutes = if (shield != null && shield.timeLimitMinutes > 0) {
         val totalLimitMillis = shield.timeLimitMinutes * 60 * 1000L
         ((totalLimitMillis - totalUsageToday).coerceAtLeast(0L) / 60000).toInt()
     } else remainingMinutes
