@@ -797,20 +797,20 @@ class AppUsageMonitorService : Service() {
 
                                 if (shield.type == FocusType.GOAL) {
                                     when {
-                                        remaining < 60000 -> prefs.delayGoalNear
-                                        remaining < 300000 -> prefs.delayGoalMid
-                                        else -> prefs.delayGoalFar
+                                        remaining < 60000 -> (prefs.delayGoalNear * 1.5).toLong().coerceAtLeast(1000L)
+                                        remaining < 300000 -> (prefs.delayGoalMid * 1.5).toLong().coerceAtLeast(1800L)
+                                        else -> (prefs.delayGoalFar * 1.2).toLong().coerceAtLeast(2000L)
                                     }
                                 } else {
                                     when {
-                                        remaining > 3600000 -> prefs.delayShieldVeryFar
-                                        remaining > 600000 -> prefs.delayShieldFar
-                                        remaining > 60000 -> prefs.delayShieldMid
-                                        else -> prefs.delayShieldNear
+                                        remaining > 3600000 -> (prefs.delayShieldVeryFar * 1.2).toLong().coerceAtLeast(5000L)
+                                        remaining > 600000 -> (prefs.delayShieldFar * 1.2).toLong().coerceAtLeast(3500L)
+                                        remaining > 60000 -> (prefs.delayShieldMid * 1.5).toLong().coerceAtLeast(2000L)
+                                        else -> (prefs.delayShieldNear * 2.0).toLong().coerceAtLeast(1200L)
                                     }
                                 }
                             }
-                            else -> prefs.delayDefault
+                            else -> (prefs.delayDefault * 1.5).toLong().coerceAtLeast(2000L)
                         }
                     } else {
                         when {
@@ -823,23 +823,23 @@ class AppUsageMonitorService : Service() {
 
                                 if (shield.type == FocusType.GOAL) {
                                     when {
-                                        remaining < 60000 -> 600L
-                                        remaining < 300000 -> 1200L
-                                        else -> 1800L
+                                        remaining < 60000 -> 1200L
+                                        remaining < 300000 -> 1800L
+                                        else -> 2500L
                                     }
                                 } else {
                                     when {
-                                        remaining > 3600000 -> 5000L
-                                        remaining > 600000 -> 3000L
-                                        remaining > 60000 -> 1500L
-                                        else -> 600L
+                                        remaining > 3600000 -> 6000L
+                                        remaining > 600000 -> 4000L
+                                        remaining > 60000 -> 2500L
+                                        else -> 1200L
                                     }
                                 }
                             }
-                            else -> 1200L
+                            else -> 2000L
                         }
                     }
-                } catch (_: Exception) { 2000L }
+                } catch (_: Exception) { 2500L }
                 delay(delayTime)
             }
         }
@@ -950,7 +950,7 @@ class AppUsageMonitorService : Service() {
 
         val timeSinceLastUsed = currentTime - shield.lastUsedTimestamp
         val isNearLimit = remainingMillis < 60000
-        val shouldUpdateDB = force || timeSinceLastUsed > 10000 || (isNearLimit && timeSinceLastUsed > 5000) || updatedShield != shield
+        val shouldUpdateDB = force || timeSinceLastUsed > 30000 || (isNearLimit && timeSinceLastUsed > 10000) || updatedShield != shield
 
         if (shouldUpdateDB) {
             val finalShield = updatedShield.copy(
