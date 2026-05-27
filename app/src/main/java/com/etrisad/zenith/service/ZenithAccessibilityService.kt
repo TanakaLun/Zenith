@@ -730,6 +730,13 @@ class ZenithAccessibilityService : AccessibilityService() {
 
         if (isBedtimeActive) {
             if (packageName !in bedtimeWhitelistedPackages) {
+                val shield = allShieldsCache.find { it.packageName == packageName }
+                val isMindfulGateway = shield == null && prefs.mindfulGatewayEnabled && !shouldBypassBlocking(packageName)
+
+                if (shield != null || isMindfulGateway) {
+                    return false
+                }
+
                 showBedtimeOverlay(packageName)
                 return true
             }
@@ -738,6 +745,13 @@ class ZenithAccessibilityService : AccessibilityService() {
 
         if (isWindDownActive && prefs.bedtimeWindDownEnabled) {
             if (packageName !in bedtimeWhitelistedPackages) {
+                val shield = allShieldsCache.find { it.packageName == packageName }
+                val isMindfulGateway = shield == null && prefs.mindfulGatewayEnabled && !shouldBypassBlocking(packageName)
+
+                if (shield != null || isMindfulGateway) {
+                    return false
+                }
+
                 showWindDownOverlay(packageName)
                 return true
             }
@@ -857,7 +871,8 @@ class ZenithAccessibilityService : AccessibilityService() {
 
         if (isSystem) {
             if (packageName.contains("car.mode", ignoreCase = true)) return true
-            return !(packageName in restrictedPackages || hasGlobalAllowSchedule)
+            val isMindfulActive = prefs?.mindfulGatewayEnabled == true
+            return !(packageName in restrictedPackages || hasGlobalAllowSchedule || isMindfulActive)
         }
 
         return false

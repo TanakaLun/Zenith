@@ -47,11 +47,35 @@ fun BedtimeAlertPill(
     val bedtimeInfo = remember(userPreferences) {
         val now = Calendar.getInstance()
         val currentMinutes = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE)
+        val currentDay = now.get(Calendar.DAY_OF_WEEK)
+        
+        val yesterdayCalendar = Calendar.getInstance().apply {
+            timeInMillis = now.timeInMillis
+            add(Calendar.DAY_OF_YEAR, -1)
+        }
+        val yesterdayDay = yesterdayCalendar.get(Calendar.DAY_OF_WEEK)
         
         val startParts = userPreferences.bedtimeStartTime.split(":")
         val endParts = userPreferences.bedtimeEndTime.split(":")
         val startMinutes = (startParts.getOrNull(0)?.toIntOrNull() ?: 22) * 60 + (startParts.getOrNull(1)?.toIntOrNull() ?: 0)
         val endMinutes = (endParts.getOrNull(0)?.toIntOrNull() ?: 7) * 60 + (endParts.getOrNull(1)?.toIntOrNull() ?: 0)
+
+        var isBedtime = false
+        if (userPreferences.bedtimeEnabled) {
+            if (startMinutes <= endMinutes) {
+                if (currentDay in userPreferences.bedtimeDays) {
+                    isBedtime = currentMinutes in startMinutes until endMinutes
+                }
+            } else {
+                if (currentDay in userPreferences.bedtimeDays && currentMinutes >= startMinutes) {
+                    isBedtime = true
+                } else if (yesterdayDay in userPreferences.bedtimeDays && currentMinutes < endMinutes) {
+                    isBedtime = true
+                }
+            }
+        }
+
+        if (!isBedtime) return@remember Triple(0f, "", false)
 
         val totalDuration = if (endMinutes > startMinutes) {
             endMinutes - startMinutes
@@ -76,13 +100,7 @@ fun BedtimeAlertPill(
         
         val formattedTime = if (h > 0) "${h}h ${m}m" else "${m}m"
 
-        val isBedtime = if (startMinutes <= endMinutes) {
-            currentMinutes in startMinutes until endMinutes
-        } else {
-            currentMinutes >= startMinutes || currentMinutes < endMinutes
-        }
-
-        Triple(progress, formattedTime, isBedtime)
+        Triple(progress, formattedTime, true)
     }
 
     if (!bedtimeInfo.third) return

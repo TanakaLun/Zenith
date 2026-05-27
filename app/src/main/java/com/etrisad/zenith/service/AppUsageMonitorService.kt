@@ -1564,6 +1564,13 @@ class AppUsageMonitorService : Service() {
 
         if (isBedtimeActive) {
             if (packageName !in bedtimeWhitelistedPackages) {
+                val shield = allShieldsCache[packageName]
+                val isMindfulGateway = shield == null && (prefs?.mindfulGatewayEnabled == true) && !shouldBypassBlocking(packageName)
+
+                if (shield != null || isMindfulGateway) {
+                    return false
+                }
+
                 showBedtimeOverlay(packageName)
                 return true
             }
@@ -1572,6 +1579,13 @@ class AppUsageMonitorService : Service() {
 
         if (isWindDownActive && prefs?.bedtimeWindDownEnabled == true) {
             if (packageName !in bedtimeWhitelistedPackages) {
+                val shield = allShieldsCache[packageName]
+                val isMindfulGateway = shield == null && (prefs?.mindfulGatewayEnabled == true) && !shouldBypassBlocking(packageName)
+
+                if (shield != null || isMindfulGateway) {
+                    return false
+                }
+
                 showWindDownOverlay(packageName)
                 return true
             }
@@ -1686,7 +1700,7 @@ class AppUsageMonitorService : Service() {
         
         if (isBedtimeOrWindDown) {
             if (packageName in bedtimeWhitelistedPackages && packageName !in restrictedPackages) {
-                return true
+                if (prefs?.mindfulGatewayEnabled != true) return true
             }
         } else {
             if (packageName in whitelistedPackages) return true
@@ -1710,7 +1724,8 @@ class AppUsageMonitorService : Service() {
 
         if (isSystem) {
             if (packageName.contains("car.mode", ignoreCase = true)) return true
-            return !(packageName in restrictedPackages || hasGlobalAllowSchedule)
+            val isMindfulActive = prefs?.mindfulGatewayEnabled == true
+            return !(packageName in restrictedPackages || hasGlobalAllowSchedule || isMindfulActive)
         }
 
         return false
