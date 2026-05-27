@@ -23,6 +23,8 @@ import com.etrisad.zenith.data.preferences.UserPreferencesRepository
 import com.etrisad.zenith.data.repository.ShieldRepository
 import com.etrisad.zenith.ui.components.overlay.SessionUsageOverlayManager
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -229,6 +231,35 @@ class ZenithAccessibilityService : AccessibilityService() {
                 }
             }
         }, 1000)
+
+        serviceScope.launch {
+            while (true) {
+                val currentTime = System.currentTimeMillis()
+                val currentPkg = lastForegroundApp
+                
+                if (currentPkg != null && !InterceptOverlayManager.isShowing && !shouldBypassBlocking(currentPkg)) {
+                    val allowedUntil = allowedApps[currentPkg]
+                    if (allowedUntil != null && allowedUntil != 0L && currentTime > allowedUntil) {
+                        val s = currentShieldCache ?: allShieldsCache.find { it.packageName == currentPkg } ?: shieldRepository.getShieldByPackageName(currentPkg)
+                        if (s?.isAutoQuitEnabled == true) {
+                            lastKickTime = System.currentTimeMillis()
+                            lastKickedPackage = currentPkg
+                            goToHomeScreen()
+                            allowedApps.remove(currentPkg)
+                            if (s.isDelayAppEnabled) {
+                                val updated = s.copy(lastDelayStartTimestamp = 0L)
+                                shieldRepository.updateShield(updated)
+                                currentShieldCache = updated
+                            }
+                        } else {
+                            allowedApps.remove(currentPkg)
+                            checkIfAppIsShielded(currentPkg)
+                        }
+                    }
+                }
+                delay(2000)
+            }
+        }
     }
 
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
@@ -254,12 +285,24 @@ class ZenithAccessibilityService : AccessibilityService() {
     private suspend fun handlePackageChange(currentApp: String) {
         if (currentApp == lastForegroundApp && currentShieldCache != null) return
         
+        val previousApp = lastForegroundApp
         lastForegroundApp = currentApp
         
         if (shouldBypassBlocking(currentApp)) {
+            // Reset delay if moving away from a shielded app to a bypassed app (like home)
+            previousApp?.let { prevPkg ->
+                allShieldsCache.find { it.packageName == prevPkg }?.let { shield ->
+                    if (shield.isDelayAppEnabled) {
+                        serviceScope.launch {
+                            shieldRepository.updateShield(shield.copy(lastDelayStartTimestamp = 0L))
+                        }
+                    }
+                }
+            }
             currentShieldCache = null
             serviceScope.launch(Dispatchers.Main) {
                 overlayManager.hideOverlay()
+                sessionUsageOverlayManager.destroyAllHUDs()
             }
             return
         }
@@ -272,19 +315,19 @@ class ZenithAccessibilityService : AccessibilityService() {
 
     private suspend fun checkBlockingInstant(currentApp: String, shield: ShieldEntity?) {
         if (shouldBypassBlocking(currentApp)) return
-        
+
         val currentTime = System.currentTimeMillis()
         val isAppPaused = shield != null && isPaused(shield)
-        val allowedUntil = allowedApps[currentApp] ?: 0L
-        val isSessionActive = currentTime < allowedUntil
 
-        if (!isSessionActive && !InterceptOverlayManager.isShowing) {
-            val isScheduled = checkSchedules(currentApp)
-            if (isScheduled) return
+        if (!isAppPaused) {
+            val allowedUntil = allowedApps[currentApp] ?: 0L
+            val isBedtimeBlocking = isBedtimeActive || (isWindDownActive && (currentPreferences?.bedtimeWindDownEnabled == true))
+            val shouldCheckSchedules = (isBedtimeBlocking && currentApp !in bedtimeWhitelistedPackages) || currentTime > allowedUntil
 
-            if (!isAppPaused && currentTime > allowedUntil) {
+            if (shouldCheckSchedules && !InterceptOverlayManager.isShowing) {
+                val isScheduled = checkSchedules(currentApp)
                 val prefs = currentPreferences ?: preferencesRepository.userPreferencesFlow.first()
-                if (shield != null || (prefs.mindfulGatewayEnabled && !shouldBypassBlocking(currentApp))) {
+                if (!isScheduled && (shield != null || (prefs.mindfulGatewayEnabled && !shouldBypassBlocking(currentApp))) && currentTime > allowedUntil) {
                     checkIfAppIsShielded(currentApp)
                 }
             }
@@ -450,7 +493,8 @@ class ZenithAccessibilityService : AccessibilityService() {
             val lastAction = effectiveShield.lastDelayStartTimestamp
 
             val lastSessionEnd = effectiveShield.lastSessionEndTimestamp
-            val isGracePeriodActive = lastSessionEnd != 0L && (currentTime - lastSessionEnd < 5 * 60 * 1000L)
+            val gracePeriodMillis = if (effectiveShield.isDelayAppEnabled) 15 * 1000L else 5 * 60 * 1000L
+            val isGracePeriodActive = lastSessionEnd != 0L && (currentTime - lastSessionEnd < gracePeriodMillis)
 
             val shieldWithTimestamp = if (effectiveShield.isDelayAppEnabled) {
                 if (isGracePeriodActive) {
@@ -509,8 +553,10 @@ class ZenithAccessibilityService : AccessibilityService() {
                                             lastSessionEndTimestamp = currentTimeOnUnlock
                                         )
                                     } else {
+                                        val periodExpired = currentTimeOnUnlock - currentShield.lastPeriodResetTimestamp > currentShield.refreshPeriodMinutes * 60 * 1000L
                                         currentShield.copy(
-                                            currentPeriodUses = currentShield.currentPeriodUses + 1,
+                                            currentPeriodUses = if (periodExpired) 1 else currentShield.currentPeriodUses + 1,
+                                            lastPeriodResetTimestamp = if (periodExpired) currentTimeOnUnlock else currentShield.lastPeriodResetTimestamp,
                                             lastDelayStartTimestamp = 0L,
                                             lastSessionEndTimestamp = currentTimeOnUnlock
                                         )
@@ -559,6 +605,14 @@ class ZenithAccessibilityService : AccessibilityService() {
                         }
                     },
                     onCloseApp = { 
+                        serviceScope.launch {
+                            val s = currentShieldCache ?: allShieldsCache.find { it.packageName == targetPackageName } ?: shieldRepository.getShieldByPackageName(targetPackageName)
+                            if (s != null && s.isDelayAppEnabled) {
+                                val updated = s.copy(lastDelayStartTimestamp = 0L)
+                                shieldRepository.updateShield(updated)
+                                currentShieldCache = updated
+                            }
+                        }
                         lastKickTime = System.currentTimeMillis()
                         lastKickedPackage = targetPackageName
                         goToHomeScreen() 

@@ -551,11 +551,31 @@ class AppUsageMonitorService : Service() {
                         if (launcherPackages.contains(currentApp) || currentApp == packageName) {
                             overlayManager.hideOverlay()
                             sessionUsageOverlayManager.destroyAllHUDs()
+
+                            lastForegroundApp?.let { prevPkg ->
+                                if (prevPkg != packageName && !launcherPackages.contains(prevPkg)) {
+                                    allShieldsCache[prevPkg]?.let { shield ->
+                                        if (shield.isDelayAppEnabled) {
+                                            serviceScope.launch {
+                                                shieldRepository.updateShield(shield.copy(lastDelayStartTimestamp = 0L))
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         } else {
                             overlayManager.checkAndHide(currentApp)
                         }
                     } else if (lastForegroundApp != null && !InterceptOverlayManager.isShowing) {
                         overlayManager.hideOverlay()
+                        currentShieldCache?.let { shield ->
+                            if (shield.isDelayAppEnabled) {
+                                serviceScope.launch {
+                                    shieldRepository.updateShield(shield.copy(lastDelayStartTimestamp = 0L))
+                                }
+                                currentShieldCache = shield.copy(lastDelayStartTimestamp = 0L)
+                            }
+                        }
                     }
 
                     if (InterceptOverlayManager.isShowing) {
@@ -708,20 +728,22 @@ class AppUsageMonitorService : Service() {
                         }
 
                         val isBedtimeBlocking = isBedtimeActive || (isWindDownActive && currentPreferences?.bedtimeWindDownEnabled == true)
-                        val isSessionActive = allowedUntilVal?.let { it > currentTime } ?: false
+                        val shouldCheckSchedules = (isBedtimeBlocking && currentApp !in bedtimeWhitelistedPackages) || (allowedUntilVal == null || currentTime > allowedUntilVal)
 
-                        if (!isSessionActive && !InterceptOverlayManager.isShowing) {
+                        if (!isAppPaused && shouldCheckSchedules && !InterceptOverlayManager.isShowing) {
                             if (checkSchedules(currentApp)) {
                                 lastForegroundApp = currentApp
                                 delay(1000)
                                 continue
                             }
 
-                            if (!isAppPaused && (allowedUntilVal == null || currentTime > allowedUntilVal)) {
+                            if (allowedUntilVal == null || currentTime > allowedUntilVal) {
                                 val shield = currentShieldCache
                                 val prefs = currentPreferences
                                 if (shield != null || (prefs?.mindfulGatewayEnabled == true && !shouldBypassBlocking(currentApp))) {
                                     if (shield != null && shield.isAutoQuitEnabled && allowedUntilVal != null && allowedUntilVal > 0) {
+                                        lastKickTime = System.currentTimeMillis()
+                                        lastKickedPackage = currentApp
                                         goToHomeScreen()
                                         allowedApps.remove(currentApp)
                                         if (shield.isDelayAppEnabled) {
@@ -1069,10 +1091,18 @@ class AppUsageMonitorService : Service() {
         return updated
     }
 
+    private var lastKickedPackage: String? = null
+    private var lastKickTime = 0L
+
     private suspend fun checkIfAppIsShielded(targetPackageName: String) {
         if (InterceptOverlayManager.isShowing && InterceptOverlayManager.currentPackage == targetPackageName) {
             return
         }
+        
+        if (targetPackageName == lastKickedPackage && System.currentTimeMillis() - lastKickTime < 3000) {
+            return
+        }
+        
         val currentForeground = getForegroundApp() ?: lastForegroundApp
         if (targetPackageName != currentForeground && targetPackageName != lastForegroundApp) return
 
@@ -1100,7 +1130,8 @@ class AppUsageMonitorService : Service() {
             val lastAction = effectiveShield.lastDelayStartTimestamp
 
             val lastSessionEnd = effectiveShield.lastSessionEndTimestamp
-            val isGracePeriodActive = lastSessionEnd != 0L && (currentTime - lastSessionEnd < 30 * 60 * 1000L)
+            val gracePeriodMillis = if (effectiveShield.isDelayAppEnabled) 15 * 1000L else 30 * 60 * 1000L
+            val isGracePeriodActive = lastSessionEnd != 0L && (currentTime - lastSessionEnd < gracePeriodMillis)
 
             val shieldWithTimestamp = if (effectiveShield.isDelayAppEnabled) {
                 if (isGracePeriodActive) {
@@ -1224,6 +1255,16 @@ class AppUsageMonitorService : Service() {
                                 }
                             },
                     onCloseApp = {
+                        lastKickTime = System.currentTimeMillis()
+                        lastKickedPackage = targetPackageName
+                        serviceScope.launch {
+                            val s = currentShieldCache ?: allShieldsCache[targetPackageName] ?: shieldRepository.getShieldByPackageName(targetPackageName)
+                            if (s != null && s.isDelayAppEnabled) {
+                                val updated = s.copy(lastDelayStartTimestamp = 0L)
+                                shieldRepository.updateShield(updated)
+                                currentShieldCache = updated
+                            }
+                        }
                         goToHomeScreen()
                     },
                     onGoalDismiss = {
@@ -1817,6 +1858,9 @@ class AppUsageMonitorService : Service() {
             lastEventQueryTime = time
         }
 
+        if (foundPackage == null) {
+            return lastForegroundApp
+        }
         return foundPackage
     }
 
