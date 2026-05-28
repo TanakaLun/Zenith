@@ -1,23 +1,22 @@
 package com.etrisad.zenith.ui.screens.bedtime
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Bedtime
+import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,26 +24,35 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Matrix
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.asComposePath
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.graphics.Matrix
-import androidx.compose.ui.graphics.asComposePath
+import androidx.core.graphics.drawable.toBitmap
 import androidx.graphics.shapes.toPath
-import androidx.compose.foundation.shape.GenericShape
-import com.etrisad.zenith.ui.viewmodel.BedtimeViewModel
-import java.time.LocalTime
-import java.time.Duration
-import java.time.format.DateTimeFormatter
-import java.time.temporal.ChronoUnit
-import com.etrisad.zenith.ui.components.ZenithButton
+import com.etrisad.zenith.ui.components.ConfirmBottomSheet
 import com.etrisad.zenith.ui.components.ZenithButtonSize
 import com.etrisad.zenith.ui.components.ZenithToggleButtonGroup
 import com.etrisad.zenith.ui.components.ZenithToggleOption
-import com.etrisad.zenith.ui.components.ConfirmBottomSheet
+import com.etrisad.zenith.ui.viewmodel.AppUsageInfo
+import com.etrisad.zenith.ui.viewmodel.BedtimeViewModel
+import com.etrisad.zenith.ui.viewmodel.HourlyUsageInfo
+import com.etrisad.zenith.ui.viewmodel.HourlySortType
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import java.time.Duration
+import java.time.LocalTime
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -53,10 +61,41 @@ fun BedtimeScreen(
     innerPadding: PaddingValues
 ) {
     val preferences by viewModel.userPreferences.collectAsState()
+    val hourlyUsage by viewModel.hourlyUsage.collectAsState()
+    val bedtimePercentage by viewModel.bedtimeUsagePercentage.collectAsState()
+    val totalUsageMillis by viewModel.bedtimeUsageTotalMillis.collectAsState()
+    val totalDurationMillis by viewModel.bedtimeDurationTotalMillis.collectAsState()
+
     var showAppPicker by remember { mutableStateOf(false) }
     var showStartTimePicker by remember { mutableStateOf(false) }
     var showEndTimePicker by remember { mutableStateOf(false) }
     var showPauseSheet by remember { mutableStateOf(false) }
+    var selectedHour by remember { mutableStateOf<Int?>(null) }
+    var isOtherHourAppsExpanded by remember(selectedHour) { mutableStateOf(false) }
+    var hourlySortType by remember { mutableStateOf(HourlySortType.USAGE_TIME) }
+    
+    val hourlyAppsData = remember(hourlyUsage, selectedHour, hourlySortType) {
+        val hourData = hourlyUsage.find { it.hour == selectedHour }
+        if (hourData != null && hourData.apps.isNotEmpty()) {
+            val sortedApps = when(hourlySortType) {
+                HourlySortType.USAGE_TIME -> hourData.apps.sortedByDescending { it.totalTimeVisible }
+                HourlySortType.RECENTLY_USED -> hourData.apps.sortedByDescending { it.lastTimeUsed }
+            }
+            val (regular, low) = sortedApps.partition { it.totalTimeVisible >= 60000L }
+            val totalLowTime = low.sumOf { it.totalTimeVisible }
+            Triple(hourData, regular, Triple(low, totalLowTime, hourData.hour))
+        } else null
+    }
+
+    val hourlyGroupTotal = remember(hourlyAppsData, isOtherHourAppsExpanded) {
+        val appsCount = if (hourlyAppsData != null) {
+            val (_, regular, lowData) = hourlyAppsData
+            val (low, totalLowTime, _) = lowData
+            val appsListSize = regular.size + (if (totalLowTime > 0) (if (isOtherHourAppsExpanded) 1 + low.size else 1) else 0)
+            1 + appsListSize // Label + Apps
+        } else 0
+        2 + appsCount // Chart (1) + Efficiency Card (1) + AppsCount
+    }
     
     var currentTime by remember { mutableStateOf(LocalTime.now()) }
     LaunchedEffect(Unit) {
@@ -64,7 +103,7 @@ fun BedtimeScreen(
             currentTime = LocalTime.now()
             val nextMinute = currentTime.plusMinutes(1).withSecond(0).withNano(0)
             val delayMillis = Duration.between(currentTime, nextMinute).toMillis()
-            kotlinx.coroutines.delay(delayMillis.coerceAtLeast(1000))
+            delay(delayMillis.coerceAtLeast(1000))
         }
     }
 
@@ -73,81 +112,301 @@ fun BedtimeScreen(
         label = "containerColor"
     )
 
-    Column(
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
+        contentPadding = PaddingValues(
+            top = innerPadding.calculateTopPadding() + 16.dp,
+            bottom = innerPadding.calculateBottomPadding() + 24.dp
+        )
     ) {
-        Spacer(modifier = Modifier.height(innerPadding.calculateTopPadding() + 16.dp))
-
-        AnimatedVisibility(
-            visible = !preferences.bedtimeEnabled,
-            enter = fadeIn(spring(stiffness = Spring.StiffnessLow)) + 
-                    expandVertically(spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessLow)),
-            exit = fadeOut(spring(stiffness = Spring.StiffnessLow)) + 
-                   shrinkVertically(spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessLow))
-        ) {
-            Column {
-                BedtimeToggleCard(
-                    enabled = preferences.bedtimeEnabled,
-                    onToggle = { 
-                        if (preferences.bedtimeEnabled) {
-                            showPauseSheet = true
-                        } else {
-                            viewModel.setBedtimeEnabled(true)
+        item(key = "bedtime_toggle_card") {
+            AnimatedVisibility(
+                visible = !preferences.bedtimeEnabled,
+                enter = fadeIn(spring(stiffness = Spring.StiffnessLow)) + 
+                        expandVertically(spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessLow)),
+                exit = fadeOut(spring(stiffness = Spring.StiffnessLow)) + 
+                       shrinkVertically(spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessLow)),
+                modifier = Modifier.animateItem()
+            ) {
+                Column {
+                    BedtimeToggleCard(
+                        enabled = preferences.bedtimeEnabled,
+                        onToggle = { 
+                            if (preferences.bedtimeEnabled) {
+                                showPauseSheet = true
+                            } else {
+                                viewModel.setBedtimeEnabled(true)
+                            }
                         }
-                    }
-                )
-                Spacer(modifier = Modifier.height(16.dp))
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
             }
         }
 
-        AnimatedVisibility(
-            visible = preferences.bedtimeEnabled,
-            enter = fadeIn(spring(stiffness = Spring.StiffnessLow)) +
-                    expandVertically(spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)),
-            exit = fadeOut(spring()) + shrinkVertically(spring())
-        ) {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                BedtimeStatusProgress(
-                    startTimeStr = preferences.bedtimeStartTime,
-                    endTimeStr = preferences.bedtimeEndTime,
-                    currentTime = currentTime
-                )
-                
-                TimeSelectionRow(
-                    startTime = preferences.bedtimeStartTime,
-                    endTime = preferences.bedtimeEndTime,
-                    onStartTimeClick = { showStartTimePicker = true },
-                    onEndTimeClick = { showEndTimePicker = true },
-                    containerColor = containerColor
-                )
+        if (preferences.bedtimeEnabled) {
+            item(key = "bedtime_status_progress") {
+                Column(modifier = Modifier.animateItem()) {
+                    BedtimeStatusProgress(
+                        startTimeStr = preferences.bedtimeStartTime,
+                        endTimeStr = preferences.bedtimeEndTime,
+                        currentTime = currentTime
+                    )
+                }
+            }
+            
+            item(key = "time_selection_row") {
+                Column(modifier = Modifier.animateItem()) {
+                    TimeSelectionRow(
+                        startTime = preferences.bedtimeStartTime,
+                        endTime = preferences.bedtimeEndTime,
+                        onStartTimeClick = { showStartTimePicker = true },
+                        onEndTimeClick = { showEndTimePicker = true }
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
+            }
 
-                DaysSelectionCard(
-                    selectedDays = preferences.bedtimeDays,
-                    onDaysChange = { viewModel.setBedtimeDays(it) },
-                    containerColor = containerColor,
-                    shape = RoundedCornerShape(8.dp)
-                )
+            item(key = "days_selection_card") {
+                Column(modifier = Modifier.animateItem()) {
+                    DaysSelectionCard(
+                        selectedDays = preferences.bedtimeDays,
+                        onDaysChange = { viewModel.setBedtimeDays(it) },
+                        containerColor = containerColor,
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
+            }
 
-                BedtimeStreakCard(
-                    currentStreak = preferences.bedtimeCurrentStreak,
-                    bestStreak = preferences.bedtimeBestStreak,
-                    containerColor = containerColor,
-                    shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
-                )
+            item(key = "bedtime_streak_card") {
+                Column(modifier = Modifier.animateItem()) {
+                    BedtimeStreakCard(
+                        currentStreak = preferences.bedtimeCurrentStreak,
+                        bestStreak = preferences.bedtimeBestStreak,
+                        containerColor = containerColor,
+                        shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+            }
 
-                Spacer(modifier = Modifier.height(12.dp))
-                
+            item(key = "usage_header") {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 8.dp),
+                        .padding(horizontal = 8.dp, vertical = 8.dp)
+                        .animateItem(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Usage",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+
+            item(key = "bedtime_hourly_chart") {
+                Column(modifier = Modifier.animateItem()) {
+                    BedtimeHourlyUsageChart(
+                        hourlyUsage = hourlyUsage,
+                        selectedHour = selectedHour,
+                        onHourClick = { selectedHour = if (selectedHour == it) null else it },
+                        formatDuration = viewModel::formatDuration,
+                        index = 0,
+                        total = hourlyGroupTotal,
+                        containerColor = containerColor
+                    )
+                }
+            }
+
+            if (hourlyAppsData != null) {
+                val (_, regularHourApps, lowData) = hourlyAppsData
+                val (lowUsageHourApps, totalLowUsageHourTime, currentTargetHour) = lowData
+
+                item(key = "hourly_apps_label_$currentTargetHour") {
+                    Column(modifier = Modifier.animateItem()) {
+                        val locale = LocalConfiguration.current.locales[0]
+                        Spacer(modifier = Modifier.height(4.dp))
+                        GroupedCard(
+                            index = 1,
+                            total = hourlyGroupTotal,
+                            containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.History,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.tertiary
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Apps used at ${String.format(locale, "%02d:00", currentTargetHour)}",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.tertiary,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                ZenithToggleButtonGroup(
+                                    options = listOf(
+                                        ZenithToggleOption(text = "Usage", icon = Icons.Outlined.Sort),
+                                        ZenithToggleOption(text = "Recent", icon = Icons.Outlined.Schedule)
+                                    ),
+                                    selectedIndices = setOf(if (hourlySortType == HourlySortType.USAGE_TIME) 0 else 1),
+                                    onToggle = { index ->
+                                        hourlySortType = if (index == 0) HourlySortType.USAGE_TIME else HourlySortType.RECENTLY_USED
+                                    },
+                                    modifier = Modifier.width(200.dp),
+                                    size = ZenithButtonSize.Small,
+                                    isScalingEnabled = false,
+                                    isShowingCheck = false,
+                                    showTextSelected = true
+                                )
+                            }
+                        }
+                    }
+                }
+
+                itemsIndexed(
+                    items = regularHourApps,
+                    key = { _, app -> "hourly-$currentTargetHour-${app.packageName}" }
+                ) { index, app ->
+                    val groupIndex = 2 + index
+                    Column(modifier = Modifier.animateItem()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        UsageItem(
+                            app = app,
+                            type = if (app.packageName in preferences.bedtimeWhitelistedPackages) "ALLOWED" else "OTHER",
+                            formatDuration = viewModel::formatDuration,
+                            index = groupIndex,
+                            total = hourlyGroupTotal,
+                            onClick = { },
+                            containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f),
+                            accentColor = MaterialTheme.colorScheme.tertiary
+                        )
+                    }
+                }
+
+                if (totalLowUsageHourTime > 0) {
+                    val otherIndexInGroup = 2 + regularHourApps.size
+                    item(key = "hourly_other_header_$currentTargetHour") {
+                        Column(modifier = Modifier.animateItem()) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            GroupedCard(
+                                index = otherIndexInGroup,
+                                total = hourlyGroupTotal,
+                                onClick = { isOtherHourAppsExpanded = !isOtherHourAppsExpanded },
+                                containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f)
+                            ) {
+                                ListItem(
+                                    headlineContent = {
+                                        Text(
+                                            text = "Other Apps",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    },
+                                    supportingContent = {
+                                        Text(
+                                            text = "${lowUsageHourApps.size} apps with minimal usage",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.tertiary
+                                        )
+                                    },
+                                    trailingContent = {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = viewModel.formatDuration(totalLowUsageHourTime),
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.tertiary
+                                            )
+                                            Icon(
+                                                imageVector = if (isOtherHourAppsExpanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(20.dp).padding(start = 4.dp),
+                                                tint = MaterialTheme.colorScheme.tertiary
+                                            )
+                                        }
+                                    },
+                                    leadingContent = {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(40.dp)
+                                                .clip(CircleShape)
+                                                .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.1f)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Outlined.Android,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(24.dp),
+                                                tint = MaterialTheme.colorScheme.tertiary
+                                            )
+                                        }
+                                    },
+                                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                                )
+                            }
+                        }
+                    }
+
+                    if (isOtherHourAppsExpanded) {
+                        itemsIndexed(
+                            items = lowUsageHourApps,
+                            key = { _, app -> "hourly-low-$currentTargetHour-${app.packageName}" }
+                        ) { index, app ->
+                            val groupIndex = 2 + regularHourApps.size + 1 + index
+                            Column(modifier = Modifier.animateItem()) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                UsageItem(
+                                    app = app,
+                                    type = if (app.packageName in preferences.bedtimeWhitelistedPackages) "ALLOWED" else "OTHER",
+                                    formatDuration = viewModel::formatDuration,
+                                    index = groupIndex,
+                                    total = hourlyGroupTotal,
+                                    onClick = { },
+                                    containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f),
+                                    accentColor = MaterialTheme.colorScheme.tertiary
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            item(key = "bedtime_efficiency_card") {
+                Column(modifier = Modifier.animateItem()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    BedtimeEfficiencyCard(
+                        percentage = bedtimePercentage,
+                        totalUsage = viewModel.formatDuration(totalUsageMillis),
+                        totalDuration = viewModel.formatDuration(totalDurationMillis),
+                        index = hourlyGroupTotal - 1,
+                        total = hourlyGroupTotal,
+                        containerColor = containerColor
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+            }
+
+            item(key = "settings_header") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 8.dp)
+                        .animateItem(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
@@ -157,46 +416,64 @@ fun BedtimeScreen(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 }
+            }
 
-                AllowedAppsCard(
-                    allowedCount = preferences.bedtimeWhitelistedPackages.size,
-                    onClick = { showAppPicker = true },
-                    containerColor = containerColor,
-                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
-                )
+            item(key = "allowed_apps_card") {
+                Column(modifier = Modifier.animateItem()) {
+                    AllowedAppsCard(
+                        allowedCount = preferences.bedtimeWhitelistedPackages.size,
+                        onClick = { showAppPicker = true },
+                        containerColor = containerColor,
+                        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
+            }
 
-                FeatureCard(
-                    icon = Icons.Outlined.NotificationsActive,
-                    title = "Wind Down Notification",
-                    subtitle = "Notify 30 minutes before bedtime",
-                    enabled = preferences.bedtimeNotificationEnabled,
-                    onToggle = { viewModel.setBedtimeNotificationEnabled(it) },
-                    containerColor = containerColor,
-                    shape = RoundedCornerShape(8.dp)
-                )
+            item(key = "feature_notification") {
+                Column(modifier = Modifier.animateItem()) {
+                    FeatureCard(
+                        icon = Icons.Outlined.NotificationsActive,
+                        title = "Wind Down Notification",
+                        subtitle = "Notify 30 minutes before bedtime",
+                        enabled = preferences.bedtimeNotificationEnabled,
+                        onToggle = { viewModel.setBedtimeNotificationEnabled(it) },
+                        containerColor = containerColor,
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
+            }
 
-                FeatureCard(
-                    icon = Icons.Outlined.DoNotDisturbOn,
-                    title = "Do Not Disturb",
-                    subtitle = "Silence notifications during bedtime",
-                    enabled = preferences.bedtimeDndEnabled,
-                    onToggle = { viewModel.setBedtimeDndEnabled(it) },
-                    containerColor = containerColor,
-                    shape = RoundedCornerShape(8.dp)
-                )
+            item(key = "feature_dnd") {
+                Column(modifier = Modifier.animateItem()) {
+                    FeatureCard(
+                        icon = Icons.Outlined.DoNotDisturbOn,
+                        title = "Do Not Disturb",
+                        subtitle = "Silence notifications during bedtime",
+                        enabled = preferences.bedtimeDndEnabled,
+                        onToggle = { viewModel.setBedtimeDndEnabled(it) },
+                        containerColor = containerColor,
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
+            }
 
-                FeatureCard(
-                    icon = Icons.Outlined.Block,
-                    title = "Wind Down Restrictions",
-                    subtitle = "Restrict app usage 30-min before bedtime",
-                    enabled = preferences.bedtimeWindDownEnabled,
-                    onToggle = { viewModel.setBedtimeWindDownEnabled(it) },
-                    containerColor = containerColor,
-                    shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
-                )
+            item(key = "feature_wind_down") {
+                Column(modifier = Modifier.animateItem()) {
+                    FeatureCard(
+                        icon = Icons.Outlined.Block,
+                        title = "Wind Down Restrictions",
+                        subtitle = "Restrict app usage 30-min before bedtime",
+                        enabled = preferences.bedtimeWindDownEnabled,
+                        onToggle = { viewModel.setBedtimeWindDownEnabled(it) },
+                        containerColor = containerColor,
+                        shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
+                    )
+                }
             }
         }
-        Spacer(modifier = Modifier.height(innerPadding.calculateBottomPadding() + 24.dp))
     }
 
     if (showAppPicker) {
@@ -254,8 +531,8 @@ fun BedtimeStatusProgress(
     endTimeStr: String,
     currentTime: LocalTime
 ) {
-    val startTime = try { LocalTime.parse(startTimeStr) } catch(e: Exception) { LocalTime.MIDNIGHT }
-    val endTime = try { LocalTime.parse(endTimeStr) } catch(e: Exception) { LocalTime.MIDNIGHT }
+    val startTime = try { LocalTime.parse(startTimeStr) } catch(_: Exception) { LocalTime.MIDNIGHT }
+    val endTime = try { LocalTime.parse(endTimeStr) } catch(_: Exception) { LocalTime.MIDNIGHT }
     
     val isBedtime = if (endTime.isAfter(startTime)) {
         currentTime.isAfter(startTime) && currentTime.isBefore(endTime)
@@ -263,7 +540,8 @@ fun BedtimeStatusProgress(
         currentTime.isAfter(startTime) || currentTime.isBefore(endTime)
     }
 
-    val (label, remainingText, progress) = remember(currentTime, startTime, endTime, isBedtime) {
+    val locale = LocalConfiguration.current.locales[0]
+    val (label, remainingText, progress) = remember(currentTime, startTime, endTime, isBedtime, locale) {
         if (isBedtime) {
             val totalDuration = if (endTime.isAfter(startTime)) {
                 Duration.between(startTime, endTime)
@@ -371,6 +649,244 @@ fun BedtimeStatusProgress(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun BedtimeHourlyUsageChart(
+    hourlyUsage: List<HourlyUsageInfo>,
+    selectedHour: Int?,
+    onHourClick: (Int) -> Unit,
+    formatDuration: (Long) -> String,
+    index: Int,
+    total: Int,
+    containerColor: Color
+) {
+    val maxUsage = remember(hourlyUsage) { hourlyUsage.maxOfOrNull { it.usageTimeMillis }?.coerceAtLeast(1L) ?: 1L }
+    val accentColor = MaterialTheme.colorScheme.tertiary
+    val locale = LocalConfiguration.current.locales[0]
+
+    GroupedCard(index = index, total = total, containerColor = containerColor) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Outlined.Schedule,
+                        contentDescription = null,
+                        tint = accentColor,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Bedtime Activity",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                AnimatedContent(
+                    targetState = selectedHour,
+                    transitionSpec = {
+                        (fadeIn(animationSpec = spring(stiffness = Spring.StiffnessLow)) + 
+                         slideInVertically(animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)) { it / 2 })
+                            .togetherWith(fadeOut(animationSpec = spring(stiffness = Spring.StiffnessLow)) + 
+                                         slideOutVertically(animationSpec = spring(stiffness = Spring.StiffnessLow)) { -it / 2 })
+                    },
+                    label = "SelectedHourText"
+                ) { hour ->
+                    if (hour != null) {
+                        val usage = hourlyUsage.find { it.hour == hour }?.usageTimeMillis ?: 0L
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                text = String.format(locale, "%02d:00 - %02d:00", hour, (hour + 1) % 24),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = formatDuration(usage),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = accentColor
+                            )
+                        }
+                    } else {
+                        Text(
+                            text = "Usage per hour",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(20.dp))
+            
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(100.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.Bottom
+            ) {
+                hourlyUsage.forEach { hourInfo ->
+                    val isSelected = selectedHour == hourInfo.hour
+                    val isCurrentHour = hourInfo.isLive
+                    
+                    val barHeight = (hourInfo.usageTimeMillis.toFloat() / maxUsage).coerceIn(0.05f, 1f)
+                    val animatedHeight by animateFloatAsState(
+                        targetValue = barHeight,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioLowBouncy,
+                            stiffness = Spring.StiffnessLow
+                        ),
+                        label = "BedtimeHourlyBarHeight_${hourInfo.hour}"
+                    )
+                    
+                    val barColor = when {
+                        isSelected -> accentColor
+                        isCurrentHour -> accentColor.copy(alpha = 0.7f)
+                        else -> accentColor.copy(alpha = 0.2f)
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(animatedHeight)
+                            .clip(CircleShape)
+                            .background(barColor)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null
+                            ) { onHourClick(hourInfo.hour) }
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                if (hourlyUsage.isNotEmpty()) {
+                    Text(String.format(locale, "%02d:00", hourlyUsage.first().hour), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Time distribution", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                    Text(String.format(locale, "%02d:00", (hourlyUsage.last().hour + 1) % 24), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun BedtimeEfficiencyCard(
+    percentage: Float,
+    totalUsage: String,
+    totalDuration: String,
+    index: Int,
+    total: Int,
+    containerColor: Color
+) {
+    val animatedProgress by animateFloatAsState(
+        targetValue = percentage,
+        animationSpec = spring(stiffness = Spring.StiffnessLow),
+        label = "BedtimeEfficiencyProgress"
+    )
+
+    val isGoalMet = percentage <= 0.1f
+    val statusColor = if (isGoalMet) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error
+
+    GroupedCard(index = index, total = total, containerColor = containerColor) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(statusColor.copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (isGoalMet) Icons.Outlined.CheckCircle else Icons.Outlined.Warning,
+                        contentDescription = null,
+                        tint = statusColor,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Usage Efficiency",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = if (isGoalMet) "Great job! Very low usage." else "High usage during bedtime.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Text(
+                    text = "${(percentage * 100).toInt()}%",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Black,
+                    color = statusColor
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(20.dp))
+            
+            LinearWavyProgressIndicator(
+                progress = { animatedProgress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp),
+                color = statusColor,
+                trackColor = statusColor.copy(alpha = 0.1f),
+                stroke = Stroke(width = with(LocalDensity.current) { 4.dp.toPx() }, cap = StrokeCap.Round)
+            )
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text(
+                        text = "Usage",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = totalUsage,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = "Total Period",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = totalDuration,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun BedtimeToggleCard(enabled: Boolean, onToggle: (Boolean) -> Unit) {
     val containerColor by animateColorAsState(
@@ -405,8 +921,7 @@ fun BedtimeToggleCard(enabled: Boolean, onToggle: (Boolean) -> Unit) {
                 Icon(
                     imageVector = Icons.Outlined.Bedtime,
                     contentDescription = null,
-                    tint = if (enabled) MaterialTheme.colorScheme.onPrimaryContainer
-                           else MaterialTheme.colorScheme.onPrimaryContainer,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -433,8 +948,7 @@ fun TimeSelectionRow(
     startTime: String,
     endTime: String,
     onStartTimeClick: () -> Unit,
-    onEndTimeClick: () -> Unit,
-    containerColor: androidx.compose.ui.graphics.Color
+    onEndTimeClick: () -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -527,8 +1041,8 @@ fun TimeSelectionRow(
 fun DaysSelectionCard(
     selectedDays: Set<Int>,
     onDaysChange: (Set<Int>) -> Unit,
-    containerColor: androidx.compose.ui.graphics.Color,
-    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
+    containerColor: Color,
+    shape: androidx.compose.ui.graphics.Shape
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -567,7 +1081,7 @@ fun DaysSelectionCard(
 fun BedtimeStreakCard(
     currentStreak: Int,
     bestStreak: Int,
-    containerColor: androidx.compose.ui.graphics.Color,
+    containerColor: Color,
     shape: androidx.compose.ui.graphics.Shape
 ) {
     Card(
@@ -660,10 +1174,135 @@ fun DaysSelector(selectedDays: Set<Int>, onDaysChange: (Set<Int>) -> Unit) {
 }
 
 @Composable
+fun GroupedCard(
+    index: Int,
+    total: Int,
+    onClick: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceContainerLow,
+    content: @Composable () -> Unit
+) {
+    val shape = when {
+        total == 1 -> RoundedCornerShape(24.dp)
+        index == 0 -> RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
+        index == total - 1 -> RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
+        else -> RoundedCornerShape(8.dp)
+    }
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
+        shape = shape,
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        content = { content() }
+    )
+}
+
+@Composable
+fun UsageItem(
+    app: AppUsageInfo,
+    type: String?,
+    formatDuration: (Long) -> String,
+    index: Int,
+    total: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceContainerLow,
+    accentColor: Color = MaterialTheme.colorScheme.secondary
+) {
+    GroupedCard(index = index, total = total, onClick = onClick, modifier = modifier, containerColor = containerColor) {
+        ListItem(
+            headlineContent = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = app.appName,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    val badgeColor = when (type) {
+                        "GOAL" -> MaterialTheme.colorScheme.tertiary
+                        "SHIELD" -> MaterialTheme.colorScheme.primary
+                        "ALLOWED" -> MaterialTheme.colorScheme.tertiary
+                        else -> MaterialTheme.colorScheme.secondary
+                    }
+                    val badgeText = when (type) {
+                        "GOAL" -> "Goal"
+                        "SHIELD" -> "Shield"
+                        "ALLOWED" -> "Allowed"
+                        else -> "Other"
+                    }
+                    Surface(
+                        color = badgeColor.copy(alpha = 0.1f),
+                        contentColor = badgeColor,
+                        shape = CircleShape,
+                    ) {
+                        Text(
+                            text = badgeText,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            },
+            trailingContent = {
+                Text(
+                    text = formatDuration(app.totalTimeVisible),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = accentColor
+                )
+            },
+            leadingContent = {
+                val appIcon by produceState<androidx.compose.ui.graphics.ImageBitmap?>(initialValue = null, app.icon) {
+                    val icon = app.icon
+                    if (icon != null) {
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            value = icon.toBitmap().asImageBitmap()
+                        }
+                    }
+                }
+                val icon = appIcon
+                if (icon != null) {
+                    Image(
+                        painter = BitmapPainter(icon),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Android,
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+            },
+            colors = ListItemDefaults.colors(
+                containerColor = Color.Transparent
+            )
+        )
+    }
+}
+
+@Composable
 fun AllowedAppsCard(
     allowedCount: Int, 
     onClick: () -> Unit, 
-    containerColor: androidx.compose.ui.graphics.Color,
+    containerColor: Color,
     shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(24.dp)
 ) {
     Card(
@@ -689,7 +1328,11 @@ fun AllowedAppsCard(
                 Text(text = "Allowed Apps", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Text(text = "$allowedCount apps bypass bedtime", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+            Icon(
+                imageVector = Icons.Outlined.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+            )
         }
     }
 }
@@ -701,7 +1344,7 @@ fun FeatureCard(
     subtitle: String,
     enabled: Boolean,
     onToggle: (Boolean) -> Unit,
-    containerColor: androidx.compose.ui.graphics.Color,
+    containerColor: Color,
     shape: androidx.compose.ui.graphics.Shape
 ) {
     Card(
@@ -747,10 +1390,9 @@ fun TimePickerDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
+            val locale = LocalConfiguration.current.locales[0]
             TextButton(onClick = {
-                val time = java.util.Locale.getDefault().let { locale ->
-                    String.format(locale, "%02d:%02d", timeState.hour, timeState.minute)
-                }
+                val time = String.format(locale, "%02d:%02d", timeState.hour, timeState.minute)
                 onTimeSelected(time)
             }) { Text("OK") }
         },

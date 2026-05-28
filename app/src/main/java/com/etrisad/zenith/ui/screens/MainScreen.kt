@@ -79,11 +79,11 @@ fun MainScreen(
     initialPackageName: String? = null,
     onInitialPackageHandled: () -> Unit = {}
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val bedtimeViewModel: BedtimeViewModel = androidx.lifecycle.viewmodel.compose.viewModel(
-        factory = BedtimeViewModelFactory(userPreferencesRepository)
+        factory = BedtimeViewModelFactory(context, userPreferencesRepository)
     )
     val navController = rememberNavController()
-    val context = LocalContext.current
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
