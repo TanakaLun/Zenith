@@ -23,6 +23,8 @@ import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,6 +39,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asComposePath
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -73,9 +76,11 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import java.text.SimpleDateFormat
 import java.util.Locale
+import java.util.Calendar
 import kotlin.math.abs
 
 import androidx.compose.ui.text.style.TextAlign
+import com.etrisad.zenith.data.preferences.UserPreferences
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
 import kotlinx.coroutines.delay
 
@@ -148,6 +153,8 @@ fun HomeScreenContent(
     LaunchedEffect(uiState.isLoading) {
         if (!uiState.isLoading) isManualRefreshing = false
     }
+
+    val bedtimeStatus = rememberBedtimeStatus(preferences)
 
     PullToRefreshBox(
         isRefreshing = uiState.isLoading,
@@ -336,6 +343,7 @@ fun HomeScreenContent(
 
             item {
                 QuickActionsSection(
+                    bedtimeStatus = bedtimeStatus,
                     onBedtimeClick = onBedtimeClick,
                     onStatsClick = onStatsClick
                 )
@@ -939,11 +947,96 @@ fun TopAppsSection(
     }
 }
 
+data class BedtimeStatus(
+    val isActive: Boolean,
+    val timeRemaining: String,
+    val progress: Float
+)
+
+@Composable
+fun rememberBedtimeStatus(prefs: UserPreferences): BedtimeStatus {
+    var status by remember { mutableStateOf(BedtimeStatus(false, "", 1f)) }
+    
+    LaunchedEffect(prefs) {
+        while (true) {
+            val now = Calendar.getInstance()
+            if (!prefs.bedtimeEnabled) {
+                status = BedtimeStatus(false, "", 1f)
+            } else {
+                val currentDay = now.get(Calendar.DAY_OF_WEEK)
+                val yesterdayCalendar = Calendar.getInstance().apply {
+                    timeInMillis = now.timeInMillis
+                    add(Calendar.DAY_OF_YEAR, -1)
+                }
+                val yesterdayDay = yesterdayCalendar.get(Calendar.DAY_OF_WEEK)
+                
+                val startParts = prefs.bedtimeStartTime.split(":")
+                val endParts = prefs.bedtimeEndTime.split(":")
+                val startMinutes = (startParts.getOrNull(0)?.toIntOrNull() ?: 22) * 60 + (startParts.getOrNull(1)?.toIntOrNull() ?: 0)
+                val endMinutes = (endParts.getOrNull(0)?.toIntOrNull() ?: 7) * 60 + (endParts.getOrNull(1)?.toIntOrNull() ?: 0)
+
+                val effectiveStartMinutes = startMinutes - 30
+                
+                val currentMinutes = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE)
+
+                var isActive = false
+                if (effectiveStartMinutes <= endMinutes) {
+                    if (currentDay in prefs.bedtimeDays) {
+                        isActive = currentMinutes in effectiveStartMinutes until endMinutes
+                    }
+                } else {
+                    if (currentDay in prefs.bedtimeDays && currentMinutes >= effectiveStartMinutes) {
+                        isActive = true
+                    } else if (yesterdayDay in prefs.bedtimeDays && currentMinutes < endMinutes) {
+                        isActive = true
+                    }
+                }
+
+                if (isActive) {
+                    val nowAdj = if (currentMinutes < effectiveStartMinutes && effectiveStartMinutes > endMinutes) currentMinutes + 1440 else currentMinutes
+                    val startAdj = effectiveStartMinutes
+                    val endAdj = if (endMinutes < effectiveStartMinutes) endMinutes + 1440 else endMinutes
+                    
+                    val totalDuration = endAdj - startAdj
+                    val elapsed = nowAdj - startAdj
+                    val progress = (elapsed.toFloat() / totalDuration.toFloat()).coerceIn(0f, 1f)
+                    
+                    val remainingMinutes = (endAdj - nowAdj).coerceAtLeast(0)
+                    val h = remainingMinutes / 60
+                    val m = remainingMinutes % 60
+                    val timeStr = if (h > 0) "${h}h ${m}m" else "${m}m"
+                    
+                    status = BedtimeStatus(true, timeStr, progress)
+                } else {
+                    status = BedtimeStatus(false, "", 1f)
+                }
+            }
+            delay(10000)
+        }
+    }
+    return status
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun QuickActionsSection(
+    bedtimeStatus: BedtimeStatus,
     onBedtimeClick: () -> Unit,
     onStatsClick: () -> Unit
 ) {
+    var showRemainingTime by remember { mutableStateOf(false) }
+    
+    LaunchedEffect(bedtimeStatus.isActive) {
+        if (bedtimeStatus.isActive) {
+            while (true) {
+                delay(3000)
+                showRemainingTime = !showRemainingTime
+            }
+        } else {
+            showRemainingTime = false
+        }
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -966,8 +1059,22 @@ fun QuickActionsSection(
         )
         QuickActionCard(
             icon = Icons.Outlined.Bedtime,
-            label = "Bedtime",
-            onClick = onBedtimeClick
+            label = if (bedtimeStatus.isActive && showRemainingTime) bedtimeStatus.timeRemaining else "Bedtime",
+            onClick = onBedtimeClick,
+            content = if (bedtimeStatus.isActive) {
+                {
+                    val density = androidx.compose.ui.platform.LocalDensity.current
+                    CircularWavyProgressIndicator(
+                        progress = { bedtimeStatus.progress },
+                        modifier = Modifier.size(32.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                        stroke = Stroke(width = with(density) { 3.dp.toPx() }),
+                        trackStroke = Stroke(width = with(density) { 3.dp.toPx() }),
+                        wavelength = 8.dp
+                    )
+                }
+            } else null
         )
     }
 }
@@ -976,7 +1083,8 @@ fun QuickActionsSection(
 fun QuickActionCard(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
-    onClick: (() -> Unit)? = null
+    onClick: (() -> Unit)? = null,
+    content: @Composable (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
@@ -1020,21 +1128,36 @@ fun QuickActionCard(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = label,
-                    modifier = Modifier.size(24.dp),
-                    tint = MaterialTheme.colorScheme.primary
-                )
+                if (content != null) {
+                    content()
+                } else {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = label,
+                        modifier = Modifier.size(24.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
         }
         Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        AnimatedContent(
+            targetState = label,
+            transitionSpec = {
+                (fadeIn(animationSpec = tween(220, delayMillis = 90)) + 
+                 slideInVertically(animationSpec = spring(stiffness = Spring.StiffnessLow)) { it / 2 })
+                .togetherWith(fadeOut(animationSpec = tween(90)) + 
+                 slideOutVertically(animationSpec = spring(stiffness = Spring.StiffnessLow)) { -it / 2 })
+            },
+            label = "QuickActionLabelAnimation"
+        ) { targetLabel ->
+            Text(
+                text = targetLabel,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 
