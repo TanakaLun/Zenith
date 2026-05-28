@@ -31,6 +31,10 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Matrix
+import androidx.compose.ui.graphics.asComposePath
+import androidx.graphics.shapes.toPath
+import androidx.compose.foundation.shape.GenericShape
 import com.etrisad.zenith.ui.viewmodel.BedtimeViewModel
 import java.time.LocalTime
 import java.time.Duration
@@ -127,7 +131,15 @@ fun BedtimeScreen(
                 DaysSelectionCard(
                     selectedDays = preferences.bedtimeDays,
                     onDaysChange = { viewModel.setBedtimeDays(it) },
-                    containerColor = containerColor
+                    containerColor = containerColor,
+                    shape = RoundedCornerShape(8.dp)
+                )
+
+                BedtimeStreakCard(
+                    currentStreak = preferences.bedtimeCurrentStreak,
+                    bestStreak = preferences.bedtimeBestStreak,
+                    containerColor = containerColor,
+                    shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -515,11 +527,12 @@ fun TimeSelectionRow(
 fun DaysSelectionCard(
     selectedDays: Set<Int>,
     onDaysChange: (Set<Int>) -> Unit,
-    containerColor: androidx.compose.ui.graphics.Color
+    containerColor: androidx.compose.ui.graphics.Color,
+    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp),
+        shape = shape,
         colors = CardDefaults.cardColors(containerColor = containerColor)
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
@@ -546,6 +559,84 @@ fun DaysSelectionCard(
             }
             Spacer(modifier = Modifier.height(16.dp))
             DaysSelector(selectedDays = selectedDays, onDaysChange = onDaysChange)
+        }
+    }
+}
+
+@Composable
+fun BedtimeStreakCard(
+    currentStreak: Int,
+    bestStreak: Int,
+    containerColor: androidx.compose.ui.graphics.Color,
+    shape: androidx.compose.ui.graphics.Shape
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = shape,
+        colors = CardDefaults.cardColors(
+            containerColor = containerColor
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column {
+                Text(
+                    text = "Bedtime Streak",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.tertiary,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "$bestStreak",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Black,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Best Streak",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline
+                )
+            }
+
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                val sunnyShape = remember {
+                    GenericShape { size, _ ->
+                        val path = MaterialShapes.Sunny.toPath().asComposePath()
+                        val matrix = Matrix()
+                        matrix.scale(size.width, size.height)
+                        path.transform(matrix)
+                        addPath(path)
+                    }
+                }
+                Surface(
+                    color = MaterialTheme.colorScheme.tertiary,
+                    shape = sunnyShape,
+                    modifier = Modifier.size(56.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "$currentStreak",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Black,
+                            color = MaterialTheme.colorScheme.onTertiary
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "nights today",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }

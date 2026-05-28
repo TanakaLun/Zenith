@@ -76,6 +76,8 @@ class UserPreferencesRepository(private val context: Context) {
         val BEDTIME_WIND_DOWN_ENABLED = booleanPreferencesKey("bedtime_wind_down_enabled")
         val BEDTIME_NOTIFICATION_ENABLED = booleanPreferencesKey("bedtime_notification_enabled")
         val BEDTIME_WHITELISTED_PACKAGES = stringPreferencesKey("bedtime_whitelisted_packages")
+        val BEDTIME_CURRENT_STREAK = intPreferencesKey("bedtime_mode_streak_current")
+        val BEDTIME_BEST_STREAK = intPreferencesKey("bedtime_mode_streak_best")
         val USER_NAME = stringPreferencesKey("user_name")
         val EARLY_KICK_ENABLED = booleanPreferencesKey("early_kick_enabled")
         val INTERCEPT_AUDIO_FOCUS_ENABLED = booleanPreferencesKey("intercept_audio_focus_enabled")
@@ -163,7 +165,9 @@ class UserPreferencesRepository(private val context: Context) {
                 bedtimeWindDownEnabled = preferences[PreferencesKeys.BEDTIME_WIND_DOWN_ENABLED] ?: false,
                 bedtimeNotificationEnabled = preferences[PreferencesKeys.BEDTIME_NOTIFICATION_ENABLED] ?: true,
                 bedtimeWhitelistedPackages = preferences[PreferencesKeys.BEDTIME_WHITELISTED_PACKAGES]?.split(",")?.filter { it.isNotEmpty() }?.toSet() ?: emptySet(),
-                userName = preferences[PreferencesKeys.USER_NAME] ?: "User",
+            bedtimeCurrentStreak = preferences[PreferencesKeys.BEDTIME_CURRENT_STREAK] ?: 0,
+            bedtimeBestStreak = preferences[PreferencesKeys.BEDTIME_BEST_STREAK] ?: 0,
+            userName = preferences[PreferencesKeys.USER_NAME] ?: "User",
                 earlyKickEnabled = preferences[PreferencesKeys.EARLY_KICK_ENABLED] ?: false,
                 interceptAudioFocusEnabled = preferences[PreferencesKeys.INTERCEPT_AUDIO_FOCUS_ENABLED] ?: true,
                 showDatabaseIndicator = preferences[PreferencesKeys.SHOW_DATABASE_INDICATOR] ?: false,
@@ -344,6 +348,84 @@ class UserPreferencesRepository(private val context: Context) {
         return Pair(liveStreak, bestStreak)
     }
 
+    suspend fun refreshBedtimeStreak(): Pair<Int, Int> {
+        val prefs = userPreferencesFlow.first()
+        if (!prefs.bedtimeEnabled) return Pair(0, prefs.bedtimeBestStreak)
+
+        val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+        val now = System.currentTimeMillis()
+        
+        val startH = try { prefs.bedtimeStartTime.split(":")[0].toInt() } catch(_: Exception) { 22 }
+        val startM = try { prefs.bedtimeStartTime.split(":")[1].toInt() } catch(_: Exception) { 0 }
+        val endH = try { prefs.bedtimeEndTime.split(":")[0].toInt() } catch(_: Exception) { 7 }
+        val endM = try { prefs.bedtimeEndTime.split(":")[1].toInt() } catch(_: Exception) { 0 }
+
+        val launcherIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+        val launcherPackage = try {
+            context.packageManager.resolveActivity(launcherIntent, PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName
+        } catch (_: Exception) { null }
+        val excludePackages = setOfNotNull(context.packageName, launcherPackage) + prefs.whitelistedPackages + prefs.bedtimeWhitelistedPackages
+
+        var liveStreak = 0
+        var currentBest = prefs.bedtimeBestStreak
+
+        for (i in 0..7) {
+            val cal = Calendar.getInstance()
+            cal.add(Calendar.DAY_OF_YEAR, -i)
+            val dayOfWeek = cal.get(Calendar.DAY_OF_WEEK)
+            
+            if (dayOfWeek !in prefs.bedtimeDays) continue
+
+            val startCal = Calendar.getInstance().apply {
+                timeInMillis = cal.timeInMillis
+                set(Calendar.HOUR_OF_DAY, startH)
+                set(Calendar.MINUTE, startM)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            
+            val endCal = Calendar.getInstance().apply {
+                timeInMillis = startCal.timeInMillis
+                if (endH < startH || (endH == startH && endM <= startM)) {
+                    add(Calendar.DAY_OF_YEAR, 1)
+                }
+                set(Calendar.HOUR_OF_DAY, endH)
+                set(Calendar.MINUTE, endM)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+
+            val startTime = startCal.timeInMillis
+            val endTime = endCal.timeInMillis
+            
+            if (startTime > now) continue
+            
+            val actualEnd = if (endTime > now) now else endTime
+            if (actualEnd <= startTime) continue
+            
+            val totalDuration = endTime - startTime
+            val targetMillis = (totalDuration * 0.1).toLong()
+            
+            val stats = usageStatsManager.queryAndAggregateUsageStats(startTime, actualEnd)
+            var usage = 0L
+            stats.forEach { (pkg, stat) ->
+                if (pkg !in excludePackages) {
+                    usage += stat.totalTimeVisible.coerceAtLeast(stat.totalTimeInForeground)
+                }
+            }
+            
+            if (usage <= targetMillis) {
+                liveStreak++
+            } else {
+                break 
+            }
+        }
+        
+        currentBest = maxOf(currentBest, liveStreak)
+        updateBedtimeStreak(liveStreak, currentBest)
+        return Pair(liveStreak, currentBest)
+    }
+
     suspend fun setAutoBackupEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences -> preferences[PreferencesKeys.AUTO_BACKUP_ENABLED] = enabled }
     }
@@ -406,6 +488,13 @@ class UserPreferencesRepository(private val context: Context) {
 
     suspend fun setBedtimeWhitelistedPackages(packages: Set<String>) {
         context.dataStore.edit { preferences -> preferences[PreferencesKeys.BEDTIME_WHITELISTED_PACKAGES] = packages.joinToString(",") }
+    }
+
+    suspend fun updateBedtimeStreak(current: Int, best: Int) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.BEDTIME_CURRENT_STREAK] = current
+            preferences[PreferencesKeys.BEDTIME_BEST_STREAK] = best
+        }
     }
 
     suspend fun setEarlyKickEnabled(enabled: Boolean) {
@@ -576,6 +665,8 @@ data class UserPreferences(
     val bedtimeWindDownEnabled: Boolean = false,
     val bedtimeNotificationEnabled: Boolean = true,
     val bedtimeWhitelistedPackages: Set<String> = emptySet(),
+    val bedtimeCurrentStreak: Int = 0,
+    val bedtimeBestStreak: Int = 0,
     val userName: String = "User",
     val earlyKickEnabled: Boolean = false,
     val interceptAudioFocusEnabled: Boolean = true,

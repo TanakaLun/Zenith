@@ -1336,6 +1336,10 @@ class AppUsageMonitorService : Service() {
             }
         }
 
+        if (prefs.bedtimeEnabled) {
+            preferencesRepository.refreshBedtimeStreak()
+        }
+
         shields.forEach { shield ->
             val lastShieldUpdateDate = Instant.ofEpochMilli(shield.lastStreakUpdateTimestamp)
                 .atZone(systemZone).toLocalDate()

@@ -20,6 +20,16 @@ class BedtimeViewModel(
             initialValue = UserPreferences()
         )
 
+    init {
+        refreshStreak()
+    }
+
+    fun refreshStreak() {
+        viewModelScope.launch {
+            userPreferencesRepository.refreshBedtimeStreak()
+        }
+    }
+
     fun setBedtimeEnabled(enabled: Boolean) {
         viewModelScope.launch {
             userPreferencesRepository.setBedtimeEnabled(enabled)
