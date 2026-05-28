@@ -706,8 +706,9 @@ fun UsageTrendsRow(
                             tint = if (uiState.percentageChange >= 0) MaterialTheme.colorScheme.error else Color(0xFF4CAF50)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
+                        val absPercentage = abs(uiState.percentageChange).toInt()
                         Text(
-                            "${abs(uiState.percentageChange).toInt()}%",
+                            text = if (absPercentage > 100) "100%+" else "$absPercentage%",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = if (uiState.percentageChange >= 0) MaterialTheme.colorScheme.error else Color(0xFF4CAF50)

@@ -804,8 +804,9 @@ fun UsageTrendsRow(
                             tint = trendColor
                         )
                         Spacer(modifier = Modifier.width(4.dp))
+                        val absPercentage = kotlin.math.abs(percentageChange).toInt()
                         Text(
-                            "${kotlin.math.abs(percentageChange).toInt()}%",
+                            text = if (absPercentage > 100) "100%+" else "$absPercentage%",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = trendColor
