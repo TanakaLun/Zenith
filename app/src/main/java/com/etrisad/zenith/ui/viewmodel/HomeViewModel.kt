@@ -566,6 +566,7 @@ class HomeViewModel(
     fun onRefresh() {
         triggerServiceRefresh()
         viewModelScope.launch {
+            userPreferencesRepository.refreshAllAppStreaks(shieldRepository)
             val prefs = userPreferencesRepository.userPreferencesFlow.first()
             if (prefs.smartRepairOnRefresh) {
                 resetCarryover()
@@ -593,6 +594,7 @@ class HomeViewModel(
             } catch (e: Exception) {
                 android.util.Log.e("HomeVM", "Sync failed: ${e.message}")
             } finally {
+                userPreferencesRepository.refreshAllAppStreaks(shieldRepository)
                 refreshUsageStats(showLoading = false)
             }
         }
@@ -616,6 +618,7 @@ class HomeViewModel(
             } catch (e: Exception) {
                 android.util.Log.e("HomeVM", "Reset carryover failed: ${e.message}")
             } finally {
+                userPreferencesRepository.refreshAllAppStreaks(shieldRepository)
                 refreshUsageStats(showLoading = false)
             }
         }

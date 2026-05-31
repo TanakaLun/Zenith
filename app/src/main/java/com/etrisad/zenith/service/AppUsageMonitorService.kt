@@ -212,6 +212,8 @@ class AppUsageMonitorService : Service() {
                 }
                 
                 updateRestrictedPackages()
+                preferencesRepository.refreshGlobalStreak(shieldRepository)
+                preferencesRepository.refreshAllAppStreaks(shieldRepository)
 
                 dailyUsageCache.clear()
                 usageStatsCache = null
@@ -253,6 +255,7 @@ class AppUsageMonitorService : Service() {
         serviceScope.launch {
             updateStreaks()
             preferencesRepository.refreshGlobalStreak(shieldRepository)
+            preferencesRepository.refreshAllAppStreaks(shieldRepository)
             shieldRepository.resetAllRemainingTimes()
             notifiedGoals.clear()
             earlyKickManager.reset()
@@ -948,6 +951,25 @@ class AppUsageMonitorService : Service() {
         val limitMillis = shield.timeLimitMinutes * 60 * 1000L
         val remainingMillis = (limitMillis - cachedTotalUsage).coerceAtLeast(0L)
 
+        // Instant streak update for GOAL shields
+        if (shield.type == FocusType.GOAL && !isPaused(shield) && shield.timeLimitMinutes > 0) {
+            if (cachedTotalUsage >= limitMillis) {
+                val lastUpdateDate = Instant.ofEpochMilli(shield.lastStreakUpdateTimestamp)
+                    .atZone(systemZone).toLocalDate()
+                val today = LocalDate.now()
+                
+                if (lastUpdateDate != today) {
+                    val newStreak = shield.currentStreak + 1
+                    val newBest = maxOf(shield.bestStreak, newStreak)
+                    updatedShield = updatedShield.copy(
+                        currentStreak = newStreak,
+                        bestStreak = newBest,
+                        lastStreakUpdateTimestamp = currentTime
+                    )
+                }
+            }
+        }
+
         val timeSinceLastUsed = currentTime - shield.lastUsedTimestamp
         val isNearLimit = remainingMillis < 60000
         val shouldUpdateDB = force || timeSinceLastUsed > 30000 || (isNearLimit && timeSinceLastUsed > 10000) || updatedShield != shield
@@ -1283,6 +1305,8 @@ class AppUsageMonitorService : Service() {
 
         if (lastCheckStr.isNotEmpty() && lastCheckStr != todayStr) {
             updateStreaks()
+            preferencesRepository.refreshGlobalStreak(shieldRepository)
+            preferencesRepository.refreshAllAppStreaks(shieldRepository)
             shieldRepository.resetAllRemainingTimes()
             notifiedGoals.clear()
             dailyUsageCache.clear()
@@ -1298,90 +1322,15 @@ class AppUsageMonitorService : Service() {
     }
 
     private suspend fun updateStreaks() {
-        val shields = shieldRepository.allShields.first()
+        preferencesRepository.refreshGlobalStreak(shieldRepository)
+        preferencesRepository.refreshAllAppStreaks(shieldRepository)
+        
         val prefs = preferencesRepository.userPreferencesFlow.first()
-        
-        if (shields.isEmpty() && prefs.screenTimeTargetMinutes <= 0) return
-
-        val now = LocalDate.now()
-        val yesterday = now.minusDays(1)
-        val startTime = yesterday.atStartOfDay(systemZone).toInstant().toEpochMilli()
-        val endTime = yesterday.atTime(LocalTime.MAX).atZone(systemZone).toInstant().toEpochMilli()
-
-        val usageMap = try {
-            usageStatsManager.queryAndAggregateUsageStats(startTime, endTime)
-        } catch (_: Exception) { null }
-        
-        val lastUpdateDate = Instant.ofEpochMilli(prefs.globalLastStreakUpdateTimestamp)
-            .atZone(systemZone).toLocalDate()
-        val isGlobalAlreadyUpdated = lastUpdateDate == now
-
-        if (usageMap != null && !isGlobalAlreadyUpdated && prefs.screenTimeTargetMinutes > 0) {
-            var totalUsageYesterday = 0L
-            val excludePackages = launcherPackages + packageName
-            
-            usageMap.forEach { (pkg, stat) ->
-                if (pkg !in excludePackages) {
-                    totalUsageYesterday += stat.totalTimeVisible.coerceAtLeast(stat.totalTimeInForeground)
-                }
-            }
-
-            val targetMillis = prefs.screenTimeTargetMinutes * 60 * 1000L
-            if (totalUsageYesterday <= targetMillis) {
-                val newStreak = prefs.globalCurrentStreak + 1
-                val newBest = maxOf(prefs.globalBestStreak, newStreak)
-                preferencesRepository.updateGlobalStreak(newStreak, newBest, System.currentTimeMillis())
-            } else {
-                preferencesRepository.updateGlobalStreak(0, prefs.globalBestStreak, System.currentTimeMillis())
-            }
-        }
-
         if (prefs.bedtimeEnabled) {
             preferencesRepository.refreshBedtimeStreak()
         }
-
-        shields.forEach { shield ->
-            val lastShieldUpdateDate = Instant.ofEpochMilli(shield.lastStreakUpdateTimestamp)
-                .atZone(systemZone).toLocalDate()
-            val isAlreadyUpdatedToday = lastShieldUpdateDate == now
-            
-            if (isAlreadyUpdatedToday) return@forEach
-
-            val stats = usageMap?.get(shield.packageName)
-            val totalUsageYesterday = stats?.let { 
-                it.totalTimeVisible.coerceAtLeast(it.totalTimeInForeground) 
-            } ?: 0L
-
-            val limitMillis = shield.timeLimitMinutes * 60 * 1000L
-
-            var shouldIncrement = false
-            if (shield.type == FocusType.GOAL) {
-                if (totalUsageYesterday >= limitMillis && limitMillis > 0) {
-                    shouldIncrement = true
-                }
-            } else {
-                if (totalUsageYesterday <= limitMillis) {
-                    shouldIncrement = true
-                }
-            }
-
-            if (shouldIncrement) {
-                val newStreak = shield.currentStreak + 1
-                val newBest = maxOf(shield.bestStreak, newStreak)
-                shieldRepository.updateShield(shield.copy(
-                    currentStreak = newStreak,
-                    bestStreak = newBest,
-                    lastStreakUpdateTimestamp = System.currentTimeMillis()
-                ))
-            } else {
-                shieldRepository.updateShield(shield.copy(
-                    currentStreak = 0,
-                    lastStreakUpdateTimestamp = System.currentTimeMillis()
-                ))
-            }
-        }
-
-        preferencesRepository.setLastStreakCheckDate(dateFormatter.format(now))
+        
+        preferencesRepository.setLastStreakCheckDate(dateFormatter.format(LocalDate.now()))
     }
 
     private fun getTotalGlobalUsageToday(): Long {
