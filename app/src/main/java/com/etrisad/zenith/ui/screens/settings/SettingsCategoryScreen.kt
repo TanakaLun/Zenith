@@ -32,7 +32,9 @@ fun SettingsCategoryScreen(
     preferencesRepository: UserPreferencesRepository,
     navController: NavController,
     innerPadding: PaddingValues,
-    onOpenPermissions: () -> Unit
+    onOpenPermissions: () -> Unit,
+    onTriggerOnboardingStats: () -> Unit,
+    onTriggerOnboardingUpdate: () -> Unit
 ) {
     val preferences by preferencesRepository.userPreferencesFlow.collectAsState(initial = UserPreferences())
     val coroutineScope = rememberCoroutineScope()
@@ -207,7 +209,24 @@ fun SettingsCategoryScreen(
                         onSetDelayShieldNear = { delay -> coroutineScope.launch { preferencesRepository.setDelayShieldNear(delay) } },
                         onSetDelayDefault = { delay -> coroutineScope.launch { preferencesRepository.setDelayDefault(delay) } },
                         onResetCustomDelays = { coroutineScope.launch { preferencesRepository.resetCustomDelays() } },
-                        onNavigateToSystemUsageDebug = { navController.navigate(Screen.SystemUsageDebug.route) }
+                        onNavigateToSystemUsageDebug = { navController.navigate(Screen.SystemUsageDebug.route) },
+                        onTriggerOnboardingPermissions = { onOpenPermissions() },
+                        onTriggerOnboardingStats = {
+                            coroutineScope.launch {
+                                preferencesRepository.setOnboardingStatsCompleted(false)
+                                onTriggerOnboardingStats()
+                                Toast.makeText(context, "Stats onboarding triggered", Toast.LENGTH_SHORT).show()
+                                navController.popBackStack(Screen.Settings.route, false)
+                            }
+                        },
+                        onTriggerOnboardingUpdate = {
+                            coroutineScope.launch {
+                                preferencesRepository.setOnboardingUpdateCompleted(false)
+                                onTriggerOnboardingUpdate()
+                                Toast.makeText(context, "Update onboarding triggered", Toast.LENGTH_SHORT).show()
+                                navController.popBackStack(Screen.Settings.route, false)
+                            }
+                        }
                     )
                 }
             }

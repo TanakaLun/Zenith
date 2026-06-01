@@ -36,12 +36,15 @@ fun DeveloperSettings(
     onSetDelayShieldNear: (Long) -> Unit,
     onSetDelayDefault: (Long) -> Unit,
     onResetCustomDelays: () -> Unit,
-    onNavigateToSystemUsageDebug: () -> Unit
+    onNavigateToSystemUsageDebug: () -> Unit,
+    onTriggerOnboardingPermissions: () -> Unit,
+    onTriggerOnboardingStats: () -> Unit,
+    onTriggerOnboardingUpdate: () -> Unit
 ) {
     if (preferences.developerModeEnabled) {
         Column {
             PreferenceCategory(title = "Database & Data")
-
+            
             SettingsToggle(
                 title = "Database Source Indicator",
                 description = "Show indicator for database records in usage graphs",
@@ -85,6 +88,35 @@ fun DeveloperSettings(
                 summary = "Fix missing or incorrect usage history",
                 onClick = onNavigateToDataRepairment,
                 icon = Icons.Outlined.Build,
+                shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+            PreferenceCategory(title = "Onboarding Triggers")
+
+            SettingsActionItem(
+                title = "Trigger Permission Sheet",
+                summary = "Open the initial permission onboarding sheet",
+                onClick = onTriggerOnboardingPermissions,
+                icon = Icons.Outlined.AdminPanelSettings,
+                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+            SettingsActionItem(
+                title = "Reset & Trigger Stats Onboarding",
+                summary = "Reset flag and show statistic experience choice",
+                onClick = onTriggerOnboardingStats,
+                icon = Icons.Outlined.BarChart,
+                shape = RoundedCornerShape(8.dp)
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+            SettingsActionItem(
+                title = "Reset & Trigger Update Onboarding",
+                summary = "Reset flag and show update preference choice",
+                onClick = onTriggerOnboardingUpdate,
+                icon = Icons.Outlined.Update,
                 shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
             )
 

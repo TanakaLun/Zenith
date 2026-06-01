@@ -87,6 +87,7 @@ class UserPreferencesRepository(private val context: Context) {
         val LAST_SYNC_TIMESTAMP = longPreferencesKey("last_sync_timestamp")
         val PREFER_SYSTEM_USAGE_HISTORY = booleanPreferencesKey("prefer_system_usage_history")
         val ONBOARDING_STATS_COMPLETED = booleanPreferencesKey("onboarding_stats_completed")
+        val ONBOARDING_UPDATE_COMPLETED = booleanPreferencesKey("onboarding_update_completed")
         val HUD_HIDE_FEATURE_LEARNED = booleanPreferencesKey("hud_hide_feature_learned")
         val SMART_REPAIR_ON_REFRESH = booleanPreferencesKey("smart_repair_on_refresh")
         val ALLOW_REPAIR_NON_UNAVAILABLE = booleanPreferencesKey("allow_repair_non_unavailable")
@@ -176,6 +177,7 @@ class UserPreferencesRepository(private val context: Context) {
                 lastSyncTimestamp = preferences[PreferencesKeys.LAST_SYNC_TIMESTAMP] ?: 0L,
                 preferSystemUsageHistory = preferences[PreferencesKeys.PREFER_SYSTEM_USAGE_HISTORY] ?: true,
                 onboardingStatsCompleted = preferences[PreferencesKeys.ONBOARDING_STATS_COMPLETED] ?: false,
+                onboardingUpdateCompleted = preferences[PreferencesKeys.ONBOARDING_UPDATE_COMPLETED] ?: false,
                 hudHideFeatureLearned = preferences[PreferencesKeys.HUD_HIDE_FEATURE_LEARNED] ?: false,
                 smartRepairOnRefresh = preferences[PreferencesKeys.SMART_REPAIR_ON_REFRESH] ?: false,
                 allowRepairNonUnavailable = preferences[PreferencesKeys.ALLOW_REPAIR_NON_UNAVAILABLE] ?: false,
@@ -608,6 +610,10 @@ class UserPreferencesRepository(private val context: Context) {
         context.dataStore.edit { preferences -> preferences[PreferencesKeys.ONBOARDING_STATS_COMPLETED] = completed }
     }
 
+    suspend fun setOnboardingUpdateCompleted(completed: Boolean) {
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.ONBOARDING_UPDATE_COMPLETED] = completed }
+    }
+
     suspend fun setHudHideFeatureLearned(learned: Boolean) {
         context.dataStore.edit { preferences -> preferences[PreferencesKeys.HUD_HIDE_FEATURE_LEARNED] = learned }
     }
@@ -758,6 +764,7 @@ data class UserPreferences(
     val lastSyncTimestamp: Long = 0L,
     val preferSystemUsageHistory: Boolean = true,
     val onboardingStatsCompleted: Boolean = false,
+    val onboardingUpdateCompleted: Boolean = false,
     val hudHideFeatureLearned: Boolean = false,
     val smartRepairOnRefresh: Boolean = false,
     val allowRepairNonUnavailable: Boolean = false,

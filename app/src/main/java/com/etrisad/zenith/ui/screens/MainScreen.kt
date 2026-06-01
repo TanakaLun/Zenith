@@ -46,7 +46,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.etrisad.zenith.ui.components.PermissionBottomSheet
-import com.etrisad.zenith.ui.components.OnboardingStatsBottomSheet
+import com.etrisad.zenith.ui.components.onboarding.OnboardingStatsBottomSheet
+import com.etrisad.zenith.ui.components.onboarding.OnboardingUpdateBottomSheet
 import com.etrisad.zenith.ui.components.UserBottomSheet
 import com.etrisad.zenith.ui.components.ZenithHeader
 import com.etrisad.zenith.ui.components.ConfirmBottomSheet
@@ -181,6 +182,7 @@ fun MainScreen(
 
     var showPermissionSheet by remember { mutableStateOf(false) }
     var showOnboardingStatsSheet by remember { mutableStateOf(false) }
+    var showOnboardingUpdateSheet by remember { mutableStateOf(false) }
     var showUserSheet by remember { mutableStateOf(false) }
 
     val updateManager = remember { GitHubUpdateManager(context) }
@@ -213,11 +215,18 @@ fun MainScreen(
         val allOnboardingGranted = mainGranted && (hasAccessibility || preferences.accessibilityDisabled)
         if (allOnboardingGranted && !preferences.onboardingStatsCompleted) {
             showOnboardingStatsSheet = true
+        } else if (allOnboardingGranted && !preferences.onboardingUpdateCompleted) {
+            showOnboardingUpdateSheet = true
         }
     }
 
     val lifecycleOwner = LocalLifecycleOwner.current
-    LaunchedEffect(lifecycleOwner, preferences.accessibilityDisabled) {
+    LaunchedEffect(
+        lifecycleOwner,
+        preferences.accessibilityDisabled,
+        preferences.onboardingStatsCompleted,
+        preferences.onboardingUpdateCompleted
+    ) {
         checkPermissions()
     }
 
@@ -240,12 +249,16 @@ fun MainScreen(
                 showPermissionSheet = false
                 if (!preferences.onboardingStatsCompleted) {
                     showOnboardingStatsSheet = true
+                } else if (!preferences.onboardingUpdateCompleted) {
+                    showOnboardingUpdateSheet = true
                 }
             },
             onAllPermissionsGranted = {
                 showPermissionSheet = false
                 if (!preferences.onboardingStatsCompleted) {
                     showOnboardingStatsSheet = true
+                } else if (!preferences.onboardingUpdateCompleted) {
+                    showOnboardingUpdateSheet = true
                 }
             }
         )
@@ -256,6 +269,18 @@ fun MainScreen(
             repository = userPreferencesRepository,
             onDismiss = {
                 showOnboardingStatsSheet = false
+                if (!preferences.onboardingUpdateCompleted) {
+                    showOnboardingUpdateSheet = true
+                }
+            }
+        )
+    }
+
+    if (showOnboardingUpdateSheet) {
+        OnboardingUpdateBottomSheet(
+            repository = userPreferencesRepository,
+            onDismiss = {
+                showOnboardingUpdateSheet = false
             }
         )
     }
@@ -784,7 +809,9 @@ fun MainScreen(
                             preferencesRepository = userPreferencesRepository,
                             navController = navController,
                             innerPadding = innerPadding,
-                            onOpenPermissions = { showPermissionSheet = true }
+                            onOpenPermissions = { showPermissionSheet = true },
+                            onTriggerOnboardingStats = { showOnboardingStatsSheet = true },
+                            onTriggerOnboardingUpdate = { showOnboardingUpdateSheet = true }
                         )
                     }
                 }
