@@ -261,22 +261,20 @@ fun UsageGraph(
                                 else -> "${currentMillis / 60000L}m"
                             }
 
-                            Row(
+                            Box(
                                 modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
+                                contentAlignment = Alignment.CenterStart
                             ) {
+                                HorizontalDivider(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    thickness = 0.5.dp,
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                                )
                                 Text(
                                     text = labelText,
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                                    modifier = Modifier.width(36.dp),
-                                    textAlign = TextAlign.End
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                HorizontalDivider(
-                                    modifier = Modifier.weight(1f),
-                                    thickness = 0.5.dp,
-                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                    modifier = Modifier.padding(start = 2.dp)
                                 )
                             }
                         }
@@ -293,7 +291,7 @@ fun UsageGraph(
                         androidx.compose.foundation.Canvas(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(bottom = 32.dp, start = 44.dp)
+                                .padding(bottom = 32.dp, start = 20.dp)
                         ) {
                             val y = size.height * (1f - animatedGoalRatio)
                             drawLine(
@@ -308,7 +306,7 @@ fun UsageGraph(
                     Row(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(bottom = 32.dp, start = 44.dp),
+                            .padding(bottom = 32.dp, start = 20.dp),
                         horizontalArrangement = Arrangement.SpaceAround,
                         verticalAlignment = Alignment.Bottom
                     ) {
@@ -350,7 +348,8 @@ fun UsageGraph(
                                 if (isGoalAchieved && !isInside) {
                                     Box(
                                         modifier = Modifier
-                                            .size(28.dp)
+                                            .fillMaxWidth(0.62f)
+                                            .aspectRatio(1f)
                                             .clip(sunnyShape)
                                             .background(MaterialTheme.colorScheme.tertiary.copy(alpha = currentAlpha)),
                                         contentAlignment = Alignment.Center
@@ -359,7 +358,7 @@ fun UsageGraph(
                                             imageVector = Icons.Filled.Check,
                                             contentDescription = null,
                                             tint = MaterialTheme.colorScheme.onTertiary,
-                                            modifier = Modifier.size(18.dp)
+                                            modifier = Modifier.fillMaxSize(0.6f)
                                         )
                                     }
                                     Spacer(modifier = Modifier.height(4.dp))
@@ -367,7 +366,7 @@ fun UsageGraph(
 
                                 Box(
                                     modifier = Modifier
-                                        .width(40.dp)
+                                        .fillMaxWidth(0.9f)
                                         .fillMaxHeight(animatedHeight)
                                         .clip(CircleShape)
                                         .background(barColor),
@@ -377,7 +376,8 @@ fun UsageGraph(
                                         Box(
                                             modifier = Modifier
                                                 .padding(top = 8.dp)
-                                                .size(28.dp)
+                                                .fillMaxWidth(0.68f)
+                                                .aspectRatio(1f)
                                                 .clip(sunnyShape)
                                                 .background(MaterialTheme.colorScheme.surfaceContainerHigh),
                                             contentAlignment = Alignment.Center
@@ -386,7 +386,7 @@ fun UsageGraph(
                                                 imageVector = Icons.Filled.Check,
                                                 contentDescription = null,
                                                 tint = MaterialTheme.colorScheme.tertiary,
-                                                modifier = Modifier.size(18.dp)
+                                                modifier = Modifier.fillMaxSize(0.6f)
                                             )
                                         }
                                     }
@@ -399,7 +399,7 @@ fun UsageGraph(
                         modifier = Modifier
                             .fillMaxWidth()
                             .align(Alignment.BottomStart)
-                            .padding(start = 44.dp)
+                            .padding(start = 20.dp)
                             .height(26.dp),
                         horizontalArrangement = Arrangement.SpaceAround
                     ) {

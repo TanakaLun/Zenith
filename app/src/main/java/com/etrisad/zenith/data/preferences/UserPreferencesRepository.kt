@@ -502,7 +502,7 @@ class UserPreferencesRepository(private val context: Context) {
             if (usage <= targetMillis) {
                 liveStreak++
             } else {
-                break 
+                break
             }
         }
         
