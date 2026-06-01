@@ -454,7 +454,7 @@ class UserPreferencesRepository(private val context: Context) {
         var liveStreak = 0
         var currentBest = prefs.bedtimeBestStreak
 
-        for (i in 0..7) {
+        for (i in 0..60) {
             val cal = Calendar.getInstance()
             cal.add(Calendar.DAY_OF_YEAR, -i)
             val dayOfWeek = cal.get(Calendar.DAY_OF_WEEK)
@@ -485,7 +485,8 @@ class UserPreferencesRepository(private val context: Context) {
             
             if (startTime > now) continue
             
-            val actualEnd = if (endTime > now) now else endTime
+            val isSessionCompleted = endTime <= now
+            val actualEnd = if (isSessionCompleted) endTime else now
             if (actualEnd <= startTime) continue
             
             val totalDuration = endTime - startTime
@@ -499,10 +500,10 @@ class UserPreferencesRepository(private val context: Context) {
                 }
             }
             
-            if (usage <= targetMillis) {
-                liveStreak++
-            } else {
+            if (usage > targetMillis) {
                 break
+            } else if (isSessionCompleted) {
+                liveStreak++
             }
         }
         

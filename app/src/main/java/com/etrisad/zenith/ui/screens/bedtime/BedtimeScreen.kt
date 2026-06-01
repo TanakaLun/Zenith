@@ -220,7 +220,7 @@ fun BedtimeScreen(
                         formatDuration = viewModel::formatDuration,
                         index = 0,
                         total = hourlyGroupTotal,
-                        containerColor = containerColor
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f)
                     )
                 }
             }
