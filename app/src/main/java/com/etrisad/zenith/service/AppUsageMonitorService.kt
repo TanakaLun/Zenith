@@ -37,6 +37,7 @@ import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
+import java.util.concurrent.ConcurrentHashMap
 
 class AppUsageMonitorService : Service() {
 
@@ -58,8 +59,8 @@ class AppUsageMonitorService : Service() {
     private var cachedTotalUsage = 0L
     private var sessionStartTime = 0L
     private var baseUsageAtSessionStart = 0L
-    private val allowedApps = mutableMapOf<String, Long>()
-    private val lastAllowedRemainingTime = mutableMapOf<String, Long>()
+    private val allowedApps = ConcurrentHashMap<String, Long>()
+    private val lastAllowedRemainingTime = ConcurrentHashMap<String, Long>()
     private var activeSchedules = listOf<com.etrisad.zenith.data.local.entity.ScheduleEntity>()
     private var whitelistedPackages = emptySet<String>()
     private var launcherPackages = emptySet<String>()
@@ -951,7 +952,6 @@ class AppUsageMonitorService : Service() {
         val limitMillis = shield.timeLimitMinutes * 60 * 1000L
         val remainingMillis = (limitMillis - cachedTotalUsage).coerceAtLeast(0L)
 
-        // Instant streak update for GOAL shields
         if (shield.type == FocusType.GOAL && !isPaused(shield) && shield.timeLimitMinutes > 0) {
             if (cachedTotalUsage >= limitMillis) {
                 val lastUpdateDate = Instant.ofEpochMilli(shield.lastStreakUpdateTimestamp)
@@ -1117,6 +1117,9 @@ class AppUsageMonitorService : Service() {
     private var lastKickTime = 0L
 
     private suspend fun checkIfAppIsShielded(targetPackageName: String) {
+        val allowedUntil = allowedApps[targetPackageName] ?: 0L
+        if (System.currentTimeMillis() < allowedUntil) return
+
         if (InterceptOverlayManager.isShowing && InterceptOverlayManager.currentPackage == targetPackageName) {
             return
         }
@@ -1187,6 +1190,7 @@ class AppUsageMonitorService : Service() {
                                 val currentTimeOnAllow = System.currentTimeMillis()
                                 val limitMillis = (shieldWithTimestamp.timeLimitMinutes) * 60 * 1000L
                                 lastAllowedRemainingTime[targetPackageName] = if (shieldWithTimestamp.timeLimitMinutes > 0) (limitMillis - getTotalUsageToday(targetPackageName)).coerceAtLeast(0L) else Long.MAX_VALUE
+                                allowedApps[targetPackageName] = currentTimeOnAllow + (minutes * 60 * 1000L)
                                 
                                 serviceScope.launch {
                                     if (isMindfulGateway) {
@@ -1232,8 +1236,6 @@ class AppUsageMonitorService : Service() {
                                             currentShieldCache = updatedShield
                                         }
                                     }
-                                    
-                                    allowedApps[targetPackageName] = currentTimeOnAllow + (minutes * 60 * 1000L)
                             
                                     val currentPrefs = currentPreferences ?: return@launch
                                     if (currentPrefs.sessionUsageOverlayEnabled) {
@@ -1739,8 +1741,11 @@ class AppUsageMonitorService : Service() {
                 schedule = schedule,
                 totalGlobalUsageToday = totalGlobalUsageToday,
                 onAllowUse = { minutes, isEmergency ->
-                    serviceScope.launch {
-                        if (isEmergency) {
+                    if (isEmergency) {
+                        val currentTime = System.currentTimeMillis()
+                        allowedApps[packageName] = currentTime + (minutes * 60 * 1000L)
+                        
+                        serviceScope.launch {
                             val shield = allShieldsCache[packageName]
                             if (shield != null) {
                                 val limitMillis = shield.timeLimitMinutes * 60 * 1000L
@@ -1752,7 +1757,6 @@ class AppUsageMonitorService : Service() {
                                 emergencyUseCount = (currentSchedule.emergencyUseCount - 1).coerceAtLeast(0)
                             )
                             shieldRepository.updateSchedule(updatedSchedule)
-                            allowedApps[packageName] = System.currentTimeMillis() + (minutes * 60 * 1000L)
                             
                             val currentPrefs = currentPreferences ?: return@launch
                             if (currentPrefs.sessionUsageOverlayEnabled) {
