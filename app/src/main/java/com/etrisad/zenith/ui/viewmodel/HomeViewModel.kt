@@ -427,7 +427,7 @@ class HomeViewModel(
 
         _isRepairing.value = true
         try {
-            delay(800)
+            shieldRepository.isShieldsLoaded.first { it }
             
             val allShields = shieldRepository.allShields.first()
             val shieldPkgs = allShields.filter { it.type == FocusType.SHIELD }.map { it.packageName }.toSet()
@@ -507,6 +507,7 @@ class HomeViewModel(
 
     init {
         viewModelScope.launch {
+            shieldRepository.isShieldsLoaded.first { it }
             combine(
                 shieldRepository.allShields,
                 shieldRepository.getAllUsage(),

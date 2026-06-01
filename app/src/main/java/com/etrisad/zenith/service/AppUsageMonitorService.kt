@@ -186,7 +186,8 @@ class AppUsageMonitorService : Service() {
                         updateBedtimeStatus(prefs)
                     }
 
-                    val shields = kotlinx.coroutines.withTimeoutOrNull(3000) {
+                    val shields = kotlinx.coroutines.withTimeoutOrNull(5000) {
+                        shieldRepository.isShieldsLoaded.first { it }
                         shieldRepository.allShields.first()
                     }
                     if (shields != null) {
@@ -285,11 +286,12 @@ class AppUsageMonitorService : Service() {
         super.onCreate()
         val app = application as com.etrisad.zenith.ZenithApplication
         shieldRepository = app.shieldRepository
-        preferencesRepository = UserPreferencesRepository(applicationContext)
+        preferencesRepository = app.userPreferencesRepository
         overlayManager = InterceptOverlayManager(this, preferencesRepository)
         sessionUsageOverlayManager = SessionUsageOverlayManager(this)
 
         serviceScope.launch {
+            shieldRepository.isShieldsLoaded.first { it }
             shieldRepository.allShields.collect { shields ->
                 allShieldsCache = shields.associateBy { it.packageName }
                 lastForegroundApp?.let { currentPkg ->
@@ -303,6 +305,7 @@ class AppUsageMonitorService : Service() {
         }
 
         serviceScope.launch {
+            shieldRepository.isShieldsLoaded.first { it }
             shieldRepository.allSchedules.collect { schedules ->
                 activeSchedules = schedules.filter { it.isActive }
                 parsedSchedulesCache = activeSchedules.map { s ->

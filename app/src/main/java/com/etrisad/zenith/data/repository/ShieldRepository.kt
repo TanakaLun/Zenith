@@ -27,12 +27,16 @@ class ShieldRepository(
     private val _allShieldsCache = MutableStateFlow<List<ShieldEntity>>(emptyList())
     val allShields: Flow<List<ShieldEntity>> = _allShieldsCache.asStateFlow()
     
+    private val _isShieldsLoaded = MutableStateFlow(false)
+    val isShieldsLoaded: Flow<Boolean> = _isShieldsLoaded.asStateFlow()
+
     val allSchedules: Flow<List<ScheduleEntity>> = scheduleDao.getAllSchedules()
 
     init {
         repositoryScope.launch {
             shieldDao.getAllShields().collect {
                 _allShieldsCache.value = it
+                _isShieldsLoaded.value = true
             }
         }
     }

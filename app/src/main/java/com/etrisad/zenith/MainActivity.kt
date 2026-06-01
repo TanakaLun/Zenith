@@ -41,14 +41,9 @@ class MainActivity : ComponentActivity() {
 
         initialPackageName = intent.getStringExtra("package_name")
 
-        val database = ZenithDatabase.getDatabase(this)
-        val shieldRepository = ShieldRepository(
-            database.shieldDao(),
-            database.scheduleDao(),
-            database.dailyUsageDao(),
-            database.hourlyUsageDao()
-        )
-        val userPreferencesRepository = UserPreferencesRepository(this)
+        val app = application as ZenithApplication
+        val shieldRepository = app.shieldRepository
+        val userPreferencesRepository = app.userPreferencesRepository
 
         DailyUsageWorker.schedule(applicationContext)
 

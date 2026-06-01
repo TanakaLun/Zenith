@@ -315,6 +315,7 @@ class UsageSyncManager(
         val now = System.currentTimeMillis()
         val dailyEntities = mutableListOf<com.etrisad.zenith.data.local.entity.DailyUsageEntity>()
 
+        repository.isShieldsLoaded.first { it }
         val allShields = repository.allShields.first()
         val shieldPkgs = allShields.filter { it.type == com.etrisad.zenith.data.local.entity.FocusType.SHIELD }.map { it.packageName }.toSet()
         val goalPkgs = allShields.filter { it.type == com.etrisad.zenith.data.local.entity.FocusType.GOAL }.map { it.packageName }.toSet()

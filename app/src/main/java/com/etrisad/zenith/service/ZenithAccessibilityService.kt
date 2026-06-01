@@ -115,6 +115,7 @@ class ZenithAccessibilityService : AccessibilityService() {
                 whitelistedPackages = prefs.whitelistedPackages
                 bedtimeWhitelistedPackages = prefs.bedtimeWhitelistedPackages
 
+                shieldRepository.isShieldsLoaded.first { it }
                 allShieldsCache = shieldRepository.allShields.first()
 
                 val schedules = shieldRepository.allSchedules.first()
@@ -158,7 +159,7 @@ class ZenithAccessibilityService : AccessibilityService() {
         
         val app = application as com.etrisad.zenith.ZenithApplication
         shieldRepository = app.shieldRepository
-        preferencesRepository = UserPreferencesRepository(this)
+        preferencesRepository = app.userPreferencesRepository
         overlayManager = InterceptOverlayManager(this, preferencesRepository)
         sessionUsageOverlayManager = SessionUsageOverlayManager(this)
 
@@ -167,6 +168,7 @@ class ZenithAccessibilityService : AccessibilityService() {
         }
 
         serviceScope.launch {
+            shieldRepository.isShieldsLoaded.first { it }
             shieldRepository.allShields.collect { shields ->
                 allShieldsCache = shields
                 lastForegroundApp?.let { currentPkg ->
@@ -177,6 +179,7 @@ class ZenithAccessibilityService : AccessibilityService() {
         }
 
         serviceScope.launch {
+            shieldRepository.isShieldsLoaded.first { it }
             shieldRepository.allSchedules.collect { schedules: List<ScheduleEntity> ->
                 activeSchedules = schedules.filter { it.isActive }
                 parsedSchedulesCache = activeSchedules.map { s ->
@@ -289,7 +292,6 @@ class ZenithAccessibilityService : AccessibilityService() {
         lastForegroundApp = currentApp
         
         if (shouldBypassBlocking(currentApp)) {
-            // Reset delay if moving away from a shielded app to a bypassed app (like home)
             previousApp?.let { prevPkg ->
                 allShieldsCache.find { it.packageName == prevPkg }?.let { shield ->
                     if (shield.isDelayAppEnabled) {
