@@ -138,10 +138,12 @@ class ShieldRepository(private val context: Context) {
         val cached = _allShieldsCache.value.find { it.packageName == packageName }
         if (cached != null) return cached
 
-        if (_allShieldsCache.value.isEmpty()) {
-            return shieldDao.getShieldByPackageName(packageName)
+        return try {
+            shieldDao.getShieldByPackageName(packageName)
+        } catch (e: Exception) {
+            android.util.Log.e("ShieldRepo", "Error fetching shield from DB: ${e.message}")
+            null
         }
-        return null
     }
 
     suspend fun insertShield(shield: ShieldEntity) {
@@ -170,7 +172,19 @@ class ShieldRepository(private val context: Context) {
     }
 
     suspend fun deleteShield(shield: ShieldEntity) {
-        shieldDao.deleteShield(shield)
+        val currentList = _allShieldsCache.value.toMutableList()
+        val removed = currentList.removeAll { it.packageName == shield.packageName }
+        if (removed) {
+            _allShieldsCache.value = currentList
+        }
+
+        repositoryScope.launch {
+            try {
+                shieldDao.deleteShield(shield)
+            } catch (e: Exception) {
+                android.util.Log.e("ShieldRepo", "Gagal menghapus shield dari database: ${e.message}")
+            }
+        }
     }
 
     fun isAppShielded(packageName: String): Flow<Boolean> {
