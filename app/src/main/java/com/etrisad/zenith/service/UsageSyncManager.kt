@@ -380,7 +380,7 @@ class UsageSyncManager(
         }
 
         if (dailyEntities.isNotEmpty()) {
-            dailyEntities.forEach { repository.insertDailyUsage(it) }
+            repository.insertAllDailyUsage(dailyEntities)
         }
     }
 

@@ -49,8 +49,15 @@ class ShieldRepository(
         return dailyUsageDao.getLastNDaysUsageForPackage(packageName, days)
     }
 
-    fun getAllUsage(): Flow<List<DailyUsageEntity>> {
-        return dailyUsageDao.getAllUsage()
+    fun getAllUsage(limit: Int = 2000): Flow<List<DailyUsageEntity>> {
+        return dailyUsageDao.getAllUsage(limit)
+    }
+
+    fun getRecentUsage(days: Int): Flow<List<DailyUsageEntity>> {
+        val cal = java.util.Calendar.getInstance()
+        cal.add(java.util.Calendar.DAY_OF_YEAR, -days)
+        val dateStr = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(cal.time)
+        return dailyUsageDao.getRecentUsage(dateStr)
     }
 
     fun getHourlyUsageForDate(date: String): Flow<List<HourlyUsageEntity>> {
@@ -108,6 +115,10 @@ class ShieldRepository(
 
     suspend fun insertDailyUsage(usage: DailyUsageEntity) {
         dailyUsageDao.insertDailyUsage(usage)
+    }
+
+    suspend fun insertAllDailyUsage(usages: List<DailyUsageEntity>) {
+        dailyUsageDao.insertAll(usages)
     }
 
     suspend fun getShieldByPackageName(packageName: String): ShieldEntity? {

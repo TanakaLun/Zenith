@@ -172,28 +172,31 @@ class HomeViewModel(
         apps to lPkg
     }
 
-    val allDatabaseUsage: Flow<List<DailyUsageEntity>> = shieldRepository.getAllUsage()
+    val allDatabaseUsage: Flow<List<DailyUsageEntity>> = shieldRepository.getRecentUsage(30)
+        .debounce(300)
+        .distinctUntilChanged()
 
     val fullUsageHistory: Flow<List<UsageHistoryGroup>> = combine(
         allDatabaseUsage,
         shieldRepository.getDatesWithHourlyUsage()
     ) { dbList, hourlyDates ->
         val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        val today = Calendar.getInstance()
-        val todayStr = dateFormat.format(today.time)
+        val todayStr = dateFormat.format(Date())
 
         val earliestDateStr = dbList.lastOrNull()?.date ?: dateFormat.format(Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -7) }.time)
         val earliestCal = Calendar.getInstance().apply {
             time = dateFormat.parse(earliestDateStr) ?: time
         }
         
-        val groups = mutableListOf<UsageHistoryGroup>()
+        val groups = ArrayList<UsageHistoryGroup>(31)
         val cal = Calendar.getInstance()
         
         val dbRecordsByDate = dbList.groupBy { it.date }
         val hourlyDatesSet = hourlyDates.toSet()
 
-        while (!cal.before(earliestCal)) {
+        var dayCount = 0
+        while (!cal.before(earliestCal) && dayCount < 30) {
+            dayCount++
             val dateStr = dateFormat.format(cal.time)
             val isToday = dateStr == todayStr
             
@@ -510,7 +513,7 @@ class HomeViewModel(
             shieldRepository.isShieldsLoaded.first { it }
             combine(
                 shieldRepository.allShields,
-                shieldRepository.getAllUsage(),
+                shieldRepository.getRecentUsage(60),
                 shieldRepository.getLastNDaysGlobalUsage(60),
                 userPreferencesRepository.userPreferencesFlow
             ) { shields, usage, global, prefs ->
@@ -1219,7 +1222,10 @@ class HomeViewModel(
             val excludedPkgs = setOf("TOTAL", "SHIELD_TOTAL", "GOAL_TOTAL", "OTHER_TOTAL")
             val historyByDate = allHistory.filter { it.packageName !in excludedPkgs }.groupBy { it.date }
 
-            val snapshotStamps = (0..20).map { i ->
+            val snapshotStampsCount = 21
+            val snapshotStamps = ArrayList<AppUsageInfo>(snapshotStampsCount)
+            
+            for (i in 0 until snapshotStampsCount) {
                 val dStart = getMidnight(i)
                 val dateStr = dateFormat.format(Date(dStart))
                 
@@ -1262,22 +1268,23 @@ class HomeViewModel(
                 if (topPackage != null && shouldShow) {
                     val cached = appInfoCache[topPackage]
                     if (cached != null) {
-                        AppUsageInfo(topPackage, cached.first, usageTime, cached.second, hasDb, hasSys, i == 0)
+                        snapshotStamps.add(AppUsageInfo(topPackage, cached.first, usageTime, cached.second, hasDb, hasSys, i == 0))
                     } else {
                         try {
                             val appInfo = pm.getApplicationInfo(topPackage, 0)
                             val label = pm.getApplicationLabel(appInfo).toString()
                             val icon = pm.getApplicationIcon(appInfo)
                             appInfoCache[topPackage] = label to icon
-                            AppUsageInfo(topPackage, label, usageTime, icon, hasDb, hasSys, i == 0)
+                            snapshotStamps.add(AppUsageInfo(topPackage, label, usageTime, icon, hasDb, hasSys, i == 0))
                         } catch (_: Exception) {
-                            AppUsageInfo(topPackage, topPackage, usageTime, null, hasDb, hasSys, i == 0)
+                            snapshotStamps.add(AppUsageInfo(topPackage, topPackage, usageTime, null, hasDb, hasSys, i == 0))
                         }
                     }
                 } else {
-                    AppUsageInfo("", "", 0, hasDatabaseRecord = hasDb, hasSystemData = hasSys, isLive = i == 0)
+                    snapshotStamps.add(AppUsageInfo("", "", 0, hasDatabaseRecord = hasDb, hasSystemData = hasSys, isLive = i == 0))
                 }
-            }.reversed()
+            }
+            val finalSnapshotStamps = snapshotStamps.reversed()
 
             val targetMillis = currentTargetMinutes * 60 * 1000L
 
@@ -1289,7 +1296,7 @@ class HomeViewModel(
                 percentageChange     = percentageChange,
                 dailyUsageHistory    = history.reversed(),
                 hourlyUsage          = hourlyUsage,
-                snapshotStamps       = snapshotStamps,
+                snapshotStamps       = finalSnapshotStamps,
                 topApps              = topApps,
                 allAppsUsage         = allAppsUsage,
                 shieldUsage          = finalShieldUsage,
