@@ -35,6 +35,9 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import com.etrisad.zenith.BuildConfig
 import com.etrisad.zenith.data.remote.model.GitHubRelease
 import com.etrisad.zenith.ui.navigation.Screen
@@ -196,21 +199,24 @@ fun FeaturedCarousel(
     }
 
     val autoScrollProgress = remember { Animatable(0f) }
+    val lifecycleOwner = LocalLifecycleOwner.current
 
-    LaunchedEffect(pagerState.settledPage, itemsCount) {
+    LaunchedEffect(pagerState.settledPage, itemsCount, lifecycleOwner) {
         if (itemsCount > 1) {
-            autoScrollProgress.snapTo(0f)
-            autoScrollProgress.animateTo(
-                targetValue = 1f,
-                animationSpec = tween(5000, easing = LinearEasing)
-            )
-            
-            if (!pagerState.isScrollInProgress) {
-                val nextStep = (pagerState.currentPage + 1) % itemsCount
-                pagerState.animateScrollToPage(
-                    page = nextStep,
-                    animationSpec = carouselAnimationSpec
+            lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                autoScrollProgress.snapTo(0f)
+                autoScrollProgress.animateTo(
+                    targetValue = 1f,
+                    animationSpec = tween(5000, easing = LinearEasing)
                 )
+                
+                if (!pagerState.isScrollInProgress) {
+                    val nextStep = (pagerState.currentPage + 1) % itemsCount
+                    pagerState.animateScrollToPage(
+                        page = nextStep,
+                        animationSpec = carouselAnimationSpec
+                    )
+                }
             }
         } else {
             autoScrollProgress.snapTo(0f)
@@ -224,7 +230,9 @@ fun FeaturedCarousel(
         stiffness = Spring.StiffnessLow
     )
 
-    val visualProgress = pagerState.currentPage + pagerState.currentPageOffsetFraction
+    val visualProgress by remember {
+        derivedStateOf { pagerState.currentPage + pagerState.currentPageOffsetFraction }
+    }
 
     Column(
         modifier = modifier.fillMaxWidth(),

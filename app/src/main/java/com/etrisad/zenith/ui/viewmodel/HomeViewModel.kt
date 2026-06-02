@@ -6,6 +6,8 @@ import android.app.usage.UsageStats
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.Stable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.etrisad.zenith.data.local.entity.ShieldEntity
@@ -24,6 +26,7 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
+@Immutable
 data class AppUsageInfo(
     val packageName: String,
     val appName: String,
@@ -75,6 +78,7 @@ data class HourlyUsageInfo(
     val isLive: Boolean = false
 )
 
+@Immutable
 data class HomeUiState(
     val totalScreenTime: Long = 0L,
     val yesterdayScreenTime: Long = 0L,

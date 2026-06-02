@@ -205,8 +205,9 @@ fun HomeScreenContent(
         ) {
             item {
                 UsageDashboard(
-                    uiState = uiState,
-                    preferences = preferences,
+                    totalScreenTime = uiState.totalScreenTime,
+                    globalCurrentStreak = uiState.globalCurrentStreak,
+                    screenTimeTargetMinutes = preferences.screenTimeTargetMinutes,
                     onSetTarget = onSetTarget,
                     formatDuration = formatDuration,
                     shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
@@ -216,7 +217,8 @@ fun HomeScreenContent(
 
             item {
                 UsageTrendsRow(
-                    uiState = uiState,
+                    yesterdayScreenTime = uiState.yesterdayScreenTime,
+                    percentageChange = uiState.percentageChange,
                     formatDuration = formatDuration
                 )
                 Spacer(modifier = Modifier.height(4.dp))
@@ -409,8 +411,9 @@ fun HomeScreenContent(
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun UsageDashboard(
-    uiState: HomeUiState,
-    preferences: com.etrisad.zenith.data.preferences.UserPreferences,
+    totalScreenTime: Long,
+    globalCurrentStreak: Int,
+    screenTimeTargetMinutes: Int,
     onSetTarget: (Int) -> Unit,
     formatDuration: (Long) -> String,
     shape: Shape = RoundedCornerShape(32.dp)
@@ -432,7 +435,7 @@ fun UsageDashboard(
                 modifier = Modifier.fillMaxWidth(),
                 contentAlignment = Alignment.Center
             ) {
-                if (preferences.screenTimeTargetMinutes > 0) {
+                if (screenTimeTargetMinutes > 0) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
@@ -446,12 +449,12 @@ fun UsageDashboard(
                         Icon(
                             imageVector = Icons.Outlined.LocalFireDepartment,
                             contentDescription = "Streak",
-                            tint = if (uiState.globalCurrentStreak > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                            tint = if (globalCurrentStreak > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         AnimatedContent(
-                            targetState = uiState.globalCurrentStreak,
+                            targetState = globalCurrentStreak,
                             transitionSpec = {
                                 (slideInVertically { height -> height } + fadeIn()).togetherWith(
                                     slideOutVertically { height -> -height } + fadeOut())
@@ -489,9 +492,9 @@ fun UsageDashboard(
                 }
             }
 
-            val hours = uiState.totalScreenTime / (1000 * 60 * 60)
-            val minutes = (uiState.totalScreenTime / (1000 * 60)) % 60
-            val seconds = (uiState.totalScreenTime / 1000) % 60
+            val hours = totalScreenTime / (1000 * 60 * 60)
+            val minutes = (totalScreenTime / (1000 * 60)) % 60
+            val seconds = (totalScreenTime / 1000) % 60
 
             Row(
                 modifier = Modifier.animateContentSize(
@@ -538,13 +541,13 @@ fun UsageDashboard(
                 }
             }
 
-            val targetMillis = preferences.screenTimeTargetMinutes * 60 * 1000L
-            val isTargetSet = preferences.screenTimeTargetMinutes > 0
-            val isExceeded = isTargetSet && uiState.totalScreenTime > targetMillis
+            val targetMillis = screenTimeTargetMinutes * 60 * 1000L
+            val isTargetSet = screenTimeTargetMinutes > 0
+            val isExceeded = isTargetSet && totalScreenTime > targetMillis
 
             if (isTargetSet) {
                 AnimatedContent(
-                    targetState = isExceeded to (targetMillis - uiState.totalScreenTime),
+                    targetState = isExceeded to (targetMillis - totalScreenTime),
                     transitionSpec = {
                         fadeIn(animationSpec = tween(300)).togetherWith(fadeOut(animationSpec = tween(300)))
                     },
@@ -567,7 +570,7 @@ fun UsageDashboard(
 
             val progress = if (isTargetSet) {
                 if (isExceeded) 0f
-                else ((targetMillis - uiState.totalScreenTime).toFloat() / targetMillis).coerceIn(0f, 1f)
+                else ((targetMillis - totalScreenTime).toFloat() / targetMillis).coerceIn(0f, 1f)
             } else {
                 0.7f
             }
@@ -591,7 +594,7 @@ fun UsageDashboard(
 
     if (showTargetSheet) {
         ScreenTimeTargetBottomSheet(
-            initialMinutes = preferences.screenTimeTargetMinutes,
+            initialMinutes = screenTimeTargetMinutes,
             onDismiss = { showTargetSheet = false },
             onSave = {
                 onSetTarget(it)
@@ -723,7 +726,8 @@ fun ScreenTimeTargetBottomSheet(
 
 @Composable
 fun UsageTrendsRow(
-    uiState: HomeUiState,
+    yesterdayScreenTime: Long,
+    percentageChange: Float,
     formatDuration: (Long) -> String
 ) {
     Row(
@@ -745,7 +749,7 @@ fun UsageTrendsRow(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    if (uiState.yesterdayScreenTime > 0) formatDuration(uiState.yesterdayScreenTime) else "-",
+                    if (yesterdayScreenTime > 0) formatDuration(yesterdayScreenTime) else "-",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -767,16 +771,16 @@ fun UsageTrendsRow(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (uiState.yesterdayScreenTime > 0) {
+                    if (yesterdayScreenTime > 0) {
                         Icon(
-                            imageVector = if (uiState.percentageChange >= 0) Icons.AutoMirrored.Outlined.TrendingUp else Icons.AutoMirrored.Outlined.TrendingDown,
+                            imageVector = if (percentageChange >= 0) Icons.AutoMirrored.Outlined.TrendingUp else Icons.AutoMirrored.Outlined.TrendingDown,
                             contentDescription = null,
                             modifier = Modifier.size(20.dp),
-                            tint = if (uiState.percentageChange >= 0) MaterialTheme.colorScheme.error else Color(0xFF4CAF50)
+                            tint = if (percentageChange >= 0) MaterialTheme.colorScheme.error else Color(0xFF4CAF50)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         
-                        val absPercentage = abs(uiState.percentageChange).toInt()
+                        val absPercentage = abs(percentageChange).toInt()
                         val percentageText = if (absPercentage > 100) "100" else absPercentage.toString()
                         val suffix = if (absPercentage > 100) "%+" else "%"
                         
@@ -801,7 +805,7 @@ fun UsageTrendsRow(
                                         text = targetChar.toString(),
                                         style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
                                         fontWeight = FontWeight.Bold,
-                                        color = if (uiState.percentageChange >= 0) MaterialTheme.colorScheme.error else Color(0xFF4CAF50)
+                                        color = if (percentageChange >= 0) MaterialTheme.colorScheme.error else Color(0xFF4CAF50)
                                     )
                                 }
                             }
@@ -809,7 +813,7 @@ fun UsageTrendsRow(
                                 text = suffix,
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = if (uiState.percentageChange >= 0) MaterialTheme.colorScheme.error else Color(0xFF4CAF50)
+                                color = if (percentageChange >= 0) MaterialTheme.colorScheme.error else Color(0xFF4CAF50)
                             )
                         }
                     } else {
