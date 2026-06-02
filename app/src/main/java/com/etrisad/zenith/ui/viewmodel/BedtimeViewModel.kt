@@ -9,26 +9,32 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.etrisad.zenith.data.preferences.UserPreferences
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
+import com.etrisad.zenith.data.repository.ShieldRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.ZoneId
 import java.util.Calendar
+import java.util.Locale
 
 class BedtimeViewModel(
     context: Context,
-    private val userPreferencesRepository: UserPreferencesRepository
+    private val userPreferencesRepository: UserPreferencesRepository,
+    private val shieldRepository: ShieldRepository
 ) : ViewModel() {
 
     private val context = context.applicationContext
     private val appInfoCache = mutableMapOf<String, Pair<String, android.graphics.drawable.Drawable?>>()
+    private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
 
     val userPreferences: StateFlow<UserPreferences> = userPreferencesRepository.userPreferencesFlow
@@ -73,10 +79,13 @@ class BedtimeViewModel(
 
     fun loadHourlyUsage() {
         viewModelScope.launch {
+            try {
+                val syncManager = com.etrisad.zenith.service.UsageSyncManager(context, shieldRepository, userPreferencesRepository)
+                syncManager.syncUsageData()
+            } catch (_: Exception) {}
+
             val prefs = userPreferences.value
-            val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
             val now = System.currentTimeMillis()
-            val zoneId = ZoneId.systemDefault()
             
             val (launcherApps, launcherPackage) = getLauncherInfo()
             val excludePackages = setOfNotNull(context.packageName, launcherPackage)
@@ -108,7 +117,7 @@ class BedtimeViewModel(
                 set(Calendar.SECOND, 0)
                 set(Calendar.MILLISECOND, 0)
             }
-            
+
             val sessionEndCal = Calendar.getInstance().apply {
                 timeInMillis = sessionStartCal.timeInMillis
                 if (endH < startH || (endH == startH && endM <= startM)) {
@@ -120,76 +129,46 @@ class BedtimeViewModel(
                 set(Calendar.MILLISECOND, 0)
             }
 
-            val queryStart = sessionStartCal.timeInMillis
-            val queryEnd = minOf(sessionEndCal.timeInMillis, now)
-
-            val hourlyMap = mutableMapOf<Int, Long>()
-            val packageHourlyMap = mutableMapOf<Int, MutableMap<String, Long>>()
-            if (queryEnd > queryStart) {
-                withContext(Dispatchers.IO) {
-                    val events = usm.queryEvents(queryStart, queryEnd)
-                    val event = UsageEvents.Event()
-                    var activePkg: String? = null
-                    var activeStartTime = 0L
-
-                    while (events.hasNextEvent()) {
-                        events.getNextEvent(event)
-                        val pkg = event.packageName
-                        val time = event.timeStamp
-
-                        when (event.eventType) {
-                            UsageEvents.Event.ACTIVITY_RESUMED,
-                            UsageEvents.Event.MOVE_TO_FOREGROUND -> {
-                                if (activePkg != null) {
-                                    addHourlySegment(hourlyMap, packageHourlyMap, activePkg!!, maxOf(activeStartTime, queryStart), minOf(time, queryEnd), zoneId, launcherApps, excludePackages)
-                                }
-                                activePkg = pkg
-                                activeStartTime = time
-                            }
-                            UsageEvents.Event.ACTIVITY_PAUSED,
-                            UsageEvents.Event.MOVE_TO_BACKGROUND -> {
-                                if (activePkg == pkg) {
-                                    addHourlySegment(hourlyMap, packageHourlyMap, pkg, maxOf(activeStartTime, queryStart), minOf(time, queryEnd), zoneId, launcherApps, excludePackages)
-                                    activePkg = null
-                                    activeStartTime = 0L
-                                }
-                            }
-                        }
-                    }
-                    if (activePkg != null) {
-                        addHourlySegment(hourlyMap, packageHourlyMap, activePkg!!, maxOf(activeStartTime, queryStart), queryEnd, zoneId, launcherApps, excludePackages)
-                    }
-                }
-            }
+            val startDateStr = dateFormat.format(sessionStartCal.time)
+            val nextDateCal = (sessionStartCal.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, 1) }
+            val nextDateStr = dateFormat.format(nextDateCal.time)
 
             val pm = context.packageManager
             val usageInfoList = bedtimeHours.map { hour ->
+                val targetDate = if (hour >= startH) startDateStr else nextDateStr
+                val hourlyData = withContext(Dispatchers.IO) {
+                    shieldRepository.getHourlyUsageForDateSync(targetDate)
+                }
+                
+                val hourTotal = hourlyData.find { it.hour == hour && it.packageName == "TOTAL" }?.usageTimeMillis ?: 0L
                 val appsForHour = withContext(Dispatchers.IO) {
-                    packageHourlyMap[hour]?.mapNotNull { (pkg, duration) ->
-                        if (duration <= 0) return@mapNotNull null
-                        
-                        val cached = appInfoCache[pkg]
-                        if (cached != null) {
-                            AppUsageInfo(pkg, cached.first, duration, cached.second)
-                        } else {
-                            try {
-                                val appInfo = pm.getApplicationInfo(pkg, 0)
-                                val label = pm.getApplicationLabel(appInfo).toString()
-                                val icon = pm.getApplicationIcon(appInfo)
-                                appInfoCache[pkg] = label to icon
-                                AppUsageInfo(pkg, label, duration, icon)
-                            } catch (e: Exception) {
-                                AppUsageInfo(pkg, pkg, duration, null)
+                    hourlyData.filter { it.hour == hour && it.packageName != "TOTAL" && it.packageName !in excludePackages && it.packageName in launcherApps }
+                        .mapNotNull { entity ->
+                            if (entity.usageTimeMillis <= 0) return@mapNotNull null
+                            
+                            val pkg = entity.packageName
+                            val cached = appInfoCache[pkg]
+                            if (cached != null) {
+                                AppUsageInfo(pkg, cached.first, entity.usageTimeMillis, cached.second)
+                            } else {
+                                try {
+                                    val appInfo = pm.getApplicationInfo(pkg, 0)
+                                    val label = pm.getApplicationLabel(appInfo).toString()
+                                    val icon = pm.getApplicationIcon(appInfo)
+                                    appInfoCache[pkg] = label to icon
+                                    AppUsageInfo(pkg, label, entity.usageTimeMillis, icon)
+                                } catch (e: Exception) {
+                                    AppUsageInfo(pkg, pkg, entity.usageTimeMillis, null)
+                                }
                             }
-                        }
-                    }?.sortedByDescending { it.totalTimeVisible } ?: emptyList()
+                        }.sortedByDescending { it.totalTimeVisible }
                 }
 
                 HourlyUsageInfo(
                     hour = hour,
-                    usageTimeMillis = hourlyMap[hour] ?: 0L,
+                    usageTimeMillis = hourTotal,
                     apps = appsForHour,
-                    isLive = hour == currentHour
+                    isLive = hour == currentHour && targetDate == dateFormat.format(calendar.time)
                 )
             }
 
@@ -204,45 +183,6 @@ class BedtimeViewModel(
                 _bedtimeUsagePercentage.value = (totalUsage.toFloat() / totalDurationMillis).coerceIn(0f, 1f)
             } else {
                 _bedtimeUsagePercentage.value = 0f
-            }
-        }
-    }
-
-    private fun addHourlySegment(
-        hourlyMap: MutableMap<Int, Long>,
-        packageHourlyMap: MutableMap<Int, MutableMap<String, Long>>,
-        packageName: String,
-        start: Long,
-        end: Long,
-        zoneId: ZoneId,
-        launcherApps: Set<String>,
-        excludePackages: Set<String>
-    ) {
-        if (packageName !in launcherApps || packageName in excludePackages || start >= end) return
-
-        var currentMillis = start
-        var currentZdt = Instant.ofEpochMilli(currentMillis).atZone(zoneId)
-
-        var nextHourZdt = currentZdt.plusHours(1).withMinute(0).withSecond(0).withNano(0)
-        var nextHourMillis = nextHourZdt.toInstant().toEpochMilli()
-
-        while (currentMillis < end) {
-            val hour = currentZdt.hour
-            val segmentEnd = if (nextHourMillis < end) nextHourMillis else end
-            val duration = segmentEnd - currentMillis
-
-            if (duration > 0) {
-                hourlyMap[hour] = (hourlyMap[hour] ?: 0L) + duration
-                
-                val hourPkgMap = packageHourlyMap.getOrPut(hour) { mutableMapOf() }
-                hourPkgMap[packageName] = (hourPkgMap[packageName] ?: 0L) + duration
-            }
-
-            currentMillis = segmentEnd
-            if (currentMillis < end) {
-                currentZdt = nextHourZdt
-                nextHourZdt = currentZdt.plusHours(1)
-                nextHourMillis = nextHourZdt.toInstant().toEpochMilli()
             }
         }
     }

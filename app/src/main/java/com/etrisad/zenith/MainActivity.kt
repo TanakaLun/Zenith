@@ -91,6 +91,7 @@ class MainActivity : ComponentActivity() {
                 MainScreen(
                     homeViewModel = homeViewModel,
                     focusViewModel = focusViewModel,
+                    shieldRepository = shieldRepository,
                     userPreferencesRepository = userPreferencesRepository,
                     windowSizeClass = windowSizeClass,
                     initialPackageName = initialPackageName,

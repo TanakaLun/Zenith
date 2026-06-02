@@ -62,7 +62,7 @@ import com.etrisad.zenith.ui.viewmodel.FocusViewModel
 import com.etrisad.zenith.ui.viewmodel.HomeViewModel
 import com.etrisad.zenith.ui.viewmodel.BedtimeViewModel
 import com.etrisad.zenith.ui.viewmodel.BedtimeViewModelFactory
-
+import com.etrisad.zenith.data.repository.ShieldRepository
 import com.etrisad.zenith.data.manager.GitHubUpdateManager
 import com.etrisad.zenith.data.remote.model.GitHubRelease
 import com.etrisad.zenith.ui.components.UpdateBottomSheet
@@ -75,6 +75,7 @@ import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 fun MainScreen(
     homeViewModel: HomeViewModel,
     focusViewModel: FocusViewModel,
+    shieldRepository: ShieldRepository,
     userPreferencesRepository: UserPreferencesRepository,
     windowSizeClass: WindowSizeClass,
     initialPackageName: String? = null,
@@ -82,7 +83,7 @@ fun MainScreen(
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val bedtimeViewModel: BedtimeViewModel = androidx.lifecycle.viewmodel.compose.viewModel(
-        factory = BedtimeViewModelFactory(context, userPreferencesRepository)
+        factory = BedtimeViewModelFactory(context, userPreferencesRepository, shieldRepository)
     )
     val navController = rememberNavController()
 
