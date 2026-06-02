@@ -1,9 +1,11 @@
 package com.etrisad.zenith.data.repository
 
+import android.content.Context
 import com.etrisad.zenith.data.local.dao.DailyUsageDao
 import com.etrisad.zenith.data.local.dao.HourlyUsageDao
 import com.etrisad.zenith.data.local.dao.ScheduleDao
 import com.etrisad.zenith.data.local.dao.ShieldDao
+import com.etrisad.zenith.data.local.database.ZenithDatabase
 import com.etrisad.zenith.data.local.entity.DailyUsageEntity
 import com.etrisad.zenith.data.local.entity.HourlyUsageEntity
 import com.etrisad.zenith.data.local.entity.ScheduleEntity
@@ -11,32 +13,43 @@ import com.etrisad.zenith.data.local.entity.ShieldEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
-class ShieldRepository(
-    private val shieldDao: ShieldDao,
-    private val scheduleDao: ScheduleDao,
-    private val dailyUsageDao: DailyUsageDao,
-    private val hourlyUsageDao: HourlyUsageDao
-) {
+class ShieldRepository(private val context: Context) {
     private val repositoryScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     
+    private val database get() = ZenithDatabase.getDatabase(context)
+    private val shieldDao get() = database.shieldDao()
+    private val scheduleDao get() = database.scheduleDao()
+    private val dailyUsageDao get() = database.dailyUsageDao()
+    private val hourlyUsageDao get() = database.hourlyUsageDao()
+
     private val _allShieldsCache = MutableStateFlow<List<ShieldEntity>>(emptyList())
     val allShields: Flow<List<ShieldEntity>> = _allShieldsCache.asStateFlow()
     
     private val _isShieldsLoaded = MutableStateFlow(false)
     val isShieldsLoaded: Flow<Boolean> = _isShieldsLoaded.asStateFlow()
 
-    val allSchedules: Flow<List<ScheduleEntity>> = scheduleDao.getAllSchedules()
+    val allSchedules: Flow<List<ScheduleEntity>> get() = scheduleDao.getAllSchedules()
 
     init {
+        startShieldObservation()
+    }
+
+    private fun startShieldObservation() {
         repositoryScope.launch {
-            shieldDao.getAllShields().collect {
-                _allShieldsCache.value = it
-                _isShieldsLoaded.value = true
+            while (true) {
+                try {
+                    shieldDao.getAllShields().collect {
+                        _allShieldsCache.value = it
+                        _isShieldsLoaded.value = true
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("ShieldRepo", "Error collecting shields, retrying... ${e.message}")
+                    delay(3000)
+                }
             }
         }
     }

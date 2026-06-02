@@ -26,13 +26,7 @@ class ZenithApplication : Application(), ImageLoaderFactory {
     }
 
     val shieldRepository: ShieldRepository by lazy {
-        val database = ZenithDatabase.getDatabase(this)
-        ShieldRepository(
-            database.shieldDao(),
-            database.scheduleDao(),
-            database.dailyUsageDao(),
-            database.hourlyUsageDao()
-        )
+        ShieldRepository(this)
     }
 
     override fun onCreate() {

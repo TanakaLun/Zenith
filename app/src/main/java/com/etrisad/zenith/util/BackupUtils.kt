@@ -49,7 +49,10 @@ object BackupUtils {
             val dbShm = File("${dbFile.path}-shm")
             val prefsFile = File(context.filesDir, "datastore/$PREFS_FILE_NAME")
 
-            ZenithDatabase.closeDatabase()
+            try {
+                val db = ZenithDatabase.getDatabase(context)
+                db.openHelper.writableDatabase.execSQL("PRAGMA wal_checkpoint(FULL)")
+            } catch (_: Exception) {}
 
             context.contentResolver.openOutputStream(targetUri)?.use { outputStream ->
                 ZipOutputStream(outputStream).use { zipOut ->
@@ -109,7 +112,6 @@ object BackupUtils {
                 }
             }
 
-            // If WAL files were not in the zip, ensure old ones are deleted to avoid corruption
             val dbPath = context.getDatabasePath(DATABASE_NAME).path
             context.contentResolver.openInputStream(sourceUri)?.use { input ->
                 ZipInputStream(input).use { zipIn ->

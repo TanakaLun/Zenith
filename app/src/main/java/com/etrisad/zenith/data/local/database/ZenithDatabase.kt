@@ -217,25 +217,34 @@ abstract class ZenithDatabase : RoomDatabase() {
         }
 
         fun getDatabase(context: Context): ZenithDatabase {
-            return INSTANCE ?: synchronized(this) {
-                val instance = Room.databaseBuilder(
-                    context.applicationContext,
-                    ZenithDatabase::class.java,
-                    "zenith_database"
-                )
-                    .addMigrations(
-                        MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, 
-                        MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, 
-                        MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
-                        MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18,
-                        MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21,
-                        MIGRATION_21_22
+            val current = INSTANCE
+            if (current != null && current.isOpen) {
+                return current
+            }
+            return synchronized(this) {
+                val current2 = INSTANCE
+                if (current2 != null && current2.isOpen) {
+                    current2
+                } else {
+                    val instance = Room.databaseBuilder(
+                        context.applicationContext,
+                        ZenithDatabase::class.java,
+                        "zenith_database"
                     )
-                    .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
-                    .fallbackToDestructiveMigrationOnDowngrade()
-                    .build()
-                INSTANCE = instance
-                instance
+                        .addMigrations(
+                            MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, 
+                            MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, 
+                            MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
+                            MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18,
+                            MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21,
+                            MIGRATION_21_22
+                        )
+                        .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
+                        .fallbackToDestructiveMigrationOnDowngrade()
+                        .build()
+                    INSTANCE = instance
+                    instance
+                }
             }
         }
 
