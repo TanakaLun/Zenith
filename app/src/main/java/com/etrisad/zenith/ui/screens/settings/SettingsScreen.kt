@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import com.etrisad.zenith.data.manager.GitHubUpdateManager
 import com.etrisad.zenith.data.preferences.ThemeConfig
 import com.etrisad.zenith.data.preferences.UserPreferences
@@ -41,6 +42,19 @@ fun SettingsScreen(
     var latestRelease by remember { mutableStateOf<GitHubRelease?>(null) }
     var allReleases by remember { mutableStateOf<List<GitHubRelease>>(emptyList()) }
     var showWhitelistSheet by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        if (preferences.checkUpdateOnStart) {
+            coroutineScope.launch {
+                when (val result = updateManager.checkForUpdates()) {
+                    is GitHubUpdateManager.UpdateResult.NewUpdate -> {
+                        latestRelease = result.release
+                    }
+                    else -> {}
+                }
+            }
+        }
+    }
 
     val onCheckForUpdate: () -> Unit = {
         if (!checkingForUpdate) {
@@ -85,6 +99,27 @@ fun SettingsScreen(
                 bottom = innerPadding.calculateBottomPadding() + 100.dp
             )
         ) {
+            item {
+                FeaturedCarousel(
+                    updateAvailable = latestRelease,
+                    onUpdateClick = { showUpdateSheet = true },
+                    onNavigate = { route ->
+                        if (route == Screen.Focus.route || route == Screen.Home.route) {
+                            navController.navigate(route) {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        } else {
+                            navController.navigate(route)
+                        }
+                    }
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
             item {
                 GeneralSettings(
                     preferences = preferences,
