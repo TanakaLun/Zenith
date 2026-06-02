@@ -23,6 +23,10 @@
   <a href="https://github.com/1372Slash/Zenith/releases">
     <img src="https://img.shields.io/github/v/release/1372Slash/Zenith?label=Download%20Zenith&style=for-the-badge&color=6750A4&logo=android&logoColor=white">
   </a>
+  <br>
+  <a href="https://ko-fi.com/1372slash">
+    <img src="https://img.shields.io/badge/Support%20me%20on%20Ko--fi-F16061?style=for-the-badge&logo=ko-fi&logoColor=white">
+  </a>
 </p>
 
 ## Screenshots
@@ -83,6 +87,16 @@ These are optional, but they make Zenith much more reliable and powerful.
 9. **Precise Timing (`SCHEDULE_EXACT_ALARM`)**: Makes sure your daily resets, bedtime schedules, and reminders happen exactly when they're supposed to.
 10. **Storage Access (`READ_EXTERNAL_STORAGE`)**: Only used if you want to use the Backup & Restore feature to save or load your settings.
 11. **Internet Access (`INTERNET`)**: Used to check for app updates (depending on where you downloaded the app) and to let you visit our GitHub or community pages from the settings.
+
+## Support the Project
+
+If you find Zenith helpful and would like to support its development, you can support me on Ko-fi. Your contribution helps keep the project alive and improving!
+
+<p align="left">
+  <a href="https://ko-fi.com/1372slash">
+    <img src="https://img.shields.io/badge/Support%20me%20on%20Ko--fi-F16061?style=for-the-badge&logo=ko-fi&logoColor=white" alt="Support me on Ko-fi">
+  </a>
+</p>
 
 ## Special Thanks
 
