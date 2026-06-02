@@ -39,7 +39,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
 import androidx.graphics.shapes.toPath
+import com.etrisad.zenith.data.local.entity.FocusType
 import com.etrisad.zenith.ui.components.ConfirmBottomSheet
+import com.etrisad.zenith.ui.components.UsageHistoryCard
 import com.etrisad.zenith.ui.components.ZenithButtonSize
 import com.etrisad.zenith.ui.components.ZenithToggleButtonGroup
 import com.etrisad.zenith.ui.components.ZenithToggleOption
@@ -65,6 +67,10 @@ fun BedtimeScreen(
     val bedtimePercentage by viewModel.bedtimeUsagePercentage.collectAsState()
     val totalUsageMillis by viewModel.bedtimeUsageTotalMillis.collectAsState()
     val totalDurationMillis by viewModel.bedtimeDurationTotalMillis.collectAsState()
+    val bedtimeHistory by viewModel.bedtimeHistory.collectAsState()
+    val sessionDateRange by viewModel.bedtimeDateRange.collectAsState()
+    
+    val bedtimeTargetMillis = remember(totalDurationMillis) { (totalDurationMillis * 0.1f).toLong() }
 
     var showAppPicker by remember { mutableStateOf(false) }
     var showStartTimePicker by remember { mutableStateOf(false) }
@@ -216,6 +222,7 @@ fun BedtimeScreen(
                     BedtimeHourlyUsageChart(
                         hourlyUsage = hourlyUsage,
                         selectedHour = selectedHour,
+                        dateRange = sessionDateRange,
                         onHourClick = { selectedHour = if (selectedHour == it) null else it },
                         formatDuration = viewModel::formatDuration,
                         index = 0,
@@ -387,13 +394,34 @@ fun BedtimeScreen(
                 }
             }
 
+            item(key = "bedtime_history_card") {
+                Column(modifier = Modifier.animateItem()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    UsageHistoryCard(
+                        history = bedtimeHistory,
+                        targetMillis = bedtimeTargetMillis,
+                        focusType = FocusType.SHIELD,
+                        formatDuration = { viewModel.formatDuration(it) },
+                        title = "History",
+                        containerColor = containerColor,
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                }
+            }
+
             item(key = "bedtime_efficiency_card") {
                 Column(modifier = Modifier.animateItem()) {
                     Spacer(modifier = Modifier.height(4.dp))
+                    val limitMillis = (totalDurationMillis * 0.1f).toLong()
+                    val remainingMillis = limitMillis - totalUsageMillis
+                    val isExceeded = remainingMillis < 0
+                    
                     BedtimeEfficiencyCard(
                         percentage = bedtimePercentage,
                         totalUsage = viewModel.formatDuration(totalUsageMillis),
                         totalDuration = viewModel.formatDuration(totalDurationMillis),
+                        usageLeft = viewModel.formatDuration(kotlin.math.abs(remainingMillis)),
+                        isExceeded = isExceeded,
                         index = hourlyGroupTotal - 1,
                         total = hourlyGroupTotal,
                         containerColor = containerColor
@@ -655,6 +683,7 @@ fun BedtimeStatusProgress(
 fun BedtimeHourlyUsageChart(
     hourlyUsage: List<HourlyUsageInfo>,
     selectedHour: Int?,
+    dateRange: String,
     onHourClick: (Int) -> Unit,
     formatDuration: (Long) -> String,
     index: Int,
@@ -715,9 +744,10 @@ fun BedtimeHourlyUsageChart(
                         }
                     } else {
                         Text(
-                            text = "Usage per hour",
+                            text = dateRange,
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
                 }
@@ -788,6 +818,8 @@ fun BedtimeEfficiencyCard(
     percentage: Float,
     totalUsage: String,
     totalDuration: String,
+    usageLeft: String,
+    isExceeded: Boolean,
     index: Int,
     total: Int,
     containerColor: Color
@@ -798,7 +830,7 @@ fun BedtimeEfficiencyCard(
         label = "BedtimeEfficiencyProgress"
     )
 
-    val isGoalMet = percentage <= 0.1f
+    val isGoalMet = !isExceeded
     val statusColor = if (isGoalMet) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error
 
     GroupedCard(index = index, total = total, containerColor = containerColor) {
@@ -841,46 +873,88 @@ fun BedtimeEfficiencyCard(
             
             Spacer(modifier = Modifier.height(20.dp))
             
-            LinearWavyProgressIndicator(
-                progress = { animatedProgress },
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(8.dp),
-                color = statusColor,
-                trackColor = statusColor.copy(alpha = 0.1f),
-                stroke = Stroke(width = with(LocalDensity.current) { 4.dp.toPx() }, cap = StrokeCap.Round)
-            )
+                    .height(12.dp),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                LinearWavyProgressIndicator(
+                    progress = { animatedProgress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp),
+                    color = statusColor,
+                    trackColor = statusColor.copy(alpha = 0.1f),
+                    stroke = Stroke(width = with(LocalDensity.current) { 4.dp.toPx() }, cap = StrokeCap.Round)
+                )
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.1f)
+                        .fillMaxHeight(),
+                    contentAlignment = Alignment.CenterEnd
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .background(MaterialTheme.colorScheme.tertiary, CircleShape)
+                            .background(MaterialTheme.colorScheme.surface, CircleShape)
+                            .padding(2.dp)
+                            .background(MaterialTheme.colorScheme.tertiary, CircleShape)
+                    )
+                }
+            }
             
             Spacer(modifier = Modifier.height(12.dp))
             
-            Row(
+            Box(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                contentAlignment = Alignment.Center
             ) {
-                Column {
-                    Text(
-                        text = "Usage",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = totalUsage,
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column {
+                        Text(
+                            text = "Usage",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = totalUsage,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = "Total Period",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = totalDuration,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                 }
-                Column(horizontalAlignment = Alignment.End) {
+
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = "Total Period",
+                        text = if (isExceeded) "Exceeded" else "Left",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = totalDuration,
+                        text = usageLeft,
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = statusColor
                     )
                 }
             }

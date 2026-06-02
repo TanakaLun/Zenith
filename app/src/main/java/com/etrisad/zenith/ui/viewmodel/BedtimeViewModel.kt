@@ -56,11 +56,18 @@ class BedtimeViewModel(
     private val _bedtimeDurationTotalMillis = MutableStateFlow(0L)
     val bedtimeDurationTotalMillis: StateFlow<Long> = _bedtimeDurationTotalMillis.asStateFlow()
 
+    private val _bedtimeHistory = MutableStateFlow<List<DailyUsage>>(emptyList())
+    val bedtimeHistory: StateFlow<List<DailyUsage>> = _bedtimeHistory.asStateFlow()
+
+    private val _bedtimeDateRange = MutableStateFlow("")
+    val bedtimeDateRange: StateFlow<String> = _bedtimeDateRange.asStateFlow()
+
     init {
         refreshStreak()
         viewModelScope.launch {
             userPreferences.collectLatest {
                 loadHourlyUsage()
+                loadBedtimeHistory()
             }
         }
     }
@@ -97,7 +104,9 @@ class BedtimeViewModel(
 
             val bedtimeHours = mutableListOf<Int>()
             var h = startH
-            while (h != endH) {
+            val stopH = if (endM > 0) (endH + 1) % 24 else endH
+            
+            while (h != stopH) {
                 bedtimeHours.add(h)
                 h = (h + 1) % 24
             }
@@ -179,11 +188,83 @@ class BedtimeViewModel(
             val totalDurationMillis = sessionEndCal.timeInMillis - sessionStartCal.timeInMillis
             _bedtimeDurationTotalMillis.value = totalDurationMillis
 
+            val dayFormat = SimpleDateFormat("dd", Locale.getDefault())
+            val monthFormat = SimpleDateFormat("MMM", Locale.getDefault())
+            
+            val startDay = dayFormat.format(sessionStartCal.time)
+            val endDay = dayFormat.format(sessionEndCal.time)
+            val startMonth = monthFormat.format(sessionStartCal.time)
+            val endMonth = monthFormat.format(sessionEndCal.time)
+            
+            _bedtimeDateRange.value = if (startMonth == endMonth) {
+                if (startDay == endDay) "$startDay $startMonth"
+                else "$startDay-$endDay $startMonth"
+            } else {
+                "$startDay $startMonth - $endDay $endMonth"
+            }
+
             if (totalDurationMillis > 0) {
                 _bedtimeUsagePercentage.value = (totalUsage.toFloat() / totalDurationMillis).coerceIn(0f, 1f)
             } else {
                 _bedtimeUsagePercentage.value = 0f
             }
+        }
+    }
+
+    fun loadBedtimeHistory() {
+        viewModelScope.launch {
+            val prefs = userPreferences.value
+            val startH = try { prefs.bedtimeStartTime.split(":")[0].toInt() } catch(_: Exception) { 22 }
+            val endH = try { prefs.bedtimeEndTime.split(":")[0].toInt() } catch(_: Exception) { 7 }
+            val endM = try { prefs.bedtimeEndTime.split(":")[1].toInt() } catch(_: Exception) { 0 }
+
+            val bedtimeHours = mutableListOf<Int>()
+            var h = startH
+            val stopH = if (endM > 0) (endH + 1) % 24 else endH
+            
+            while (h != stopH) {
+                bedtimeHours.add(h)
+                h = (h + 1) % 24
+            }
+
+            val calendar = Calendar.getInstance()
+            calendar.set(Calendar.HOUR_OF_DAY, 0)
+            calendar.set(Calendar.MINUTE, 0)
+            calendar.set(Calendar.SECOND, 0)
+            calendar.set(Calendar.MILLISECOND, 0)
+
+            val historyList = mutableListOf<DailyUsage>()
+
+            for (i in 0 until 21) {
+                val sessionStartCal = (calendar.clone() as Calendar).apply {
+                    add(Calendar.DAY_OF_YEAR, -i)
+                }
+
+                val startDateStr = dateFormat.format(sessionStartCal.time)
+                val nextDateCal = (sessionStartCal.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, 1) }
+                val nextDateStr = dateFormat.format(nextDateCal.time)
+
+                var sessionTotal = 0L
+                for (hour in bedtimeHours) {
+                    val targetDate = if (hour >= startH) startDateStr else nextDateStr
+                    val hourlyData = withContext(Dispatchers.IO) {
+                        shieldRepository.getHourlyUsageForDateSync(targetDate)
+                    }
+                    val hourTotal = hourlyData.find { it.hour == hour && it.packageName == "TOTAL" }?.usageTimeMillis ?: 0L
+                    sessionTotal += hourTotal
+                }
+
+                historyList.add(
+                    DailyUsage(
+                        date = sessionStartCal.timeInMillis,
+                        totalTime = sessionTotal,
+                        hasDatabaseRecord = true,
+                        isLive = i == 0
+                    )
+                )
+            }
+
+            _bedtimeHistory.value = historyList.reversed()
         }
     }
 
