@@ -59,7 +59,7 @@ class AppUsageMonitorService : Service() {
     private var cachedTotalUsage = 0L
     private var sessionStartTime = 0L
     private var baseUsageAtSessionStart = 0L
-    private val allowedApps = ConcurrentHashMap<String, Long>()
+    private val allowedApps get() = shieldRepository.allowedApps
     private val lastAllowedRemainingTime = ConcurrentHashMap<String, Long>()
     private var activeSchedules = listOf<com.etrisad.zenith.data.local.entity.ScheduleEntity>()
     private var whitelistedPackages = emptySet<String>()
@@ -94,6 +94,8 @@ class AppUsageMonitorService : Service() {
     private var lastLauncherAppsRefreshTime = 0L
 
     private var previouslyActiveScheduleIds = setOf<Long>()
+
+    private val mindfulGatewayStates get() = shieldRepository.mindfulGatewayStates
 
     private var baseGlobalUsageAtSessionStart = 0L
     private var cachedTotalGlobalUsage = 0L
@@ -737,7 +739,7 @@ class AppUsageMonitorService : Service() {
                         val isBedtimeBlocking = isBedtimeActive || (isWindDownActive && currentPreferences?.bedtimeWindDownEnabled == true)
                         val shouldCheckSchedules = (isBedtimeBlocking && currentApp !in bedtimeWhitelistedPackages) || (allowedUntilVal == null || currentTime > allowedUntilVal)
 
-                        if (!isAppPaused && shouldCheckSchedules && !InterceptOverlayManager.isShowing) {
+                        if (!isAppPaused && shouldCheckSchedules && !InterceptOverlayManager.isShowing && !ZenithAccessibilityService.isServiceRunning) {
                             if (checkSchedules(currentApp)) {
                                 lastForegroundApp = currentApp
                                 delay(1000)
@@ -1076,7 +1078,6 @@ class AppUsageMonitorService : Service() {
         manager.notify(999, notification)
     }
 
-    private val mindfulGatewayStates = mutableMapOf<String, ShieldEntity>()
 
     private fun getMindfulShield(packageName: String, appName: String): ShieldEntity {
         val existing = mindfulGatewayStates[packageName]

@@ -16,9 +16,13 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.util.concurrent.ConcurrentHashMap
 
 class ShieldRepository(private val context: Context) {
     private val repositoryScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    
+    val allowedApps = ConcurrentHashMap<String, Long>()
+    val mindfulGatewayStates = ConcurrentHashMap<String, ShieldEntity>()
     
     private val database get() = ZenithDatabase.getDatabase(context)
     private val shieldDao get() = database.shieldDao()

@@ -50,7 +50,7 @@ class ZenithAccessibilityService : AccessibilityService() {
     private var lastUsageFetchTime = 0L
     private var cachedTotalUsage = 0L
     private val notifiedGoals = Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
-    private val allowedApps = ConcurrentHashMap<String, Long>()
+    private val allowedApps get() = shieldRepository.allowedApps
     @Volatile
     private var activeSchedules = listOf<ScheduleEntity>()
     @Volatile
@@ -433,7 +433,7 @@ class ZenithAccessibilityService : AccessibilityService() {
         } catch (_: Exception) {}
     }
 
-    private val mindfulGatewayStates = mutableMapOf<String, ShieldEntity>()
+    private val mindfulGatewayStates get() = shieldRepository.mindfulGatewayStates
 
     private fun getMindfulShield(packageName: String, appName: String): ShieldEntity {
         val existing = mindfulGatewayStates[packageName]

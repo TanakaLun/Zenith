@@ -133,24 +133,26 @@ class InterceptOverlayManager(
         onCloseApp: () -> Unit,
         onGoalDismiss: () -> Unit
     ) {
-        if (isShowing && currentPackage == packageName) return
-        isShowing = true
-        currentPackage = packageName
-
-        if (Looper.myLooper() != Looper.getMainLooper()) {
-            mainHandler.post {
-                showOverlay(packageName, appName, shield, totalUsageToday, totalGlobalUsageToday, delayDurationSeconds, onAllowUse, onCloseApp, onGoalDismiss)
+        synchronized(this) {
+            if (isShowing && currentPackage == packageName) return
+            
+            if (Looper.myLooper() != Looper.getMainLooper()) {
+                mainHandler.post {
+                    showOverlay(packageName, appName, shield, totalUsageToday, totalGlobalUsageToday, delayDurationSeconds, onAllowUse, onCloseApp, onGoalDismiss)
+                }
+                return
             }
-            return
-        }
 
-        if (overlayView != null) {
-            updateOverlayContent(packageName, appName, shield, totalUsageToday, totalGlobalUsageToday, delayDurationSeconds, onAllowUse, onCloseApp, onGoalDismiss)
-            return
-        }
+            if (overlayView != null) {
+                updateOverlayContent(packageName, appName, shield, totalUsageToday, totalGlobalUsageToday, delayDurationSeconds, onAllowUse, onCloseApp, onGoalDismiss)
+                isShowing = true
+                currentPackage = packageName
+                return
+            }
 
-        isShowing = true
-        currentPackage = packageName
+            isShowing = true
+            currentPackage = packageName
+        }
 
         val usageState = androidx.compose.runtime.mutableStateOf(Pair(totalUsageToday, totalGlobalUsageToday))
         overlayUsageState = usageState
@@ -222,19 +224,21 @@ class InterceptOverlayManager(
         onAllowUse: (Int, Boolean) -> Unit,
         onCloseApp: () -> Unit
     ) {
-        if (isShowing && currentPackage == packageName) return
-        
-        if (Looper.myLooper() != Looper.getMainLooper()) {
-            mainHandler.post {
-                showScheduleOverlay(packageName, appName, schedule, totalGlobalUsageToday, onAllowUse, onCloseApp)
+        synchronized(this) {
+            if (isShowing && currentPackage == packageName) return
+            
+            if (Looper.myLooper() != Looper.getMainLooper()) {
+                mainHandler.post {
+                    showScheduleOverlay(packageName, appName, schedule, totalGlobalUsageToday, onAllowUse, onCloseApp)
+                }
+                return
             }
-            return
+            
+            if (isShowing || overlayView != null) hideOverlay()
+            
+            isShowing = true
+            currentPackage = packageName
         }
-        
-        if (isShowing || overlayView != null) hideOverlay()
-        
-        isShowing = true
-        currentPackage = packageName
 
         val usageState = androidx.compose.runtime.mutableStateOf(Pair(0L, totalGlobalUsageToday))
         overlayUsageState = usageState
@@ -297,19 +301,21 @@ class InterceptOverlayManager(
         appName: String,
         onCloseApp: () -> Unit
     ) {
-        if (isShowing && currentPackage == packageName) return
+        synchronized(this) {
+            if (isShowing && currentPackage == packageName) return
 
-        if (Looper.myLooper() != Looper.getMainLooper()) {
-            mainHandler.post {
-                showBedtimeOverlay(packageName, appName, onCloseApp)
+            if (Looper.myLooper() != Looper.getMainLooper()) {
+                mainHandler.post {
+                    showBedtimeOverlay(packageName, appName, onCloseApp)
+                }
+                return
             }
-            return
+            
+            if (isShowing || overlayView != null) hideOverlay()
+            
+            isShowing = true
+            currentPackage = packageName
         }
-        
-        if (isShowing || overlayView != null) hideOverlay()
-        
-        isShowing = true
-        currentPackage = packageName
 
         val vStore = ViewModelStore()
         viewModelStore = vStore
@@ -362,19 +368,21 @@ class InterceptOverlayManager(
         onAllowUse: (Int) -> Unit,
         onCloseApp: () -> Unit
     ) {
-        if (isShowing && currentPackage == packageName) return
+        synchronized(this) {
+            if (isShowing && currentPackage == packageName) return
 
-        if (Looper.myLooper() != Looper.getMainLooper()) {
-            mainHandler.post {
-                showWindDownOverlay(packageName, appName, sessionUsed, onAllowUse, onCloseApp)
+            if (Looper.myLooper() != Looper.getMainLooper()) {
+                mainHandler.post {
+                    showWindDownOverlay(packageName, appName, sessionUsed, onAllowUse, onCloseApp)
+                }
+                return
             }
-            return
+
+            if (isShowing || overlayView != null) hideOverlay()
+
+            isShowing = true
+            currentPackage = packageName
         }
-
-        if (isShowing || overlayView != null) hideOverlay()
-
-        isShowing = true
-        currentPackage = packageName
 
         val vStore = ViewModelStore()
         viewModelStore = vStore
@@ -500,40 +508,42 @@ class InterceptOverlayManager(
     }
 
     fun hideOverlay() {
-        isShowing = false
-        val target = currentPackage
-        currentPackage = null
-        
-        resumeMedia()
+        synchronized(this) {
+            isShowing = false
+            val target = currentPackage
+            currentPackage = null
+            
+            resumeMedia()
 
-        if (Looper.myLooper() != Looper.getMainLooper()) {
-            mainHandler.post { hideOverlay() }
-            return
-        }
+            if (Looper.myLooper() != Looper.getMainLooper()) {
+                mainHandler.post { hideOverlay() }
+                return
+            }
 
-        val view = overlayView
-        if (view != null) {
-            try {
-                lifecycleOwner?.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
-                lifecycleOwner?.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
-                lifecycleOwner?.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
-                
-                view.disposeComposition()
-                windowManager.removeViewImmediate(view)
-                
-                viewModelStore?.clear()
-            } catch (e: Exception) {
-                val currentTime = System.currentTimeMillis()
-                if (e.message != lastOverlayError || currentTime - lastOverlayErrorTime > 30000) {
-                    Log.e(TAG, "Error removing overlay for $target: ${e.message}", e)
-                    lastOverlayError = e.message
-                    lastOverlayErrorTime = currentTime
+            val view = overlayView
+            if (view != null) {
+                try {
+                    lifecycleOwner?.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
+                    lifecycleOwner?.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
+                    lifecycleOwner?.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
+                    
+                    view.disposeComposition()
+                    windowManager.removeViewImmediate(view)
+                    
+                    viewModelStore?.clear()
+                } catch (e: Exception) {
+                    val currentTime = System.currentTimeMillis()
+                    if (e.message != lastOverlayError || currentTime - lastOverlayErrorTime > 30000) {
+                        Log.e(TAG, "Error removing overlay for $target: ${e.message}", e)
+                        lastOverlayError = e.message
+                        lastOverlayErrorTime = currentTime
+                    }
+                } finally {
+                    overlayView = null
+                    lifecycleOwner = null
+                    viewModelStore = null
+                    overlayUsageState = null
                 }
-            } finally {
-                overlayView = null
-                lifecycleOwner = null
-                viewModelStore = null
-                overlayUsageState = null
             }
         }
     }
