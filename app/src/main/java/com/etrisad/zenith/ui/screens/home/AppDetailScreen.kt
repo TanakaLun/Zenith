@@ -381,6 +381,8 @@ fun AppDetailScreen(
                 onDismiss = { viewModel.closeSettingsSheet() },
                 onSave = { limit, reminders, goalReminder, isCaller, isSound, soundUri ->
                     viewModel.saveFocus(
+                        packageName = uiState.packageName,
+                        appName = uiState.appName,
                         timeLimitMinutes = limit,
                         maxEmergencyUses = 3,
                         isRemindersEnabled = reminders,
@@ -404,6 +406,8 @@ fun AppDetailScreen(
                 onDismiss = { viewModel.closeSettingsSheet() },
                 onSave = { limit, emergency, reminders, strict, autoQuit, maxUses, refresh, delayApp ->
                     viewModel.saveFocus(
+                        packageName = uiState.packageName,
+                        appName = uiState.appName,
                         timeLimitMinutes = limit,
                         maxEmergencyUses = emergency,
                         isRemindersEnabled = reminders,

@@ -1,12 +1,15 @@
 package com.etrisad.zenith.data.local.entity
 
+import androidx.annotation.Keep
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
+@Keep
 enum class FocusType {
     SHIELD, GOAL
 }
 
+@Keep
 @Entity(tableName = "shields")
 data class ShieldEntity(
     @PrimaryKey

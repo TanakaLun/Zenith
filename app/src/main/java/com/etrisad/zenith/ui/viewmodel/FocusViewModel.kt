@@ -16,9 +16,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -75,17 +72,7 @@ class FocusViewModel(
                 .collect { shields ->
                     try {
                         allShields = shields
-
-                        val s = shields.filter { it.type == FocusType.SHIELD }
-                        val g = shields.filter { it.type == FocusType.GOAL }
-                        _uiState.update { currentState ->
-                            currentState.copy(
-                                activeShields = sortShields(s, currentState.shieldSortType),
-                                activeGoals = sortShields(g, currentState.goalSortType)
-                            )
-                        }
-
-                        updateShieldedLists()
+                        updateShieldedLists(shields)
                         updateInstalledAppsFilter()
                     } catch (e: Exception) {
                         android.util.Log.e("FocusViewModel", "Error in allShields collector: ${e.message}")
@@ -110,20 +97,29 @@ class FocusViewModel(
 
     fun onShieldSortTypeChange(sortType: ShieldSortType) {
         _uiState.value = _uiState.value.copy(shieldSortType = sortType)
-        updateShieldedLists()
+        updateShieldedLists(allShields)
     }
 
     fun onGoalSortTypeChange(sortType: ShieldSortType) {
         _uiState.value = _uiState.value.copy(goalSortType = sortType)
-        updateShieldedLists()
+        updateShieldedLists(allShields)
     }
 
     private var updateShieldedJob: kotlinx.coroutines.Job? = null
 
-    private fun updateShieldedLists() {
+    private fun updateShieldedLists(latestShields: List<ShieldEntity>) {
         updateShieldedJob?.cancel()
         updateShieldedJob = viewModelScope.launch {
             try {
+                val initialShields = latestShields.filter { it.type == FocusType.SHIELD }
+                val initialGoals = latestShields.filter { it.type == FocusType.GOAL }
+                _uiState.update { currentState ->
+                    currentState.copy(
+                        activeShields = sortShields(initialShields, currentState.shieldSortType),
+                        activeGoals = sortShields(initialGoals, currentState.goalSortType)
+                    )
+                }
+
                 val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as android.app.usage.UsageStatsManager
 
                 val accurateUsageMap = withContext(Dispatchers.IO) {
@@ -135,7 +131,7 @@ class FocusViewModel(
                     }
                 }
 
-                val liveShields = allShields.map { shield ->
+                val liveShields = latestShields.map { shield ->
                     val usage = accurateUsageMap[shield.packageName] ?: 0L
                     val limitMillis = shield.timeLimitMinutes * 60 * 1000L
                     shield.copy(remainingTimeMillis = (limitMillis - usage).coerceAtLeast(0L))
@@ -152,10 +148,8 @@ class FocusViewModel(
                 }
             } catch (e: Exception) {
                 android.util.Log.e("FocusViewModel", "Critical error in updateShieldedLists: ${e.message}")
-
-                val shields = allShields.filter { it.type == FocusType.SHIELD }
-                val goals = allShields.filter { it.type == FocusType.GOAL }
-                
+                val shields = latestShields.filter { it.type == FocusType.SHIELD }
+                val goals = latestShields.filter { it.type == FocusType.GOAL }
                 _uiState.update { currentState ->
                     currentState.copy(
                         activeShields = sortShields(shields, currentState.shieldSortType),
@@ -169,7 +163,7 @@ class FocusViewModel(
     private fun startRealTimeUpdates() {
         viewModelScope.launch {
             while (true) {
-                updateShieldedLists()
+                updateShieldedLists(allShields)
                 kotlinx.coroutines.delay(15000)
             }
         }
@@ -258,9 +252,7 @@ class FocusViewModel(
     private suspend fun getTopUsedApps(limit: Int): List<AppInfo> = withContext(Dispatchers.IO) {
         try {
             val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as android.app.usage.UsageStatsManager
-
             val accurateUsageMap = com.etrisad.zenith.util.ScreenUsageHelper.fetchAppUsageTodayTillNow(usm)
-            
             accurateUsageMap.entries
                 .sortedByDescending { it.value }
                 .mapNotNull { (pkg, _) ->
@@ -410,6 +402,8 @@ class FocusViewModel(
     }
 
     fun saveFocus(
+        packageName: String,
+        appName: String,
         timeLimitMinutes: Int,
         maxEmergencyUses: Int = 3,
         isRemindersEnabled: Boolean = true,
@@ -423,11 +417,10 @@ class FocusViewModel(
         isGoalCallerSoundEnabled: Boolean = true,
         goalCallerSoundUri: String? = null
     ) {
-        val selectedApp = _uiState.value.selectedAppForFocus ?: return
         val type = _uiState.value.selectedFocusType
         viewModelScope.launch {
             try {
-                val existing = allShields.find { it.packageName == selectedApp.packageName }
+                val existing = allShields.find { it.packageName == packageName }
                 
                 val shouldResetStreak = existing?.let { 
                     if (it.type == type) {
@@ -439,8 +432,8 @@ class FocusViewModel(
                 } ?: false
 
                 val shield = ShieldEntity(
-                    packageName = selectedApp.packageName,
-                    appName = selectedApp.appName,
+                    packageName = packageName,
+                    appName = appName,
                     type = type,
                     timeLimitMinutes = timeLimitMinutes,
                     emergencyUseCount = existing?.emergencyUseCount ?: (if (type == FocusType.SHIELD) maxEmergencyUses else 0),
@@ -524,9 +517,7 @@ class FocusViewModel(
         } else {
             current + packageName
         }
-        
         val isSelectionStillActive = newSelection.isNotEmpty() || _uiState.value.selectedSchedules.isNotEmpty()
-        
         _uiState.value = _uiState.value.copy(
             selectedShields = newSelection,
             isSelectionMode = if (_uiState.value.isSelectionMode) isSelectionStillActive else _uiState.value.isSelectionMode
@@ -540,9 +531,7 @@ class FocusViewModel(
         } else {
             current + id
         }
-        
         val isSelectionStillActive = _uiState.value.selectedShields.isNotEmpty() || newSelection.isNotEmpty()
-        
         _uiState.value = _uiState.value.copy(
             selectedSchedules = newSelection,
             isSelectionMode = if (_uiState.value.isSelectionMode) isSelectionStillActive else _uiState.value.isSelectionMode
@@ -553,7 +542,6 @@ class FocusViewModel(
         viewModelScope.launch {
             val shieldsToDelete = _uiState.value.selectedShields
             val schedulesToDelete = _uiState.value.selectedSchedules
-
             shieldsToDelete.forEach { pkg ->
                 allShields.find { it.packageName == pkg }?.let {
                     shieldRepository.deleteShield(it)
@@ -572,7 +560,6 @@ class FocusViewModel(
         viewModelScope.launch {
             val shieldsToPause = _uiState.value.selectedShields
             val pauseEndTimestamp = if (durationMinutes == -1) 0L else System.currentTimeMillis() + (durationMinutes * 60 * 1000L)
-
             shieldsToPause.forEach { pkg ->
                 allShields.find { it.packageName == pkg }?.let { shield ->
                     shieldRepository.updateShield(shield.copy(

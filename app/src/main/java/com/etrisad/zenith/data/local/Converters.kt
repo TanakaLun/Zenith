@@ -12,4 +12,18 @@ class Converters {
     fun toList(data: String): List<String> {
         return if (data.isEmpty()) emptyList() else data.split(",")
     }
+
+    @TypeConverter
+    fun fromFocusType(type: com.etrisad.zenith.data.local.entity.FocusType): String {
+        return type.name
+    }
+
+    @TypeConverter
+    fun toFocusType(value: String): com.etrisad.zenith.data.local.entity.FocusType {
+        return try {
+            com.etrisad.zenith.data.local.entity.FocusType.valueOf(value)
+        } catch (e: Exception) {
+            com.etrisad.zenith.data.local.entity.FocusType.SHIELD
+        }
+    }
 }

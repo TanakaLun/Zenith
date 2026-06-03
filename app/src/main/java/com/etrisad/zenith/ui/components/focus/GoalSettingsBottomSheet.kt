@@ -444,16 +444,16 @@ fun GoalSettingsBottomSheet(
             ) {
                 ZenithButton(
                     onClick = {
+                        onSave(
+                            timePickerState.hour * 60 + timePickerState.minute,
+                            remindersEnabled,
+                            goalReminderPeriodMinutes,
+                            isGoalCallerEnabled,
+                            isGoalCallerSoundEnabled,
+                            goalCallerSoundUri
+                        )
                         scope.launch {
                             sheetState.hide()
-                            onSave(
-                                timePickerState.hour * 60 + timePickerState.minute,
-                                remindersEnabled,
-                                goalReminderPeriodMinutes,
-                                isGoalCallerEnabled,
-                                isGoalCallerSoundEnabled,
-                                goalCallerSoundUri
-                            )
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),

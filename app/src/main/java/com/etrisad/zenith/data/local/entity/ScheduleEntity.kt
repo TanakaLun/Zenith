@@ -1,13 +1,16 @@
 package com.etrisad.zenith.data.local.entity
 
+import androidx.annotation.Keep
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import androidx.room.TypeConverters
 
+@Keep
 enum class ScheduleMode {
     BLOCK, ALLOW
 }
 
+@Keep
 @Entity(tableName = "schedules")
 data class ScheduleEntity(
     @PrimaryKey(autoGenerate = true)

@@ -1619,6 +1619,8 @@ class HomeViewModel(
     }
 
     fun saveFocus(
+        packageName: String,
+        appName: String,
         timeLimitMinutes: Int,
         maxEmergencyUses: Int,
         isRemindersEnabled: Boolean,
@@ -1633,8 +1635,6 @@ class HomeViewModel(
         goalCallerSoundUri: String? = null
     ) {
         val state = _appDetailUiState.value
-        val packageName = state.packageName
-        val appName = state.appName
         val type = state.type ?: com.etrisad.zenith.data.local.entity.FocusType.SHIELD
 
         viewModelScope.launch {

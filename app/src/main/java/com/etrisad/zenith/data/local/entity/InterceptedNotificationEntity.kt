@@ -1,8 +1,10 @@
 package com.etrisad.zenith.data.local.entity
 
+import androidx.annotation.Keep
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
+@Keep
 @Entity(tableName = "intercepted_notifications")
 data class InterceptedNotificationEntity(
     @PrimaryKey(autoGenerate = true)

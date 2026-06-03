@@ -1,9 +1,11 @@
 package com.etrisad.zenith.data.local.entity
 
+import androidx.annotation.Keep
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
+@Keep
 @Entity(
     tableName = "daily_usage",
     indices = [Index(value = ["date", "packageName"], unique = true)]
