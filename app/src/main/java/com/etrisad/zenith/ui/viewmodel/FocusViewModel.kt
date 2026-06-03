@@ -16,6 +16,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -72,14 +73,28 @@ class FocusViewModel(
         viewModelScope.launch {
             shieldRepository.allShields
                 .collect { shields ->
-                    allShields = shields
-                    updateShieldedLists()
-                    updateInstalledAppsFilter()
+                    try {
+                        allShields = shields
+
+                        val s = shields.filter { it.type == FocusType.SHIELD }
+                        val g = shields.filter { it.type == FocusType.GOAL }
+                        _uiState.update { currentState ->
+                            currentState.copy(
+                                activeShields = sortShields(s, currentState.shieldSortType),
+                                activeGoals = sortShields(g, currentState.goalSortType)
+                            )
+                        }
+
+                        updateShieldedLists()
+                        updateInstalledAppsFilter()
+                    } catch (e: Exception) {
+                        android.util.Log.e("FocusViewModel", "Error in allShields collector: ${e.message}")
+                    }
                 }
         }
         viewModelScope.launch {
             shieldRepository.allSchedules.collect { schedules ->
-                _uiState.value = _uiState.value.copy(activeSchedules = schedules)
+                _uiState.update { it.copy(activeSchedules = schedules) }
             }
         }
         viewModelScope.launch {
@@ -103,28 +118,50 @@ class FocusViewModel(
         updateShieldedLists()
     }
 
+    private var updateShieldedJob: kotlinx.coroutines.Job? = null
+
     private fun updateShieldedLists() {
-        viewModelScope.launch {
-            val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as android.app.usage.UsageStatsManager
+        updateShieldedJob?.cancel()
+        updateShieldedJob = viewModelScope.launch {
+            try {
+                val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as android.app.usage.UsageStatsManager
 
-            val accurateUsageMap = withContext(Dispatchers.IO) {
-                com.etrisad.zenith.util.ScreenUsageHelper.fetchAppUsageTodayTillNow(usm)
-            }
+                val accurateUsageMap = withContext(Dispatchers.IO) {
+                    try {
+                        com.etrisad.zenith.util.ScreenUsageHelper.fetchAppUsageTodayTillNow(usm)
+                    } catch (e: Exception) {
+                        android.util.Log.e("FocusViewModel", "Error fetching usage stats: ${e.message}")
+                        emptyMap<String, Long>()
+                    }
+                }
 
-            val liveShields = allShields.map { shield ->
-                val usage = accurateUsageMap[shield.packageName] ?: 0L
-                val limitMillis = shield.timeLimitMinutes * 60 * 1000L
-                shield.copy(remainingTimeMillis = (limitMillis - usage).coerceAtLeast(0L))
-            }
+                val liveShields = allShields.map { shield ->
+                    val usage = accurateUsageMap[shield.packageName] ?: 0L
+                    val limitMillis = shield.timeLimitMinutes * 60 * 1000L
+                    shield.copy(remainingTimeMillis = (limitMillis - usage).coerceAtLeast(0L))
+                }
 
-            val shields = liveShields.filter { it.type == FocusType.SHIELD }
-            val goals = liveShields.filter { it.type == FocusType.GOAL }
+                val shields = liveShields.filter { it.type == FocusType.SHIELD }
+                val goals = liveShields.filter { it.type == FocusType.GOAL }
 
-            _uiState.update { currentState ->
-                currentState.copy(
-                    activeShields = sortShields(shields, currentState.shieldSortType),
-                    activeGoals = sortShields(goals, currentState.goalSortType)
-                )
+                _uiState.update { currentState ->
+                    currentState.copy(
+                        activeShields = sortShields(shields, currentState.shieldSortType),
+                        activeGoals = sortShields(goals, currentState.goalSortType)
+                    )
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("FocusViewModel", "Critical error in updateShieldedLists: ${e.message}")
+
+                val shields = allShields.filter { it.type == FocusType.SHIELD }
+                val goals = allShields.filter { it.type == FocusType.GOAL }
+                
+                _uiState.update { currentState ->
+                    currentState.copy(
+                        activeShields = sortShields(shields, currentState.shieldSortType),
+                        activeGoals = sortShields(goals, currentState.goalSortType)
+                    )
+                }
             }
         }
     }
@@ -187,38 +224,53 @@ class FocusViewModel(
         }
     }
 
+    private var filterJob: kotlinx.coroutines.Job? = null
     private fun updateInstalledAppsFilter() {
-        val query = _uiState.value.searchQuery
+        filterJob?.cancel()
+        filterJob = viewModelScope.launch {
+            val query = _uiState.value.searchQuery
 
-        val filtered = if (query.isBlank()) {
-            _allInstalledApps.value
-        } else {
-            _allInstalledApps.value.filter {
-                it.appName.contains(query, ignoreCase = true) ||
-                        it.packageName.contains(query, ignoreCase = true)
+            val filtered = withContext(Dispatchers.Default) {
+                if (query.isBlank()) {
+                    _allInstalledApps.value
+                } else {
+                    _allInstalledApps.value.filter {
+                        it.appName.contains(query, ignoreCase = true) ||
+                                it.packageName.contains(query, ignoreCase = true)
+                    }
+                }
+            }
+
+            val topApps = withContext(Dispatchers.IO) {
+                getTopUsedApps(limit = 6)
+            }
+
+            _uiState.update { currentState ->
+                currentState.copy(
+                    installedApps = filtered,
+                    topApps = topApps,
+                    isLoadingApps = false
+                )
             }
         }
-
-        val topApps = getTopUsedApps(limit = 6)
-
-        _uiState.value = _uiState.value.copy(
-            installedApps = filtered,
-            topApps = topApps,
-            isLoadingApps = false
-        )
     }
 
-    private fun getTopUsedApps(limit: Int): List<AppInfo> {
-        val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as android.app.usage.UsageStatsManager
+    private suspend fun getTopUsedApps(limit: Int): List<AppInfo> = withContext(Dispatchers.IO) {
+        try {
+            val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as android.app.usage.UsageStatsManager
 
-        val accurateUsageMap = com.etrisad.zenith.util.ScreenUsageHelper.fetchAppUsageTodayTillNow(usm)
-        
-        return accurateUsageMap.entries
-            .sortedByDescending { it.value }
-            .mapNotNull { (pkg, _) ->
-                _allInstalledApps.value.find { it.packageName == pkg }
-            }
-            .take(limit)
+            val accurateUsageMap = com.etrisad.zenith.util.ScreenUsageHelper.fetchAppUsageTodayTillNow(usm)
+            
+            accurateUsageMap.entries
+                .sortedByDescending { it.value }
+                .mapNotNull { (pkg, _) ->
+                    _allInstalledApps.value.find { it.packageName == pkg }
+                }
+                .take(limit)
+        } catch (e: Exception) {
+            android.util.Log.e("FocusViewModel", "Error fetching top apps: ${e.message}")
+            emptyList()
+        }
     }
 
     fun onSearchQueryChange(query: String) {

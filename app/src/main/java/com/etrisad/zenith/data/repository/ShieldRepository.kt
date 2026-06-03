@@ -16,6 +16,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
 
 class ShieldRepository(private val context: Context) {
@@ -30,33 +31,23 @@ class ShieldRepository(private val context: Context) {
     private val dailyUsageDao get() = database.dailyUsageDao()
     private val hourlyUsageDao get() = database.hourlyUsageDao()
 
-    private val _allShieldsCache = MutableStateFlow<List<ShieldEntity>>(emptyList())
-    val allShields: Flow<List<ShieldEntity>> = _allShieldsCache.asStateFlow()
-    
-    private val _isShieldsLoaded = MutableStateFlow(false)
-    val isShieldsLoaded: Flow<Boolean> = _isShieldsLoaded.asStateFlow()
+    val allShields: StateFlow<List<ShieldEntity>> = shieldDao.getAllShields()
+        .distinctUntilChanged()
+        .stateIn(
+            scope = repositoryScope,
+            started = SharingStarted.Eagerly,
+            initialValue = emptyList()
+        )
+
+    val isShieldsLoaded: StateFlow<Boolean> = allShields
+        .map { true }
+        .stateIn(
+            scope = repositoryScope,
+            started = SharingStarted.Eagerly,
+            initialValue = false
+        )
 
     val allSchedules: Flow<List<ScheduleEntity>> get() = scheduleDao.getAllSchedules()
-
-    init {
-        startShieldObservation()
-    }
-
-    private fun startShieldObservation() {
-        repositoryScope.launch {
-            while (true) {
-                try {
-                    shieldDao.getAllShields().collect {
-                        _allShieldsCache.value = it
-                        _isShieldsLoaded.value = true
-                    }
-                } catch (e: Exception) {
-                    android.util.Log.e("ShieldRepo", "Error collecting shields, retrying... ${e.message}")
-                    delay(3000)
-                }
-            }
-        }
-    }
 
     fun getLastNDaysGlobalUsage(days: Int): Flow<List<DailyUsageEntity>> {
         return dailyUsageDao.getLastNDaysGlobalUsage(days)
@@ -139,7 +130,7 @@ class ShieldRepository(private val context: Context) {
     }
 
     suspend fun getShieldByPackageName(packageName: String): ShieldEntity? {
-        val cached = _allShieldsCache.value.find { it.packageName == packageName }
+        val cached = allShields.value.find { it.packageName == packageName }
         if (cached != null) return cached
 
         return try {
@@ -150,39 +141,19 @@ class ShieldRepository(private val context: Context) {
         }
     }
 
-    suspend fun insertShield(shield: ShieldEntity) {
-        val currentList = _allShieldsCache.value.toMutableList()
-        val index = currentList.indexOfFirst { it.packageName == shield.packageName }
-        if (index != -1) {
-            currentList[index] = shield
-        } else {
-            currentList.add(shield)
-        }
-        _allShieldsCache.value = currentList
-
-        repositoryScope.launch {
-            try {
-                shieldDao.insertShield(shield)
-            } catch (e: Exception) {
-                android.util.Log.e("ShieldRepo", "Gagal insert ke database: ${e.message}")
-            }
+    suspend fun insertShield(shield: ShieldEntity) = withContext(Dispatchers.IO) {
+        try {
+            shieldDao.insertShield(shield)
+        } catch (e: Exception) {
+            android.util.Log.e("ShieldRepo", "Gagal insert ke database: ${e.message}")
         }
     }
 
-    suspend fun updateShield(shield: ShieldEntity) {
-        val currentList = _allShieldsCache.value.toMutableList()
-        val index = currentList.indexOfFirst { it.packageName == shield.packageName }
-        if (index != -1) {
-            currentList[index] = shield
-            _allShieldsCache.value = currentList
-        }
-
-        repositoryScope.launch {
-            try {
-                shieldDao.updateShield(shield)
-            } catch (e: Exception) {
-                android.util.Log.e("ShieldRepo", "Gagal update database: ${e.message}")
-            }
+    suspend fun updateShield(shield: ShieldEntity) = withContext(Dispatchers.IO) {
+        try {
+            shieldDao.updateShield(shield)
+        } catch (e: Exception) {
+            android.util.Log.e("ShieldRepo", "Gagal update database: ${e.message}")
         }
     }
 
@@ -190,19 +161,11 @@ class ShieldRepository(private val context: Context) {
         shieldDao.resetAllRemainingTimes()
     }
 
-    suspend fun deleteShield(shield: ShieldEntity) {
-        val currentList = _allShieldsCache.value.toMutableList()
-        val removed = currentList.removeAll { it.packageName == shield.packageName }
-        if (removed) {
-            _allShieldsCache.value = currentList
-        }
-
-        repositoryScope.launch {
-            try {
-                shieldDao.deleteShield(shield)
-            } catch (e: Exception) {
-                android.util.Log.e("ShieldRepo", "Gagal menghapus shield dari database: ${e.message}")
-            }
+    suspend fun deleteShield(shield: ShieldEntity) = withContext(Dispatchers.IO) {
+        try {
+            shieldDao.deleteShield(shield)
+        } catch (e: Exception) {
+            android.util.Log.e("ShieldRepo", "Gagal menghapus shield dari database: ${e.message}")
         }
     }
 
