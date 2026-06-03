@@ -79,6 +79,7 @@ class UserPreferencesRepository(private val context: Context) {
         val BEDTIME_WHITELISTED_PACKAGES = stringPreferencesKey("bedtime_whitelisted_packages")
         val BEDTIME_CURRENT_STREAK = intPreferencesKey("bedtime_mode_streak_current")
         val BEDTIME_BEST_STREAK = intPreferencesKey("bedtime_mode_streak_best")
+        val BEDTIME_STREAK_RESET_DATE = stringPreferencesKey("bedtime_streak_reset_date")
         val USER_NAME = stringPreferencesKey("user_name")
         val EARLY_KICK_ENABLED = booleanPreferencesKey("early_kick_enabled")
         val INTERCEPT_AUDIO_FOCUS_ENABLED = booleanPreferencesKey("intercept_audio_focus_enabled")
@@ -167,9 +168,10 @@ class UserPreferencesRepository(private val context: Context) {
                 bedtimeWindDownEnabled = preferences[PreferencesKeys.BEDTIME_WIND_DOWN_ENABLED] ?: false,
                 bedtimeNotificationEnabled = preferences[PreferencesKeys.BEDTIME_NOTIFICATION_ENABLED] ?: true,
                 bedtimeWhitelistedPackages = preferences[PreferencesKeys.BEDTIME_WHITELISTED_PACKAGES]?.split(",")?.filter { it.isNotEmpty() }?.toSet() ?: emptySet(),
-            bedtimeCurrentStreak = preferences[PreferencesKeys.BEDTIME_CURRENT_STREAK] ?: 0,
-            bedtimeBestStreak = preferences[PreferencesKeys.BEDTIME_BEST_STREAK] ?: 0,
-            userName = preferences[PreferencesKeys.USER_NAME] ?: "User",
+                bedtimeCurrentStreak = preferences[PreferencesKeys.BEDTIME_CURRENT_STREAK] ?: 0,
+                bedtimeBestStreak = preferences[PreferencesKeys.BEDTIME_BEST_STREAK] ?: 0,
+                bedtimeStreakResetDate = preferences[PreferencesKeys.BEDTIME_STREAK_RESET_DATE] ?: "",
+                userName = preferences[PreferencesKeys.USER_NAME] ?: "User",
                 earlyKickEnabled = preferences[PreferencesKeys.EARLY_KICK_ENABLED] ?: false,
                 interceptAudioFocusEnabled = preferences[PreferencesKeys.INTERCEPT_AUDIO_FOCUS_ENABLED] ?: true,
                 showDatabaseIndicator = preferences[PreferencesKeys.SHOW_DATABASE_INDICATOR] ?: false,
@@ -441,6 +443,7 @@ class UserPreferencesRepository(private val context: Context) {
 
         val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
         val now = System.currentTimeMillis()
+        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
         
         val startH = try { prefs.bedtimeStartTime.split(":")[0].toInt() } catch(_: Exception) { 22 }
         val startM = try { prefs.bedtimeStartTime.split(":")[1].toInt() } catch(_: Exception) { 0 }
@@ -464,6 +467,12 @@ class UserPreferencesRepository(private val context: Context) {
         for (i in 0..60) {
             val cal = Calendar.getInstance()
             cal.add(Calendar.DAY_OF_YEAR, -i)
+
+            if (prefs.bedtimeStreakResetDate.isNotEmpty()) {
+                val dayStr = sdf.format(cal.time)
+                if (dayStr < prefs.bedtimeStreakResetDate) break
+            }
+
             val dayOfWeek = cal.get(Calendar.DAY_OF_WEEK)
             
             if (dayOfWeek !in prefs.bedtimeDays) continue
@@ -641,9 +650,11 @@ class UserPreferencesRepository(private val context: Context) {
     }
 
     suspend fun resetBedtimeStreak() {
+        val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(System.currentTimeMillis())
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.BEDTIME_CURRENT_STREAK] = 0
             preferences[PreferencesKeys.BEDTIME_BEST_STREAK] = 0
+            preferences[PreferencesKeys.BEDTIME_STREAK_RESET_DATE] = today
         }
     }
 
@@ -821,6 +832,7 @@ data class UserPreferences(
     val bedtimeWhitelistedPackages: Set<String> = emptySet(),
     val bedtimeCurrentStreak: Int = 0,
     val bedtimeBestStreak: Int = 0,
+    val bedtimeStreakResetDate: String = "",
     val userName: String = "User",
     val earlyKickEnabled: Boolean = false,
     val interceptAudioFocusEnabled: Boolean = true,

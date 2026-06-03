@@ -572,7 +572,7 @@ fun BedtimeStatusProgress(
     }
 
     val locale = LocalConfiguration.current.locales[0]
-    val (label, remainingText, progress) = remember(currentTime, startTime, endTime, isBedtime, locale) {
+    val (label, remainingText, progressValue) = remember(currentTime, startTime, endTime, isBedtime, locale) {
         if (isBedtime) {
             val totalDuration = if (endTime.isAfter(startTime)) {
                 Duration.between(startTime, endTime)
@@ -613,6 +613,12 @@ fun BedtimeStatusProgress(
         }
     }
 
+    val animatedProgress by animateFloatAsState(
+        targetValue = progressValue,
+        animationSpec = spring(stiffness = Spring.StiffnessMedium),
+        label = "BedtimeStatusProgress"
+    )
+
     val density = LocalDensity.current
     val strokeWidth = remember(density) { with(density) { 4.dp.toPx() } }
 
@@ -643,7 +649,7 @@ fun BedtimeStatusProgress(
             .padding(16.dp)
     ) {
         CircularWavyProgressIndicator(
-            progress = { progress },
+            progress = { animatedProgress },
             modifier = Modifier.fillMaxSize(),
             color = if (isBedtime) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.secondary,
             trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
