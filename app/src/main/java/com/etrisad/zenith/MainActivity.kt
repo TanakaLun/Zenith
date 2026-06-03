@@ -54,6 +54,8 @@ class MainActivity : ComponentActivity() {
             } else {
                 userPreferencesRepository.setDynamicColor(false)
             }
+
+            userPreferencesRepository.initializeDefaultWhitelist()
         }
         
         val homeViewModelFactory = HomeViewModelFactory(applicationContext, shieldRepository, userPreferencesRepository)

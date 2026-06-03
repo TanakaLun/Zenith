@@ -3,6 +3,7 @@ package com.etrisad.zenith.data.preferences
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -18,10 +19,12 @@ import com.etrisad.zenith.data.local.entity.FocusType
 import com.etrisad.zenith.data.repository.ShieldRepository
 import com.etrisad.zenith.ui.theme.FontAxes
 import com.etrisad.zenith.ui.theme.GSFlexSettings
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.*
@@ -279,6 +282,45 @@ class UserPreferencesRepository(private val context: Context) {
 
     suspend fun setWhitelistedPackages(packages: Set<String>) {
         context.dataStore.edit { preferences -> preferences[PreferencesKeys.WHITELISTED_PACKAGES] = packages.joinToString(",") }
+    }
+
+    suspend fun initializeDefaultWhitelist() {
+        val prefs = userPreferencesFlow.first()
+        if (prefs.whitelistedPackages.isEmpty()) {
+            withContext(Dispatchers.IO) {
+                val pm = context.packageManager
+                val installedApps = try {
+                    pm.getInstalledApplications(PackageManager.GET_META_DATA)
+                } catch (e: Exception) {
+                    emptyList()
+                }
+
+                val systemApps = installedApps.filter {
+                    val isSystemFlag = (it.flags and (ApplicationInfo.FLAG_SYSTEM or ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) != 0
+                    val hasLauncher = pm.getLaunchIntentForPackage(it.packageName) != null
+                    val pkg = it.packageName
+
+                    val isCoreComponent = pkg == "android" ||
+                            pkg.startsWith("com.android.settings") ||
+                            pkg.startsWith("com.android.systemui") ||
+                            pkg.startsWith("com.android.shell") ||
+                            pkg.startsWith("com.android.phone") ||
+                            pkg.startsWith("com.android.angle") ||
+                            pkg.startsWith("com.android.providers") ||
+                            pkg.startsWith("com.google.android.angle") ||
+                            pkg.startsWith("com.google.android.setupwizard") ||
+                            pkg.contains("restore") ||
+                            pkg.contains("overlay") ||
+                            pkg.contains("documentsui")
+
+                    isSystemFlag && (!hasLauncher || isCoreComponent)
+                }.map { it.packageName }.toSet()
+
+                if (systemApps.isNotEmpty()) {
+                    setWhitelistedPackages(systemApps)
+                }
+            }
+        }
     }
 
     suspend fun setLastResetDate(date: String) {
