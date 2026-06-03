@@ -351,7 +351,7 @@ class UsageSyncManager(
 
             appTotals.forEach { (pkg, time) ->
                 val existingPkgTime = existingDailyMap[pkg]?.usageTimeMillis ?: 0L
-                val finalPkgTime = maxOf(time, existingPkgTime)
+                val finalPkgTime = maxOf(time, existingPkgTime).coerceAtMost(finalTotal)
                 
                 dailyEntities.add(
                     com.etrisad.zenith.data.local.entity.DailyUsageEntity(
@@ -366,12 +366,9 @@ class UsageSyncManager(
                 else if (pkg in goalPkgs) goalTime += finalPkgTime
             }
 
-            val existingShieldTotal = existingDailyMap["SHIELD_TOTAL"]?.usageTimeMillis ?: 0L
-            val existingGoalTotal = existingDailyMap["GOAL_TOTAL"]?.usageTimeMillis ?: 0L
-            
-            val finalShieldTotal = maxOf(shieldTime, existingShieldTotal)
-            val finalGoalTotal = maxOf(goalTime, existingGoalTotal)
-            val otherTime = (finalTotal - (finalShieldTotal + finalGoalTotal)).coerceAtLeast(0L)
+            val finalShieldTotal = shieldTime.coerceAtMost(finalTotal)
+            val finalGoalTotal = goalTime.coerceAtMost(finalTotal)
+            val otherTime = (finalTotal - (finalShieldTotal + finalGoalTotal)).coerceAtMost(finalTotal).coerceAtLeast(0L)
 
             dailyEntities.add(com.etrisad.zenith.data.local.entity.DailyUsageEntity(id = existingDailyMap["TOTAL"]?.id ?: 0, date = date, packageName = "TOTAL", usageTimeMillis = finalTotal, lastUpdated = now))
             dailyEntities.add(com.etrisad.zenith.data.local.entity.DailyUsageEntity(id = existingDailyMap["SHIELD_TOTAL"]?.id ?: 0, date = date, packageName = "SHIELD_TOTAL", usageTimeMillis = finalShieldTotal, lastUpdated = now))

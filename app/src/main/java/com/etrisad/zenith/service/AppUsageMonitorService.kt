@@ -1358,6 +1358,8 @@ class AppUsageMonitorService : Service() {
 
     private fun getFilteredGlobalUsage(appUsageMap: Map<String, Long>): Long {
         val currentTime = System.currentTimeMillis()
+        val todayStart = getStartOfDay()
+        val timeSinceMidnight = (currentTime - todayStart).coerceAtLeast(0L)
 
         if (currentTime - lastLauncherAppsRefreshTime > 3600000 || launcherAppsCache.isEmpty()) {
             refreshLauncherCache()
@@ -1365,16 +1367,16 @@ class AppUsageMonitorService : Service() {
 
         val excludePackages = setOfNotNull(packageName, defaultLauncherPackage)
 
-        var totalToday = 0L
+        var totalSum = 0L
         appUsageMap.forEach { (pkg, time) ->
             if (pkg !in excludePackages && pkg in launcherAppsCache) {
                 if (time > 0) {
-                    totalToday += time
+                    totalSum += time
                 }
             }
         }
-        val todayStart = getStartOfDay()
-        return totalToday.coerceAtMost(currentTime - todayStart)
+
+        return totalSum.coerceAtMost(timeSinceMidnight)
     }
 
     private fun refreshLauncherCache() {

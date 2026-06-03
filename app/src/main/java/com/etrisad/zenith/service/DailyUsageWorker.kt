@@ -174,29 +174,29 @@ class DailyUsageWorker(context: Context, params: WorkerParameters) : CoroutineWo
         val userPrefsRepo = UserPreferencesRepository(applicationContext)
         val prefs = userPrefsRepo.userPreferencesFlow.first()
 
-        val calculatedSum = finalAppUsages.values.sum()
-        
-        var totalUsage = if (isDateToday && prefs.lastKnownDailyUsageDate == dateString) {
-            if (prefs.lastKnownDailyUsage > calculatedSum && (prefs.lastKnownDailyUsage - calculatedSum) < 1800000L) {
-                prefs.lastKnownDailyUsage
-            } else {
-                calculatedSum
-            }
-        } else {
-            calculatedSum
+        finalAppUsages.keys.forEach { pkg ->
+            finalAppUsages[pkg] = (finalAppUsages[pkg] ?: 0L).coerceAtMost(timeSinceMidnight)
         }
 
-        totalUsage = totalUsage.coerceAtMost(timeSinceMidnight)
+        val calculatedSum = finalAppUsages.values.sum()
 
-        if (existingTotalVal > 0 && existingTotalVal < (timeSinceMidnight + 60000L)) {
-            totalUsage = maxOf(totalUsage, existingTotalVal)
+        var totalUsage = calculatedSum.coerceAtMost(timeSinceMidnight)
+
+        if (isDateToday && prefs.lastKnownDailyUsageDate == dateString) {
+            if (prefs.lastKnownDailyUsage > totalUsage && (prefs.lastKnownDailyUsage - totalUsage) < 1800000L) {
+                totalUsage = prefs.lastKnownDailyUsage.coerceAtMost(timeSinceMidnight)
+            }
+        }
+
+        if (existingTotalVal > 0) {
+            totalUsage = maxOf(totalUsage, existingTotalVal).coerceAtMost(timeSinceMidnight)
         }
 
         val usagesToInsert = mutableListOf<DailyUsageEntity>()
         finalAppUsages.forEach { (pkg, time) ->
             val existing = existingDaily[pkg]
             val finalTime = if (existing != null) maxOf(existing.usageTimeMillis, time) else time
-            usagesToInsert.add(DailyUsageEntity(date = dateString, packageName = pkg, usageTimeMillis = finalTime))
+            usagesToInsert.add(DailyUsageEntity(date = dateString, packageName = pkg, usageTimeMillis = finalTime.coerceAtMost(timeSinceMidnight)))
         }
 
         usagesToInsert.add(DailyUsageEntity(date = dateString, packageName = "TOTAL", usageTimeMillis = totalUsage))

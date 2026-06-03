@@ -11,7 +11,8 @@ object ScreenUsageHelper {
         val appUsageMap: Map<String, Long>,
         val hourlyUsageMap: Map<Int, Map<String, Long>>,
         val sessionCounts: Map<String, Int>,
-        val lastUsedMap: Map<String, Long> = emptyMap()
+        val lastUsedMap: Map<String, Long> = emptyMap(),
+        val totalGlobalUsage: Long = 0L
     )
 
     private var lastResult: UsageResult? = null
@@ -54,24 +55,27 @@ object ScreenUsageHelper {
         val events = usageStatsManager.queryEvents(start - MIDNIGHT_LOOKBACK_MS, end)
         val event = UsageEvents.Event()
 
-        var isScreenOn = true
+        var isScreenOn = false
+
+        var totalSequentialUsage = 0L
 
         while (events.hasNextEvent()) {
             events.getNextEvent(event)
             val pkg = event.packageName
-            val time = event.timeStamp
+            val time = event.timeStamp.coerceAtMost(end)
 
             when (event.eventType) {
                 UsageEvents.Event.SCREEN_INTERACTIVE -> isScreenOn = true
                 UsageEvents.Event.SCREEN_NON_INTERACTIVE -> {
                     isScreenOn = false
                     activePkg?.let { p ->
-                        val segmentStart = if (activeStartTime > start) activeStartTime else start
-                        val segmentEnd = if (time < end) time else end
+                        val segmentStart = maxOf(activeStartTime, start)
+                        val segmentEnd = minOf(time, end)
                         if (segmentStart < segmentEnd) {
                             val duration = segmentEnd - segmentStart
                             if (duration > MIN_SEGMENT_DURATION) {
                                 usageMap[p] = (usageMap[p] ?: 0L) + duration
+                                totalSequentialUsage += duration
                                 if (duration > SESSION_MIN_DURATION) {
                                     sessionCounts[p] = (sessionCounts[p] ?: 0) + 1
                                 }
@@ -166,7 +170,7 @@ object ScreenUsageHelper {
             }
         }
 
-        val result = UsageResult(usageMap, hourlyMap, sessionCounts, lastUsedMap)
+        val result = UsageResult(usageMap, hourlyMap, sessionCounts, lastUsedMap, totalSequentialUsage)
         lastResult = result
         lastQueryTime = currentTime
         return result

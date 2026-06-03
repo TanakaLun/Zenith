@@ -742,18 +742,22 @@ class HomeViewModel(
             }
 
             val dayRecords = mutableListOf<UsageRecord.Live>()
-            var dayTotal = 0L
+            var dayTotalSum = 0L
+
+            val maxAllowedForDay = if (i == 0) (now - start).coerceAtLeast(0L) else 86400000L
 
             usageMap.forEach { (pkg, time) ->
                 if (pkg in excludePackages || pkg !in launcherApps) return@forEach
                 if (time > 0) {
-                    dayTotal += time
-                    dayRecords.add(UsageRecord.Live(pkg, time))
+                    val cappedTime = time.coerceAtMost(maxAllowedForDay)
+                    dayTotalSum += cappedTime
+                    dayRecords.add(UsageRecord.Live(pkg, cappedTime))
                 }
             }
 
-            if (dayTotal > 0) {
-                dayRecords.add(UsageRecord.Live("TOTAL", dayTotal))
+            if (dayTotalSum > 0) {
+                val finalTotal = dayTotalSum.coerceAtMost(maxAllowedForDay)
+                dayRecords.add(UsageRecord.Live("TOTAL", finalTotal))
                 resultMap[dateStr] = dayRecords.sortedByDescending { it.usageTimeMillis }
             }
         }
@@ -969,11 +973,7 @@ class HomeViewModel(
                 }
             }
 
-            val totalToday = if (isSelectedToday) {
-                appTotals.values.sum().coerceAtMost(timeSinceMidnight)
-            } else {
-                0L
-            }
+            val totalToday = todayDetailed.totalGlobalUsage.coerceAtMost(timeSinceMidnight)
 
             val appList = appTotals.mapNotNull { (pkg, time) ->
                 val sessions = appSessionCounts[pkg] ?: (if (time > 4000) 1 else 0)
@@ -1010,9 +1010,13 @@ class HomeViewModel(
 
             val selectedDayTotal = if (isSelectedToday) {
                 val dbTotalToday = selectedDayHistory.find { it.packageName == "TOTAL" }?.usageTimeMillis ?: 0L
-                maxOf(totalToday, dbTotalToday)
+                maxOf(totalToday, dbTotalToday).coerceAtMost(timeSinceMidnight)
             } else {
-                selectedDayHistory.find { it.packageName == "TOTAL" }?.usageTimeMillis ?: appTotals.values.sum()
+                val selectedDateStr = dateFormat.format(Date(selectedDate))
+                val dbTotal = selectedDayHistory.find { it.packageName == "TOTAL" }?.usageTimeMillis
+                val fallbackTotal = globalFallbackMap[selectedDateStr]?.find { it.packageName == "TOTAL" }?.usageTimeMillis
+                
+                dbTotal ?: fallbackTotal ?: appTotals.values.sum().coerceAtMost(86400000L)
             }
 
             val (finalShieldUsage, finalGoalUsage, finalOtherUsage) = if (isSelectedToday || (storedShieldUsage == null && storedGoalUsage == null)) {
@@ -1200,13 +1204,17 @@ class HomeViewModel(
                 
                 val dbEntry = globalHistory.find { it.date == dateStr }
                 val hasSystemData = globalFallbackMap[dateStr] != null
-                val dayTotal = if (i == 0) {
+                val dayTotal = if (dateStr == selectedDateStr) {
+                    selectedDayTotal
+                } else if (i == 0) {
                     actualTodayTotal
                 } else {
-                    dbEntry?.usageTimeMillis 
-                        ?: if (preferSystemUsageHistory) {
-                             globalFallbackMap[dateStr]?.find { it.packageName == "TOTAL" }?.usageTimeMillis ?: 0L
-                        } else 0L
+                    val dbTotal = dbEntry?.usageTimeMillis
+                    val fallbackTotal = if (preferSystemUsageHistory) {
+                        globalFallbackMap[dateStr]?.find { it.packageName == "TOTAL" }?.usageTimeMillis
+                    } else null
+                    
+                    dbTotal ?: fallbackTotal ?: 0L
                 }
                 DailyUsage(
                     date = dStart, 
