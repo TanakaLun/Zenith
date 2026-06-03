@@ -25,6 +25,7 @@ import android.os.Build
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.mutableStateOf
@@ -49,13 +50,11 @@ class MainActivity : ComponentActivity() {
 
         lifecycleScope.launch {
             val prefs = userPreferencesRepository.userPreferencesFlow.first()
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                userPreferencesRepository.setDynamicColor(true)
-            } else {
-                userPreferencesRepository.setDynamicColor(false)
+            val shouldBeDynamic = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+            
+            if (prefs.dynamicColor != shouldBeDynamic) {
+                userPreferencesRepository.setDynamicColor(shouldBeDynamic)
             }
-
-            userPreferencesRepository.initializeDefaultWhitelist()
         }
         
         val homeViewModelFactory = HomeViewModelFactory(applicationContext, shieldRepository, userPreferencesRepository)

@@ -44,6 +44,7 @@ import androidx.navigation.compose.rememberNavController
 import com.etrisad.zenith.data.preferences.ThemeConfig
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -154,6 +155,7 @@ fun MainScreen(
 
     val useNavigationRail = windowSizeClass.widthSizeClass != WindowWidthSizeClass.Compact
 
+    val scope = rememberCoroutineScope()
     var bedtimeSwitchVisible by remember { mutableStateOf(false) }
     var bedtimeSwitchInLayout by remember { mutableStateOf(false) }
     var showPauseSheet by remember { mutableStateOf(false) }
@@ -224,13 +226,23 @@ fun MainScreen(
     }
 
     val lifecycleOwner = LocalLifecycleOwner.current
+    
     LaunchedEffect(
         lifecycleOwner,
         preferences.accessibilityDisabled,
         preferences.onboardingStatsCompleted,
-        preferences.onboardingUpdateCompleted
+        preferences.onboardingUpdateCompleted,
+        preferences.whitelistInitialized
     ) {
         checkPermissions()
+
+        if (!preferences.whitelistInitialized) {
+            val hasUsageStats = com.etrisad.zenith.util.hasUsageStatsPermission(context)
+            val hasOverlay = android.provider.Settings.canDrawOverlays(context)
+            if (hasUsageStats && hasOverlay) {
+                userPreferencesRepository.initializeDefaultWhitelist()
+            }
+        }
     }
 
     DisposableEffect(lifecycleOwner) {
@@ -250,6 +262,7 @@ fun MainScreen(
             preferencesRepository = userPreferencesRepository,
             onDismissRequest = {
                 showPermissionSheet = false
+                scope.launch { userPreferencesRepository.initializeDefaultWhitelist() }
                 if (!preferences.onboardingStatsCompleted) {
                     showOnboardingStatsSheet = true
                 } else if (!preferences.onboardingUpdateCompleted && com.etrisad.zenith.BuildConfig.SHOW_UPDATES) {
@@ -258,6 +271,7 @@ fun MainScreen(
             },
             onAllPermissionsGranted = {
                 showPermissionSheet = false
+                scope.launch { userPreferencesRepository.initializeDefaultWhitelist() }
                 if (!preferences.onboardingStatsCompleted) {
                     showOnboardingStatsSheet = true
                 } else if (!preferences.onboardingUpdateCompleted && com.etrisad.zenith.BuildConfig.SHOW_UPDATES) {

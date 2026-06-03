@@ -92,6 +92,7 @@ class UserPreferencesRepository(private val context: Context) {
         val PREFER_SYSTEM_USAGE_HISTORY = booleanPreferencesKey("prefer_system_usage_history")
         val ONBOARDING_STATS_COMPLETED = booleanPreferencesKey("onboarding_stats_completed")
         val ONBOARDING_UPDATE_COMPLETED = booleanPreferencesKey("onboarding_update_completed")
+        val WHITELIST_INITIALIZED = booleanPreferencesKey("whitelist_initialized")
         val HUD_HIDE_FEATURE_LEARNED = booleanPreferencesKey("hud_hide_feature_learned")
         val SMART_REPAIR_ON_REFRESH = booleanPreferencesKey("smart_repair_on_refresh")
         val ALLOW_REPAIR_NON_UNAVAILABLE = booleanPreferencesKey("allow_repair_non_unavailable")
@@ -183,6 +184,7 @@ class UserPreferencesRepository(private val context: Context) {
                 preferSystemUsageHistory = preferences[PreferencesKeys.PREFER_SYSTEM_USAGE_HISTORY] ?: true,
                 onboardingStatsCompleted = preferences[PreferencesKeys.ONBOARDING_STATS_COMPLETED] ?: false,
                 onboardingUpdateCompleted = preferences[PreferencesKeys.ONBOARDING_UPDATE_COMPLETED] ?: false,
+                whitelistInitialized = preferences[PreferencesKeys.WHITELIST_INITIALIZED] ?: false,
                 hudHideFeatureLearned = preferences[PreferencesKeys.HUD_HIDE_FEATURE_LEARNED] ?: false,
                 smartRepairOnRefresh = preferences[PreferencesKeys.SMART_REPAIR_ON_REFRESH] ?: false,
                 allowRepairNonUnavailable = preferences[PreferencesKeys.ALLOW_REPAIR_NON_UNAVAILABLE] ?: false,
@@ -286,11 +288,11 @@ class UserPreferencesRepository(private val context: Context) {
 
     suspend fun initializeDefaultWhitelist() {
         val prefs = userPreferencesFlow.first()
-        if (prefs.whitelistedPackages.isEmpty()) {
+        if (!prefs.whitelistInitialized && prefs.whitelistedPackages.isEmpty()) {
             withContext(Dispatchers.IO) {
                 val pm = context.packageManager
                 val installedApps = try {
-                    pm.getInstalledApplications(PackageManager.GET_META_DATA)
+                    pm.getInstalledApplications(0)
                 } catch (e: Exception) {
                     emptyList()
                 }
@@ -318,6 +320,10 @@ class UserPreferencesRepository(private val context: Context) {
 
                 if (systemApps.isNotEmpty()) {
                     setWhitelistedPackages(systemApps)
+                }
+                
+                context.dataStore.edit { preferences -> 
+                    preferences[PreferencesKeys.WHITELIST_INITIALIZED] = true 
                 }
             }
         }
@@ -884,6 +890,7 @@ data class UserPreferences(
     val preferSystemUsageHistory: Boolean = true,
     val onboardingStatsCompleted: Boolean = false,
     val onboardingUpdateCompleted: Boolean = false,
+    val whitelistInitialized: Boolean = false,
     val hudHideFeatureLearned: Boolean = false,
     val smartRepairOnRefresh: Boolean = false,
     val allowRepairNonUnavailable: Boolean = false,
