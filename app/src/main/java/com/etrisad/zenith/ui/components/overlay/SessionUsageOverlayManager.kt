@@ -42,6 +42,7 @@ import com.etrisad.zenith.ui.theme.GSFlexSettings
 import com.etrisad.zenith.ui.theme.ZenithTheme
 import kotlinx.coroutines.*
 import java.util.Collections
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.roundToInt
 
 class SessionUsageOverlayManager(private val context: Context) {
@@ -58,10 +59,6 @@ class SessionUsageOverlayManager(private val context: Context) {
         "com.google.android.permissioncontroller",
         "com.google.android.packageinstaller"
     )
-
-    @Volatile
-    private var currentForegroundPackage: String = ""
-    private var foregroundUpdateJob: Job? = null
 
     private data class HUDInstance(
         val overlayView: ComposeView,
@@ -97,8 +94,16 @@ class SessionUsageOverlayManager(private val context: Context) {
         var lastReportedUsageSeconds: Int = initialSeconds
     }
 
-    private val activeSessions = Collections.synchronizedList(mutableListOf<Session>())
-    private val MaxHuds = 4
+    companion object {
+        private val activeSessions = Collections.synchronizedList(mutableListOf<Session>())
+        private val globalHUDViews = ConcurrentHashMap<String, ComposeView>()
+        private const val MaxHuds = 4
+
+        @Volatile
+        private var currentForegroundPackage: String = ""
+        private var foregroundUpdateJob: Job? = null
+        private val managerScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    }
 
     fun showHUD(
         packageName: String,
@@ -130,7 +135,7 @@ class SessionUsageOverlayManager(private val context: Context) {
                 session.hudInstance = createHUDInstance(session)
             }
 
-            session.timerJob = scope.launch {
+            session.timerJob = managerScope.launch {
                 var lastUpdateMillis = System.currentTimeMillis()
                 while (true) {
                     if (!isGoal && session.secondsLeftState.intValue <= 0) break
@@ -190,7 +195,7 @@ class SessionUsageOverlayManager(private val context: Context) {
         }
         synchronized(activeSessions) {
             activeSessions.forEach { session ->
-                session.hudInstance?.let { destroyHUDInstance(it) }
+                session.hudInstance?.let { destroyHUDInstance(it, session.packageName) }
                 session.hudInstance = null
                 session.isVisibleState.value = false
             }
@@ -198,6 +203,13 @@ class SessionUsageOverlayManager(private val context: Context) {
     }
 
     private fun createHUDInstance(session: Session): HUDInstance {
+        globalHUDViews[session.packageName]?.let { oldView ->
+            try {
+                windowManager.removeViewImmediate(oldView)
+            } catch (_: Exception) {}
+            globalHUDViews.remove(session.packageName)
+        }
+
         val vStore = ViewModelStore()
         val lOwner = MyLifecycleOwner()
         lOwner.performRestore(null)
@@ -246,7 +258,7 @@ class SessionUsageOverlayManager(private val context: Context) {
                         },
                         onHideTemporarily = {
                             session.isTemporarilyHiddenState.value = true
-                            scope.launch {
+                            managerScope.launch {
                                 delay(30000)
                                 session.isTemporarilyHiddenState.value = false
                                 updateForegroundApp(currentForegroundPackage, force = true)
@@ -262,7 +274,7 @@ class SessionUsageOverlayManager(private val context: Context) {
                             if (isTimeUp) {
                                 hideHUD(session.packageName)
                             } else if (!shouldBeVisible) {
-                                session.hudInstance?.let { destroyHUDInstance(it) }
+                                session.hudInstance?.let { destroyHUDInstance(it, session.packageName) }
                                 session.hudInstance = null
                             }
                         }
@@ -278,22 +290,25 @@ class SessionUsageOverlayManager(private val context: Context) {
         composeView.setViewTreeSavedStateRegistryOwner(lOwner)
 
         try {
+            globalHUDViews[session.packageName] = composeView
             windowManager.addView(composeView, params)
             lOwner.handleLifecycleEvent(Lifecycle.Event.ON_START)
             lOwner.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
         } catch (e: Exception) {
+            globalHUDViews.remove(session.packageName)
             e.printStackTrace()
         }
 
         return HUDInstance(composeView, lOwner, vStore)
     }
 
-    private fun destroyHUDInstance(hud: HUDInstance) {
+    private fun destroyHUDInstance(hud: HUDInstance, packageName: String) {
         if (Looper.myLooper() != Looper.getMainLooper()) {
-            mainHandler.post { destroyHUDInstance(hud) }
+            mainHandler.post { destroyHUDInstance(hud, packageName) }
             return
         }
         try {
+            globalHUDViews.remove(packageName)
             hud.lifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
             hud.lifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
             hud.lifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
@@ -316,7 +331,7 @@ class SessionUsageOverlayManager(private val context: Context) {
                 val session = iterator.next()
                 if (packageName == null || session.packageName == packageName) {
                     session.timerJob?.cancel()
-                    session.hudInstance?.let { destroyHUDInstance(it) }
+                    session.hudInstance?.let { destroyHUDInstance(it, session.packageName) }
                     session.onSessionEnd()
                     iterator.remove()
                     if (packageName != null) break
@@ -343,7 +358,7 @@ class SessionUsageOverlayManager(private val context: Context) {
         currentForegroundPackage = packageName
         
         foregroundUpdateJob?.cancel()
-        foregroundUpdateJob = scope.launch {
+        foregroundUpdateJob = managerScope.launch {
             val sessionsToProcess = synchronized(activeSessions) { activeSessions.toList() }
             sessionsToProcess.forEach { session ->
                 val isForeground = packageName.isNotEmpty() &&

@@ -688,7 +688,7 @@ class AppUsageMonitorService : Service() {
                         val isAppPaused = shieldForPauseCheck != null && isPaused(shieldForPauseCheck)
 
                         val allowedUntilVal = allowedApps[currentApp]
-                        if (!isAppPaused && allowedUntilVal != null && allowedUntilVal > currentTime) {
+                        if (!isAppPaused && allowedUntilVal != null && allowedUntilVal > currentTime && !ZenithAccessibilityService.isServiceRunning) {
                             val prefs = currentPreferences
                             if (prefs?.sessionUsageOverlayEnabled == true) {
                                 val remainingMinutes = ((allowedUntilVal - currentTime) / 60000L).toInt().coerceAtLeast(1)
