@@ -58,7 +58,18 @@ fun AllowedBedAppsBottomSheet(
 
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
-            val installedApps = pm.getInstalledApplications(PackageManager.GET_META_DATA)
+            val installedApps = try {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                    pm.getInstalledApplications(PackageManager.ApplicationInfoFlags.of(0L))
+                } else {
+                    @Suppress("DEPRECATION")
+                    pm.getInstalledApplications(0)
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("AllowedBedApps", "Failed to get installed applications", e)
+                emptyList()
+            }
+
             apps = installedApps.asSequence()
                 .map {
                     val isSystemFlag = (it.flags and (ApplicationInfo.FLAG_SYSTEM or ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) != 0
