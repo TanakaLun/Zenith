@@ -183,10 +183,14 @@ class HomeViewModel(
         .debounce(300)
         .distinctUntilChanged()
 
+    private val _globalFallbackMap = MutableStateFlow<Map<String, List<UsageRecord.Live>>>(emptyMap())
+    val globalFallbackMap: StateFlow<Map<String, List<UsageRecord.Live>>> = _globalFallbackMap.asStateFlow()
+
     val fullUsageHistory: Flow<List<UsageHistoryGroup>> = combine(
         allDatabaseUsage,
-        shieldRepository.getDatesWithHourlyUsage()
-    ) { dbList, hourlyDates ->
+        shieldRepository.getDatesWithHourlyUsage(),
+        _globalFallbackMap
+    ) { dbList, hourlyDates, fallbackMap ->
         val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
         val todayStr = dateFormat.format(Date())
 
@@ -209,8 +213,10 @@ class HomeViewModel(
 
             val dbRecords = dbRecordsByDate[dateStr] ?: emptyList()
             val dbTotal = dbRecords.find { it.packageName == "TOTAL" }?.usageTimeMillis ?: 0L
-            val systemRecords = if (preferSystemUsageHistory || isToday) globalFallbackMap[dateStr] ?: emptyList() else emptyList()
-            val systemTotal = if (preferSystemUsageHistory || isToday) systemRecords.find { it.packageName == "TOTAL" }?.usageTimeMillis ?: 0L else 0L
+            
+            // Always include system records in the group data for debug/repair purposes
+            val systemRecords = fallbackMap[dateStr] ?: emptyList()
+            val systemTotal = systemRecords.find { it.packageName == "TOTAL" }?.usageTimeMillis ?: 0L
 
             val hasHourly = hourlyDatesSet.contains(dateStr)
             val hasSnap = dbRecords.any { it.packageName != "TOTAL" && it.packageName != "SHIELD_TOTAL" && it.packageName != "GOAL_TOTAL" && it.packageName != "OTHER_TOTAL" }
@@ -249,7 +255,7 @@ class HomeViewModel(
                     records = liveRecords,
                     totalTimeMillis = maxOf(dbTotal, liveTotal),
                     hasDatabaseRecord = dbRecords.isNotEmpty(),
-                    hasSystemData = true,
+                    hasSystemData = systemRecords.isNotEmpty(),
                     isLive = true,
                     hasSnapshot = hasSnap,
                     hasHourlyUsage = hasHourly,
@@ -294,7 +300,7 @@ class HomeViewModel(
                     records = combinedRecords,
                     totalTimeMillis = dbTotal,
                     hasDatabaseRecord = true,
-                    hasSystemData = systemTotal > 0L,
+                    hasSystemData = systemRecords.isNotEmpty(),
                     hasSnapshot = hasSnap,
                     hasHourlyUsage = hasHourly,
                     hasPiechartData = hasPiechart,
@@ -439,7 +445,7 @@ class HomeViewModel(
         val dbAppRecords = dbRecords.filter { it.packageName !in setOf("TOTAL", "SHIELD_TOTAL", "GOAL_TOTAL", "OTHER_TOTAL") }
         
         val recordsToUse = if (mode == RepairMode.SYSTEM) {
-            globalFallbackMap[date] ?: (if (prefs.allowRepairNonUnavailable) dbAppRecords.map { UsageRecord.Live(it.packageName, it.usageTimeMillis) } else null)
+            _globalFallbackMap.value[date] ?: (if (prefs.allowRepairNonUnavailable) dbAppRecords.map { UsageRecord.Live(it.packageName, it.usageTimeMillis) } else null)
         } else {
             dbAppRecords.map { UsageRecord.Live(it.packageName, it.usageTimeMillis) }
         }
@@ -523,7 +529,7 @@ class HomeViewModel(
 
     private var globalHistory: List<DailyUsageEntity> = emptyList()
     private var allHistory: List<DailyUsageEntity> = emptyList()
-    private var globalFallbackMap: Map<String, List<UsageRecord.Live>> = emptyMap()
+
     private var detailFallbackMap: Map<String, Long> = emptyMap()
     private var currentTargetMinutes: Int = 0
     private var prefGlobalBestStreak: Int = 0
@@ -678,16 +684,16 @@ class HomeViewModel(
     private var lastFullFallbackRefresh = 0L
     private suspend fun updateGlobalFallback(forceFull: Boolean = false) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         val now = System.currentTimeMillis()
-        val isFullNeeded = forceFull || globalFallbackMap.isEmpty() || (now - lastFullFallbackRefresh > 1800000)
+        val isFullNeeded = forceFull || _globalFallbackMap.value.isEmpty() || (now - lastFullFallbackRefresh > 1800000)
 
         val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
         val (launcherApps, launcherPackage) = getLauncherInfo()
         val excludePackages = setOfNotNull(context.packageName, launcherPackage)
 
         val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        val resultMap = globalFallbackMap.toMutableMap()
+        val resultMap = _globalFallbackMap.value.toMutableMap()
 
-        val daysToRefresh = if (isFullNeeded) 30 else 1
+        val daysToRefresh = if (forceFull || resultMap.isEmpty()) 30 else 1
 
         for (i in 0..daysToRefresh) {
             val start = getMidnight(i)
@@ -776,10 +782,12 @@ class HomeViewModel(
                 val finalTotal = dayTotalSum.coerceAtMost(maxAllowedForDay)
                 dayRecords.add(UsageRecord.Live("TOTAL", finalTotal))
                 resultMap[dateStr] = dayRecords.sortedByDescending { it.usageTimeMillis }
+            } else {
+                resultMap[dateStr] = emptyList()
             }
         }
 
-        globalFallbackMap = resultMap
+        _globalFallbackMap.value = resultMap
         if (isFullNeeded) lastFullFallbackRefresh = now
     }
 
@@ -1031,7 +1039,7 @@ class HomeViewModel(
             } else {
                 val selectedDateStr = dateFormat.format(Date(selectedDate))
                 val dbTotal = selectedDayHistory.find { it.packageName == "TOTAL" }?.usageTimeMillis
-                val fallbackTotal = globalFallbackMap[selectedDateStr]?.find { it.packageName == "TOTAL" }?.usageTimeMillis
+                val fallbackTotal = _globalFallbackMap.value[selectedDateStr]?.find { it.packageName == "TOTAL" }?.usageTimeMillis
 
                 dbTotal ?: fallbackTotal ?: appTotals.values.sum().coerceAtMost(86400000L)
             }
@@ -1207,20 +1215,20 @@ class HomeViewModel(
             val yesterdayDateStr = dateFormat.format(yesterdayCal.time)
 
             val totalYesterday = globalHistory.find { it.date == yesterdayDateStr }?.usageTimeMillis
-                ?: globalFallbackMap[yesterdayDateStr]?.find { it.packageName == "TOTAL" }?.usageTimeMillis
+                ?: _globalFallbackMap.value[yesterdayDateStr]?.find { it.packageName == "TOTAL" }?.usageTimeMillis
                 ?: 0L
 
             val todayDateStr = dateFormat.format(Date(todayStart))
             val actualTodayDbTotal = allHistory.find { it.date == todayDateStr && it.packageName == "TOTAL" }?.usageTimeMillis ?: 0L
 
-            val actualTodayTotal = maxOf(totalToday, actualTodayDbTotal).coerceAtMost(timeSinceMidnight)
+            val actualTodayTotal = maxOf(totalYesterday, actualTodayDbTotal).coerceAtMost(timeSinceMidnight)
 
             val history = (0 until 21).map { i ->
                 val dStart = getMidnight(i)
                 val dateStr = dateFormat.format(Date(dStart))
 
                 val dbEntry = globalHistory.find { it.date == dateStr }
-                val hasSystemData = globalFallbackMap[dateStr] != null
+                val hasSystemData = _globalFallbackMap.value[dateStr] != null
                 val dayTotal = if (dateStr == selectedDateStr) {
                     selectedDayTotal
                 } else if (i == 0) {
@@ -1228,7 +1236,7 @@ class HomeViewModel(
                 } else {
                     val dbTotal = dbEntry?.usageTimeMillis
                     val fallbackTotal = if (preferSystemUsageHistory) {
-                        globalFallbackMap[dateStr]?.find { it.packageName == "TOTAL" }?.usageTimeMillis
+                        _globalFallbackMap.value[dateStr]?.find { it.packageName == "TOTAL" }?.usageTimeMillis
                     } else null
 
                     dbTotal ?: fallbackTotal ?: 0L
@@ -1276,7 +1284,7 @@ class HomeViewModel(
                     if (i == 0) {
                         filteredTodayUsage.maxByOrNull { it.value }?.let { it.key to it.value }
                     } else {
-                        globalFallbackMap[dateStr]?.filter { it.packageName != "TOTAL" }
+                        _globalFallbackMap.value[dateStr]?.filter { it.packageName != "TOTAL" }
                             ?.maxByOrNull { it.usageTimeMillis }
                             ?.let { it.packageName to it.usageTimeMillis }
                     }
@@ -1290,7 +1298,7 @@ class HomeViewModel(
                 }
 
                 val hasDb = dbDayApps.isNotEmpty()
-                val hasSys = globalFallbackMap[dateStr] != null
+                val hasSys = _globalFallbackMap.value[dateStr]?.isNotEmpty() == true
 
                 val shouldShow = i == 0 || hasDb || (preferSystemUsageHistory && hasSys)
 
@@ -1562,7 +1570,7 @@ class HomeViewModel(
                 val currentDay = Calendar.getInstance().get(Calendar.DAY_OF_YEAR)
                 if (currentDay != lastUpdateDay) {
                     appInfoCache.clear()
-                    globalFallbackMap = emptyMap()
+                    _globalFallbackMap.value = emptyMap()
                     detailFallbackMap = emptyMap()
 
                     val today = getMidnight(0)
@@ -1740,7 +1748,7 @@ class HomeViewModel(
 
             weekDays.forEach { day ->
                 val dateStr = dateFormat.format(Date(day.date))
-                globalFallbackMap[dateStr]?.forEach { record ->
+                _globalFallbackMap.value[dateStr]?.forEach { record ->
                     if (record.packageName != "TOTAL") {
                         appUsageMap[record.packageName] = (appUsageMap[record.packageName] ?: 0L) + record.usageTimeMillis
                     }
