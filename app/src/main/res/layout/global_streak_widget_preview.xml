@@ -2,15 +2,11 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="110dp"
     android:layout_height="110dp">
-
-    <!-- Background Cookie (12-sided) -->
     <ImageView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:src="@drawable/widget_preview_cookie"
         android:tint="@color/zenith_secondary_container" />
-
-    <!-- Center Content -->
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -45,8 +41,6 @@
             android:includeFontPadding="false"
             android:textStyle="bold" />
     </LinearLayout>
-
-    <!-- Best Streak Badge (Bottom End) -->
     <FrameLayout
         android:layout_width="28dp"
         android:layout_height="28dp"

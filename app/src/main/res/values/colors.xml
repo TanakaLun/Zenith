@@ -7,8 +7,6 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
-
-    <!-- Zenith Non-Dynamic Light Palette for Widget Previews -->
     <color name="zenith_primary">#4D568D</color>
     <color name="zenith_on_primary">#FFFFFF</color>
     <color name="zenith_primary_container">#DEE0FF</color>

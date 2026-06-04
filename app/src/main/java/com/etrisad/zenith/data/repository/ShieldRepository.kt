@@ -125,6 +125,10 @@ class ShieldRepository(private val context: Context) {
         hourlyUsageDao.deleteHourlyUsageForPackage(date, packageName)
     }
 
+    suspend fun getUsageByDateAndPackage(date: String, packageName: String): DailyUsageEntity? {
+        return dailyUsageDao.getUsageByDateAndPackage(date, packageName)
+    }
+
     suspend fun insertDailyUsage(usage: DailyUsageEntity) {
         dailyUsageDao.insertDailyUsage(usage)
     }

@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <data-extraction-rules>
     <cloud-backup>
-        <!-- Hanya sertakan file yang sama dengan manual backup -->
         <include domain="database" path="zenith_database"/>
         <include domain="file" path="datastore/settings.preferences_pb"/>
 

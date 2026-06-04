@@ -1,5 +1,4 @@
 <resources>
-    <!-- Tema Splash Screen untuk Mode Gelap (Background Hitam) -->
     <style name="Theme.App.Starting" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">?android:attr/colorBackground</item>
         <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>

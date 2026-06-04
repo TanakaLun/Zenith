@@ -1,5 +1,4 @@
 /build
-# build APK
 /app/release/
 /app/build/
 /*.apk
