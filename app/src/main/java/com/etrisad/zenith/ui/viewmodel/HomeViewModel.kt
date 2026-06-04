@@ -119,6 +119,8 @@ sealed class UsageRecord {
     data class Live(val packageName: String, val usageTimeMillis: Long) : UsageRecord()
 }
 
+enum class RepairMode { SYSTEM, DATABASE_RECALC }
+
 data class UsageHistoryGroup(
     val date: String,
     val records: List<UsageRecord>,
@@ -131,6 +133,7 @@ data class UsageHistoryGroup(
     val hasHourlyUsage: Boolean = false,
     val hasPiechartData: Boolean = false,
     val systemTotalMillis: Long = 0L,
+    val databaseAppSumMillis: Long = 0L,
     val shieldTotalMillis: Long = 0L,
     val goalTotalMillis: Long = 0L,
     val otherTotalMillis: Long = 0L
@@ -216,6 +219,8 @@ class HomeViewModel(
             val dbShieldTotal = dbRecords.find { it.packageName == "SHIELD_TOTAL" }?.usageTimeMillis ?: 0L
             val dbGoalTotal = dbRecords.find { it.packageName == "GOAL_TOTAL" }?.usageTimeMillis ?: 0L
             val dbOtherTotal = dbRecords.find { it.packageName == "OTHER_TOTAL" }?.usageTimeMillis ?: 0L
+            val dbAppSum = dbRecords.filter { it.packageName !in setOf("TOTAL", "SHIELD_TOTAL", "GOAL_TOTAL", "OTHER_TOTAL") }
+                .sumOf { it.usageTimeMillis }
 
             if (isToday) {
                 val liveRecords = mutableListOf<UsageRecord>()
@@ -250,6 +255,7 @@ class HomeViewModel(
                     hasHourlyUsage = hasHourly,
                     hasPiechartData = true,
                     systemTotalMillis = liveTotal,
+                    databaseAppSumMillis = dbAppSum,
                     shieldTotalMillis = maxOf(dbShieldTotal, liveShield),
                     goalTotalMillis = maxOf(dbGoalTotal, liveGoal),
                     otherTotalMillis = maxOf(dbOtherTotal, liveOther)
@@ -262,7 +268,8 @@ class HomeViewModel(
                     isMissing = true,
                     hasSnapshot = false,
                     hasHourlyUsage = hasHourly,
-                    systemTotalMillis = 0L
+                    systemTotalMillis = 0L,
+                    databaseAppSumMillis = 0L
                 ))
             } else if (dbRecords.isEmpty() && systemRecords.isNotEmpty()) {
                 groups.add(UsageHistoryGroup(
@@ -272,7 +279,8 @@ class HomeViewModel(
                     hasSystemData = true,
                     hasSnapshot = false,
                     hasHourlyUsage = hasHourly,
-                    systemTotalMillis = systemTotal
+                    systemTotalMillis = systemTotal,
+                    databaseAppSumMillis = 0L
                 ))
             } else {
                 val combinedRecords = mutableListOf<UsageRecord>()
@@ -291,6 +299,7 @@ class HomeViewModel(
                     hasHourlyUsage = hasHourly,
                     hasPiechartData = hasPiechart,
                     systemTotalMillis = systemTotal,
+                    databaseAppSumMillis = dbAppSum,
                     shieldTotalMillis = dbShieldTotal,
                     goalTotalMillis = dbGoalTotal,
                     otherTotalMillis = dbOtherTotal
@@ -307,7 +316,7 @@ class HomeViewModel(
         userPreferencesRepository.userPreferencesFlow
     ) { groups, prefs ->
         if (prefs.allowRepairNonUnavailable) {
-            groups.filter { it.hasSystemData }
+            groups.filter { (it.hasSystemData || it.hasDatabaseRecord) && !it.isLive }
         } else {
             groups.filter { (it.isMissing || !it.hasDatabaseRecord) && it.hasSystemData && !it.isLive }
         }
@@ -421,16 +430,21 @@ class HomeViewModel(
         userPreferencesRepository.setAllowRepairNonUnavailable(enabled)
     }
 
-    suspend fun repairData(date: String) {
+    suspend fun repairData(date: String, mode: RepairMode = RepairMode.SYSTEM) {
         val prefs = userPreferencesRepository.userPreferencesFlow.first()
         val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
         val todayStr = dateFormat.format(Date())
 
         val dbRecords = shieldRepository.getDailyUsagesForDateSync(date)
         val dbAppRecords = dbRecords.filter { it.packageName !in setOf("TOTAL", "SHIELD_TOTAL", "GOAL_TOTAL", "OTHER_TOTAL") }
-        val systemRecords = globalFallbackMap[date] ?: (if (prefs.allowRepairNonUnavailable) dbAppRecords.map { UsageRecord.Live(it.packageName, it.usageTimeMillis) } else null)
+        
+        val recordsToUse = if (mode == RepairMode.SYSTEM) {
+            globalFallbackMap[date] ?: (if (prefs.allowRepairNonUnavailable) dbAppRecords.map { UsageRecord.Live(it.packageName, it.usageTimeMillis) } else null)
+        } else {
+            dbAppRecords.map { UsageRecord.Live(it.packageName, it.usageTimeMillis) }
+        }
 
-        if (systemRecords == null) return
+        if (recordsToUse == null || recordsToUse.isEmpty()) return
 
         _isRepairing.value = true
         try {
@@ -444,10 +458,10 @@ class HomeViewModel(
             var gUsage = 0L
             var appSum = 0L
 
-            systemRecords.forEach { record ->
+            recordsToUse.forEach { record ->
                 if (record.packageName != "TOTAL") {
                     val existing = dbAppRecords.find { it.packageName == record.packageName }?.usageTimeMillis ?: 0L
-                    val finalUsage = maxOf(record.usageTimeMillis, existing)
+                    val finalUsage = if (mode == RepairMode.SYSTEM) maxOf(record.usageTimeMillis, existing) else existing
 
                     shieldRepository.insertDailyUsage(
                         DailyUsageEntity(
@@ -463,9 +477,12 @@ class HomeViewModel(
                 }
             }
 
-            val systemTotal = systemRecords.find { it.packageName == "TOTAL" }?.usageTimeMillis ?: appSum
+            val systemTotal = if (mode == RepairMode.SYSTEM) {
+                recordsToUse.find { it.packageName == "TOTAL" }?.usageTimeMillis ?: appSum
+            } else appSum
+
             val existingTotal = dbRecords.find { it.packageName == "TOTAL" }?.usageTimeMillis ?: 0L
-            var finalTotal = maxOf(systemTotal, appSum, existingTotal)
+            var finalTotal = if (mode == RepairMode.SYSTEM) maxOf(systemTotal, appSum, existingTotal) else appSum
 
             if (date == todayStr) {
                 val cal = Calendar.getInstance()
@@ -480,8 +497,8 @@ class HomeViewModel(
             val existingShieldTotal = dbRecords.find { it.packageName == "SHIELD_TOTAL" }?.usageTimeMillis ?: 0L
             val existingGoalTotal = dbRecords.find { it.packageName == "GOAL_TOTAL" }?.usageTimeMillis ?: 0L
 
-            val finalShieldTotal = maxOf(sUsage, existingShieldTotal)
-            val finalGoalTotal = maxOf(gUsage, existingGoalTotal)
+            val finalShieldTotal = if (mode == RepairMode.SYSTEM) maxOf(sUsage, existingShieldTotal) else sUsage
+            val finalGoalTotal = if (mode == RepairMode.SYSTEM) maxOf(gUsage, existingGoalTotal) else gUsage
             val oUsage = (finalTotal - (finalShieldTotal + finalGoalTotal)).coerceAtLeast(0L)
 
             shieldRepository.insertDailyUsage(DailyUsageEntity(date = date, packageName = "TOTAL", usageTimeMillis = finalTotal))

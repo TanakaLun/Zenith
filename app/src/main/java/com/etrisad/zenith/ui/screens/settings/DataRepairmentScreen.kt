@@ -32,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.etrisad.zenith.ui.components.ZenithContainedLoadingIndicator
+import com.etrisad.zenith.ui.viewmodel.RepairMode
 import com.etrisad.zenith.ui.viewmodel.HomeViewModel
 import com.etrisad.zenith.data.preferences.UserPreferences
 import com.etrisad.zenith.ui.viewmodel.UsageHistoryGroup
@@ -170,7 +171,7 @@ fun DataRepairmentScreen(
                         RepairableGroupCard(
                             group = group,
                             formatDuration = { viewModel.formatDuration(it) },
-                            onRepair = { date -> scope.launch { viewModel.repairData(date) } },
+                            onRepair = { date, mode -> scope.launch { viewModel.repairData(date, mode) } },
                             isFirst = isFirst,
                             isLast = isLast,
                             enabled = !isRepairing
@@ -233,12 +234,14 @@ fun DataRepairmentScreen(
 fun RepairableGroupCard(
     group: UsageHistoryGroup,
     formatDuration: (Long) -> String,
-    onRepair: (String) -> Unit,
+    onRepair: (String, RepairMode) -> Unit,
     isFirst: Boolean,
     isLast: Boolean,
     enabled: Boolean
 ) {
     var expanded by remember { mutableStateOf(false) }
+    var repairMode by remember { mutableStateOf(if (group.hasSystemData) RepairMode.SYSTEM else RepairMode.DATABASE_RECALC) }
+    
     val rotation by animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy)
@@ -294,13 +297,17 @@ fun RepairableGroupCard(
                 Box(
                     modifier = Modifier
                         .size(40.dp)
-                        .background(MaterialTheme.colorScheme.errorContainer, CircleShape),
+                        .background(
+                            if (group.isMissing) MaterialTheme.colorScheme.errorContainer 
+                            else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f), 
+                            CircleShape
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Outlined.BugReport,
+                        imageVector = if (group.isMissing) Icons.Outlined.History else Icons.Outlined.BuildCircle,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onErrorContainer,
+                        tint = if (group.isMissing) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -314,9 +321,13 @@ fun RepairableGroupCard(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = if (group.isMissing) "Missing from Database" else "System stats only",
+                        text = when {
+                            group.isMissing -> "No existing record"
+                            !group.hasDatabaseRecord -> "System data only"
+                            else -> "Incomplete database record"
+                        },
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
+                        color = if (group.isMissing) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
@@ -338,31 +349,96 @@ fun RepairableGroupCard(
                         modifier = Modifier.padding(bottom = 16.dp),
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                     )
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 20.dp),
+                        shape = RoundedCornerShape(20.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Outlined.History,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    "Current Database Value",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = if (group.hasDatabaseRecord) formatDuration(group.totalTimeMillis) else "No data stored",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Black,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                            if (!group.hasDatabaseRecord) {
+                                Badge(
+                                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                                ) {
+                                    Text("MISSING", modifier = Modifier.padding(horizontal = 4.dp))
+                                }
+                            }
+                        }
+                    }
+
+                    Text(
+                        text = "Repair Source (New Value)",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         RepairComparisonCard(
-                            title = "Current",
-                            duration = if (group.hasDatabaseRecord) formatDuration(group.totalTimeMillis) else "None",
-                            icon = Icons.Outlined.History,
-                            modifier = Modifier.weight(1f),
-                            containerColor = MaterialTheme.colorScheme.surface
+                            title = "Database",
+                            subtitle = "Recalculate apps",
+                            duration = formatDuration(group.databaseAppSumMillis),
+                            icon = Icons.Outlined.SdStorage,
+                            modifier = Modifier.weight(1f).clickable(enabled = group.hasDatabaseRecord) { 
+                                repairMode = RepairMode.DATABASE_RECALC 
+                            },
+                            selected = repairMode == RepairMode.DATABASE_RECALC,
+                            enabled = group.hasDatabaseRecord
                         )
+                        
                         RepairComparisonCard(
-                            title = "Calculated",
+                            title = "System",
+                            subtitle = "Sync with OS",
                             duration = formatDuration(group.systemTotalMillis),
                             icon = Icons.Outlined.Calculate,
-                            modifier = Modifier.weight(1f),
-                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                            modifier = Modifier.weight(1f).clickable(enabled = group.hasSystemData) { 
+                                repairMode = RepairMode.SYSTEM 
+                            },
+                            selected = repairMode == RepairMode.SYSTEM,
+                            enabled = group.hasSystemData
                         )
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
                     
                     Text(
-                        text = "Calculated Breakdown",
+                        text = if (repairMode == RepairMode.SYSTEM) "System Stats Breakdown" else "Existing App Breakdown",
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
@@ -371,25 +447,32 @@ fun RepairableGroupCard(
 
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         val summaryPkgs = setOf("TOTAL", "SHIELD_TOTAL", "GOAL_TOTAL", "OTHER_TOTAL")
-                        val liveRecords = group.records
-                            .filterIsInstance<UsageRecord.Live>()
-                            .filter { it.packageName !in summaryPkgs }
+                        val displayRecords = group.records
+                            .filter { record ->
+                                when (repairMode) {
+                                    RepairMode.SYSTEM -> record is UsageRecord.Live && record.packageName !in summaryPkgs
+                                    RepairMode.DATABASE_RECALC -> record is UsageRecord.Database && record.entity.packageName !in summaryPkgs
+                                }
+                            }
                         
-                        if (liveRecords.isEmpty()) {
+                        if (displayRecords.isEmpty()) {
                             Text(
-                                "No individual app data available",
+                                "No individual app data available for this mode",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(vertical = 8.dp)
                             )
                         }
 
-                        liveRecords.forEachIndexed { index, record ->
+                        displayRecords.forEachIndexed { index, record ->
+                            val pkg = if (record is UsageRecord.Live) record.packageName else (record as UsageRecord.Database).entity.packageName
+                            val dur = if (record is UsageRecord.Live) record.usageTimeMillis else (record as UsageRecord.Database).entity.usageTimeMillis
+                            
                             RepairRecordItem(
-                                packageName = record.packageName,
-                                duration = formatDuration(record.usageTimeMillis),
+                                packageName = pkg,
+                                duration = formatDuration(dur),
                                 isFirst = index == 0,
-                                isLast = index == liveRecords.size - 1
+                                isLast = index == displayRecords.size - 1
                             )
                         }
                     }
@@ -397,9 +480,10 @@ fun RepairableGroupCard(
                     Spacer(modifier = Modifier.height(24.dp))
 
                     HoldToAcceptButton(
-                        onAccept = { onRepair(group.date) },
+                        onAccept = { onRepair(group.date, repairMode) },
                         modifier = Modifier.fillMaxWidth(),
-                        enabled = enabled
+                        enabled = enabled,
+                        text = if (repairMode == RepairMode.SYSTEM) "Repair from System Stats" else "Re-index from App Records"
                     )
                 }
             }
@@ -468,39 +552,92 @@ fun RepairRecordItem(
 @Composable
 fun RepairComparisonCard(
     title: String,
+    subtitle: String,
     duration: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
-    containerColor: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    selected: Boolean = false,
+    enabled: Boolean = true
 ) {
+    val alpha by animateFloatAsState(targetValue = if (enabled) 1f else 0.4f)
+    val containerColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh
+    val contentColor = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+    
     Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
+        modifier = modifier.graphicsLayer { this.alpha = alpha },
+        shape = RoundedCornerShape(20.dp),
         color = containerColor,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        border = androidx.compose.foundation.BorderStroke(
+            width = 2.dp, 
+            color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent
+        ),
+        shadowElevation = if (selected) 6.dp else 0.dp
     ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(24.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = title,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = duration,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.ExtraBold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+        Box(modifier = Modifier.fillMaxWidth()) {
+            if (selected) {
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.CheckCircle,
+                        contentDescription = null,
+                        modifier = Modifier.padding(2.dp).size(14.dp),
+                        tint = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
+            }
+            
+            Column(
+                modifier = Modifier.padding(14.dp),
+                horizontalAlignment = Alignment.Start
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .background(
+                            if (selected) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.15f)
+                            else MaterialTheme.colorScheme.surfaceVariant,
+                            CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(14.dp))
+                
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = contentColor
+                )
+                
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = contentColor.copy(alpha = 0.7f),
+                    maxLines = 1
+                )
+                
+                Spacer(modifier = Modifier.height(6.dp))
+                
+                Text(
+                    text = if (enabled) duration else "--:--",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Black,
+                    color = contentColor
+                )
+            }
         }
     }
 }
@@ -509,7 +646,8 @@ fun RepairComparisonCard(
 fun HoldToAcceptButton(
     onAccept: () -> Unit,
     modifier: Modifier = Modifier,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    text: String = "Hold to repair records"
 ) {
     var isHolding by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -585,7 +723,7 @@ fun HoldToAcceptButton(
             )
             Spacer(modifier = Modifier.width(12.dp))
             Text(
-                text = if (isHolding) "Hold steady..." else "Hold to repair records",
+                text = if (isHolding) "Hold steady..." else text,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.ExtraBold,
                 color = MaterialTheme.colorScheme.primary,
