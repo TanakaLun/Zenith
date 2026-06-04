@@ -58,6 +58,7 @@ fun DeveloperSettings(
     onTriggerOnboardingStats: () -> Unit,
     onTriggerOnboardingUpdate: () -> Unit,
     onResetBedtimeStreak: () -> Unit,
+    onResetStreakRecovery: () -> Unit,
     onUpdateAppStreak: (String, Int) -> Unit,
     onUpdateGlobalScreenTime: (Long) -> Unit,
     onUpdateAppScreenTime: (String, Long) -> Unit
@@ -186,6 +187,15 @@ fun DeveloperSettings(
                 summary = "Reset current and best bedtime streaks to 0",
                 onClick = onResetBedtimeStreak,
                 icon = Icons.Outlined.Bedtime,
+                shape = RoundedCornerShape(8.dp)
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+            SettingsActionItem(
+                title = "Reset Streak Recovery Flag",
+                summary = "Allow automatic streak recovery to run one more time",
+                onClick = onResetStreakRecovery,
+                icon = Icons.Outlined.RestartAlt,
                 shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
             )
 

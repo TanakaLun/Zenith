@@ -551,6 +551,7 @@ class HomeViewModel(
                 Unit
             }.debounce(250).collect {
                 updateGlobalFallback()
+                userPreferencesRepository.refreshAllAppStreaks(shieldRepository)
                 refreshUsageStats(showLoading = false)
             }
         }

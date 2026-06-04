@@ -248,6 +248,12 @@ fun SettingsCategoryScreen(
                                 Toast.makeText(context, "Bedtime streak reset to 0", Toast.LENGTH_SHORT).show()
                             }
                         },
+                        onResetStreakRecovery = {
+                            coroutineScope.launch {
+                                preferencesRepository.setStreakRecoveryPerformed(false)
+                                Toast.makeText(context, "Recovery flag reset. It will run on next refresh.", Toast.LENGTH_SHORT).show()
+                            }
+                        },
                         onUpdateAppStreak = { pkg, streak ->
                             coroutineScope.launch {
                                 val shield = app.shieldRepository.getShieldByPackageName(pkg)

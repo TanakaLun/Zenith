@@ -222,7 +222,7 @@ class DailyUsageWorker(context: Context, params: WorkerParameters) : CoroutineWo
 
         if (!isBackup) {
             sendDataSavedNotification()
-            dailyUsageDao.deleteOldUsage(dateFormat.format(Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -21) }.time))
+            dailyUsageDao.deleteOldUsage(dateFormat.format(Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -180) }.time))
         }
 
         return Result.success()
