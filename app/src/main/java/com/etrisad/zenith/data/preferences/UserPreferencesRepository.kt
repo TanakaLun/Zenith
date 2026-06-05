@@ -43,6 +43,10 @@ enum class GSFlexPreset {
     ZENITH, NEO, COMPACT, AIRY, CUSTOM
 }
 
+enum class ForegroundNotificationStatusMode {
+    DAILY_USAGE, ACTIVE_FOCUS, DEFAULT
+}
+
 class UserPreferencesRepository(private val context: Context) {
 
     private object PreferencesKeys {
@@ -69,6 +73,7 @@ class UserPreferencesRepository(private val context: Context) {
         val FLOATING_TAB_BAR_ENABLED = booleanPreferencesKey("floating_tab_bar_enabled")
         val EXPRESSIVE_COLORS = booleanPreferencesKey("expressive_colors")
         val TOTAL_USAGE_PILL_ENABLED = booleanPreferencesKey("total_usage_pill_enabled")
+        val FOREGROUND_NOTIFICATION_STATUS_MODE = stringPreferencesKey("foreground_notification_status_mode")
         val LAST_KNOWN_DAILY_USAGE = longPreferencesKey("last_known_daily_usage")
         val LAST_KNOWN_DAILY_USAGE_DATE = stringPreferencesKey("last_known_daily_usage_date")
 
@@ -163,6 +168,9 @@ class UserPreferencesRepository(private val context: Context) {
                 floatingTabBarEnabled = preferences[PreferencesKeys.FLOATING_TAB_BAR_ENABLED] ?: false,
                 expressiveColors = preferences[PreferencesKeys.EXPRESSIVE_COLORS] ?: false,
                 totalUsagePillEnabled = preferences[PreferencesKeys.TOTAL_USAGE_PILL_ENABLED] ?: false,
+                foregroundNotificationStatusMode = preferences[PreferencesKeys.FOREGROUND_NOTIFICATION_STATUS_MODE]
+                    ?.let { runCatching { ForegroundNotificationStatusMode.valueOf(it) }.getOrNull() }
+                    ?: ForegroundNotificationStatusMode.DAILY_USAGE,
                 lastKnownDailyUsage = preferences[PreferencesKeys.LAST_KNOWN_DAILY_USAGE] ?: 0L,
                 lastKnownDailyUsageDate = preferences[PreferencesKeys.LAST_KNOWN_DAILY_USAGE_DATE] ?: "",
                 bedtimeEnabled = preferences[PreferencesKeys.BEDTIME_ENABLED] ?: false,
@@ -677,6 +685,10 @@ class UserPreferencesRepository(private val context: Context) {
         context.dataStore.edit { preferences -> preferences[PreferencesKeys.TOTAL_USAGE_PILL_ENABLED] = enabled }
     }
 
+    suspend fun setForegroundNotificationStatusMode(mode: ForegroundNotificationStatusMode) {
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.FOREGROUND_NOTIFICATION_STATUS_MODE] = mode.name }
+    }
+
     suspend fun setLastKnownDailyUsage(usage: Long, date: String) {
         context.dataStore.edit { preferences -> preferences[PreferencesKeys.LAST_KNOWN_DAILY_USAGE] = usage; preferences[PreferencesKeys.LAST_KNOWN_DAILY_USAGE_DATE] = date }
     }
@@ -1014,6 +1026,7 @@ data class UserPreferences(
     val floatingTabBarEnabled: Boolean = false,
     val expressiveColors: Boolean = false,
     val totalUsagePillEnabled: Boolean = false,
+    val foregroundNotificationStatusMode: ForegroundNotificationStatusMode = ForegroundNotificationStatusMode.DAILY_USAGE,
     val lastKnownDailyUsage: Long = 0L,
     val lastKnownDailyUsageDate: String = "",
     val bedtimeEnabled: Boolean = false,
