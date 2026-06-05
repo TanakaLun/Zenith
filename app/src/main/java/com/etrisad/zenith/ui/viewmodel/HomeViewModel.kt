@@ -189,10 +189,12 @@ class HomeViewModel(
     val fullUsageHistory: Flow<List<UsageHistoryGroup>> = combine(
         allDatabaseUsage,
         shieldRepository.getDatesWithHourlyUsage(),
-        _globalFallbackMap
-    ) { dbList, hourlyDates, fallbackMap ->
+        _globalFallbackMap,
+        userPreferencesRepository.userPreferencesFlow
+    ) { dbList, hourlyDates, fallbackMap, prefs ->
         val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
         val todayStr = dateFormat.format(Date())
+        val preferSystem = prefs.preferSystemUsageHistory
 
         val earliestDateStr = dbList.lastOrNull()?.date ?: dateFormat.format(Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -7) }.time)
         val earliestCal = Calendar.getInstance().apply {
@@ -214,7 +216,7 @@ class HomeViewModel(
             val dbRecords = dbRecordsByDate[dateStr] ?: emptyList()
             val dbTotal = dbRecords.find { it.packageName == "TOTAL" }?.usageTimeMillis ?: 0L
 
-            val systemRecords = fallbackMap[dateStr] ?: emptyList()
+            val systemRecords = if (preferSystem) (fallbackMap[dateStr] ?: emptyList()) else emptyList()
             val systemTotal = systemRecords.find { it.packageName == "TOTAL" }?.usageTimeMillis ?: 0L
 
             val hasHourly = hourlyDatesSet.contains(dateStr)
@@ -348,11 +350,7 @@ class HomeViewModel(
                 val start = getMidnight(i)
                 val end = if (i == 0) now else getMidnight(i - 1)
 
-                val events = try {
-                    usm.queryEvents(start - 1800000L, end)
-                } catch (e: Exception) {
-                    null
-                }
+                val events = usm.queryEvents(start - 1800000L, end)
                 val event = UsageEvents.Event()
 
                 val usageMap = mutableMapOf<String, Long>()
@@ -360,7 +358,7 @@ class HomeViewModel(
                 var activeStartTime = 0L
                 var isScreenOn = true
 
-                while (events?.hasNextEvent() == true) {
+                while (events.hasNextEvent()) {
                     events.getNextEvent(event)
                     val pkg = event.packageName
                     val time = event.timeStamp
@@ -446,7 +444,7 @@ class HomeViewModel(
 
         val dbRecords = shieldRepository.getDailyUsagesForDateSync(date)
         val dbAppRecords = dbRecords.filter { it.packageName !in setOf("TOTAL", "SHIELD_TOTAL", "GOAL_TOTAL", "OTHER_TOTAL") }
-        
+
         val recordsToUse = if (mode == RepairMode.SYSTEM) {
             _globalFallbackMap.value[date] ?: (if (prefs.allowRepairNonUnavailable) dbAppRecords.map { UsageRecord.Live(it.packageName, it.usageTimeMillis) } else null)
         } else {
@@ -696,7 +694,7 @@ class HomeViewModel(
         val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
         val resultMap = _globalFallbackMap.value.toMutableMap()
 
-        val daysToRefresh = if (forceFull || resultMap.isEmpty()) 30 else 1
+        val daysToRefresh = if (isFullNeeded) 30 else 1
 
         for (i in 0..daysToRefresh) {
             val start = getMidnight(i)
@@ -704,18 +702,14 @@ class HomeViewModel(
             val dateStr = dateFormat.format(Date(start))
 
             val usageMap = mutableMapOf<String, Long>()
-            val events = try {
-                usm.queryEvents(start - 1800000L, end)
-            } catch (e: Exception) {
-                null
-            }
+            val events = usm.queryEvents(start - 1800000L, end)
             val event = UsageEvents.Event()
 
             var activePkg: String? = null
             var activeStartTime = 0L
             var isScreenOn = true
 
-            while (events?.hasNextEvent() == true) {
+            while (events.hasNextEvent()) {
                 events.getNextEvent(event)
                 val pkg = event.packageName
                 val time = event.timeStamp
@@ -809,11 +803,7 @@ class HomeViewModel(
             val end = if (i == 0) now else getMidnight(i - 1)
             val dateStr = dateFormat.format(Date(start))
 
-            val events = try {
-                usm.queryEvents(start - 1800000L, end)
-            } catch (e: Exception) {
-                null
-            }
+            val events = usm.queryEvents(start - 1800000L, end)
             val event = UsageEvents.Event()
 
             var activePkg: String? = null
@@ -821,7 +811,7 @@ class HomeViewModel(
             var isScreenOn = true
             var dayUsage = 0L
 
-            while (events?.hasNextEvent() == true) {
+            while (events.hasNextEvent()) {
                 events.getNextEvent(event)
                 val pkg = event.packageName
                 val time = event.timeStamp
@@ -887,7 +877,6 @@ class HomeViewModel(
         }
         detailFallbackMap = result
     }
-
 
     fun selectDate(dateMillis: Long?) {
         val cal = Calendar.getInstance()
@@ -988,21 +977,17 @@ class HomeViewModel(
                             it.packageName != "OTHER_TOTAL"
                 }
 
-                val dayStats = try {
-                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                        usm.queryAndAggregateUsageStats(dayStart, dayEnd)
-                    }
-                } catch (e: Exception) {
-                    null
+                val dayStats = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    usm.queryAndAggregateUsageStats(dayStart, dayEnd)
                 }
 
                 if (dbAppRecords.isNotEmpty()) {
                     dbAppRecords.forEach { record ->
                         appTotals[record.packageName] = record.usageTimeMillis
-                        lastUsedMap[record.packageName] = dayStats?.get(record.packageName)?.lastTimeUsed ?: 0L
+                        lastUsedMap[record.packageName] = dayStats[record.packageName]?.lastTimeUsed ?: 0L
                     }
-                } else {
-                    dayStats?.forEach { (pkg, stat) ->
+                } else if (preferSystemUsageHistory) {
+                    dayStats.forEach { (pkg, stat) ->
                         if (pkg in excludePackages || pkg !in launcherApps) return@forEach
                         val time = stat.totalTimeVisible.coerceAtLeast(stat.totalTimeInForeground)
                         if (time > 0) {
@@ -1054,7 +1039,9 @@ class HomeViewModel(
             } else {
                 val selectedDateStr = dateFormat.format(Date(selectedDate))
                 val dbTotal = selectedDayHistory.find { it.packageName == "TOTAL" }?.usageTimeMillis
-                val fallbackTotal = _globalFallbackMap.value[selectedDateStr]?.find { it.packageName == "TOTAL" }?.usageTimeMillis
+                val fallbackTotal = if (preferSystemUsageHistory) {
+                    _globalFallbackMap.value[selectedDateStr]?.find { it.packageName == "TOTAL" }?.usageTimeMillis
+                } else null
 
                 dbTotal ?: fallbackTotal ?: appTotals.values.sum().coerceAtMost(86400000L)
             }
@@ -1230,20 +1217,20 @@ class HomeViewModel(
             val yesterdayDateStr = dateFormat.format(yesterdayCal.time)
 
             val totalYesterday = globalHistory.find { it.date == yesterdayDateStr }?.usageTimeMillis
-                ?: _globalFallbackMap.value[yesterdayDateStr]?.find { it.packageName == "TOTAL" }?.usageTimeMillis
+                ?: (if (preferSystemUsageHistory) _globalFallbackMap.value[yesterdayDateStr]?.find { it.packageName == "TOTAL" }?.usageTimeMillis else null)
                 ?: 0L
 
             val todayDateStr = dateFormat.format(Date(todayStart))
             val actualTodayDbTotal = allHistory.find { it.date == todayDateStr && it.packageName == "TOTAL" }?.usageTimeMillis ?: 0L
 
-            val actualTodayTotal = maxOf(totalYesterday, actualTodayDbTotal).coerceAtMost(timeSinceMidnight)
+            val actualTodayTotal = maxOf(totalToday, actualTodayDbTotal).coerceAtMost(timeSinceMidnight)
 
             val history = (0 until 21).map { i ->
                 val dStart = getMidnight(i)
                 val dateStr = dateFormat.format(Date(dStart))
 
                 val dbEntry = globalHistory.find { it.date == dateStr }
-                val hasSystemData = _globalFallbackMap.value[dateStr] != null
+                val hasSystemData = _globalFallbackMap.value[dateStr] != null && preferSystemUsageHistory
                 val dayTotal = if (dateStr == selectedDateStr) {
                     selectedDayTotal
                 } else if (i == 0) {
@@ -1298,11 +1285,11 @@ class HomeViewModel(
                 } else {
                     if (i == 0) {
                         filteredTodayUsage.maxByOrNull { it.value }?.let { it.key to it.value }
-                    } else {
+                    } else if (preferSystemUsageHistory) {
                         _globalFallbackMap.value[dateStr]?.filter { it.packageName != "TOTAL" }
                             ?.maxByOrNull { it.usageTimeMillis }
                             ?.let { it.packageName to it.usageTimeMillis }
-                    }
+                    } else null
                 }
 
                 val topPackage = topEntry?.first
@@ -1313,7 +1300,7 @@ class HomeViewModel(
                 }
 
                 val hasDb = dbDayApps.isNotEmpty()
-                val hasSys = _globalFallbackMap.value[dateStr]?.isNotEmpty() == true
+                val hasSys = _globalFallbackMap.value[dateStr]?.isNotEmpty() == true && preferSystemUsageHistory
 
                 val shouldShow = i == 0 || hasDb || (preferSystemUsageHistory && hasSys)
 
@@ -1425,7 +1412,7 @@ class HomeViewModel(
                 val yesterdayDateStr = dateFormat.format(yesterdayCal.time)
 
                 val yesterdayUsage = historyFromDb.find { it.date == yesterdayDateStr }?.usageTimeMillis
-                    ?: detailFallbackMap[yesterdayDateStr]
+                    ?: (if (prefs.preferSystemUsageHistory) detailFallbackMap[yesterdayDateStr] else 0L)
                     ?: 0L
 
                 val history = (0 until 21).map { i ->
@@ -1761,11 +1748,22 @@ class HomeViewModel(
             val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
             val appUsageMap = mutableMapOf<String, Long>()
 
+            val preferSystem = userPreferencesRepository.userPreferencesFlow.first().preferSystemUsageHistory
             weekDays.forEach { day ->
                 val dateStr = dateFormat.format(Date(day.date))
-                _globalFallbackMap.value[dateStr]?.forEach { record ->
-                    if (record.packageName != "TOTAL") {
+
+                allHistory.filter { it.date == dateStr }.forEach { record ->
+                    if (record.packageName !in setOf("TOTAL", "SHIELD_TOTAL", "GOAL_TOTAL", "OTHER_TOTAL")) {
                         appUsageMap[record.packageName] = (appUsageMap[record.packageName] ?: 0L) + record.usageTimeMillis
+                    }
+                }
+
+                if (preferSystem) {
+                    _globalFallbackMap.value[dateStr]?.forEach { record ->
+                        if (record.packageName != "TOTAL") {
+                            val existing = appUsageMap[record.packageName] ?: 0L
+                            appUsageMap[record.packageName] = maxOf(existing, record.usageTimeMillis)
+                        }
                     }
                 }
             }
