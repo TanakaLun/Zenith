@@ -18,11 +18,8 @@ import com.etrisad.zenith.data.repository.ShieldRepository
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
 import com.etrisad.zenith.data.preferences.UserPreferences
 import com.etrisad.zenith.service.UsageSyncManager
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -518,6 +515,7 @@ class HomeViewModel(
             android.util.Log.e("HomeVM", "Error repairing data: ${e.message}")
         } finally {
             _isRepairing.value = false
+            refreshUsageStats(showLoading = false)
         }
     }
 
@@ -539,12 +537,21 @@ class HomeViewModel(
     init {
         viewModelScope.launch {
             shieldRepository.isShieldsLoaded.first { it }
+            var lastPreferSystem: Boolean? = null
+            var lastOnboardingCompleted: Boolean? = null
+            
             combine(
                 shieldRepository.allShields,
                 shieldRepository.getRecentUsage(60),
                 shieldRepository.getLastNDaysGlobalUsage(60),
                 userPreferencesRepository.userPreferencesFlow
             ) { shields, usage, global, prefs ->
+                val forceUpdate = (lastPreferSystem != null && lastPreferSystem != prefs.preferSystemUsageHistory) ||
+                                (lastOnboardingCompleted != null && lastOnboardingCompleted != prefs.onboardingStatsCompleted)
+                
+                lastPreferSystem = prefs.preferSystemUsageHistory
+                lastOnboardingCompleted = prefs.onboardingStatsCompleted
+
                 allShields = shields
                 allHistory = usage
                 globalHistory = global
@@ -572,10 +579,10 @@ class HomeViewModel(
                         bestStreak = shield?.bestStreak ?: 0
                     ) }
                 }
-                Unit
-            }.debounce(250).collect {
-                updateGlobalFallback()
-                refreshUsageStats(showLoading = false)
+                forceUpdate
+            }.debounce(150).collect { forceUpdate ->
+                updateGlobalFallback(forceFull = forceUpdate)
+                refreshUsageStats(showLoading = forceUpdate)
             }
         }
 
@@ -691,105 +698,112 @@ class HomeViewModel(
         val (launcherApps, launcherPackage) = getLauncherInfo()
         val excludePackages = setOfNotNull(context.packageName, launcherPackage)
 
-        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        val resultMap = _globalFallbackMap.value.toMutableMap()
-
         val daysToRefresh = if (isFullNeeded) 30 else 1
+        if (isFullNeeded) lastFullFallbackRefresh = now
 
-        for (i in 0..daysToRefresh) {
-            val start = getMidnight(i)
-            val end = if (i == 0) now else getMidnight(i - 1)
-            val dateStr = dateFormat.format(Date(start))
+        val results = coroutineScope {
+            (0..daysToRefresh).map { i ->
+                async {
+                    val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                    val start = getMidnight(i)
+                    val end = if (i == 0) now else getMidnight(i - 1)
+                    val dateStr = dateFormat.format(Date(start))
 
-            val usageMap = mutableMapOf<String, Long>()
-            val events = usm.queryEvents(start - 1800000L, end)
-            val event = UsageEvents.Event()
+                    val usageMap = mutableMapOf<String, Long>()
+                    val events = try {
+                        usm.queryEvents(start - 1800000L, end)
+                    } catch (e: Exception) { null }
 
-            var activePkg: String? = null
-            var activeStartTime = 0L
-            var isScreenOn = true
+                    if (events == null) return@async dateStr to emptyList<UsageRecord.Live>()
 
-            while (events.hasNextEvent()) {
-                events.getNextEvent(event)
-                val pkg = event.packageName
-                val time = event.timeStamp
+                    val event = UsageEvents.Event()
+                    var activePkg: String? = null
+                    var activeStartTime = 0L
+                    var isScreenOn = true
 
-                when (event.eventType) {
-                    UsageEvents.Event.SCREEN_INTERACTIVE -> isScreenOn = true
-                    UsageEvents.Event.SCREEN_NON_INTERACTIVE -> {
-                        isScreenOn = false
-                        activePkg?.let { p ->
-                            val segmentStart = maxOf(activeStartTime, start)
-                            val segmentEnd = minOf(time, end)
-                            if (segmentStart < segmentEnd) {
-                                usageMap[p] = (usageMap[p] ?: 0L) + (segmentEnd - segmentStart)
+                    while (events.hasNextEvent()) {
+                        events.getNextEvent(event)
+                        val pkg = event.packageName
+                        val time = event.timeStamp
+
+                        when (event.eventType) {
+                            UsageEvents.Event.SCREEN_INTERACTIVE -> isScreenOn = true
+                            UsageEvents.Event.SCREEN_NON_INTERACTIVE -> {
+                                isScreenOn = false
+                                activePkg?.let { p ->
+                                    val segmentStart = maxOf(activeStartTime, start)
+                                    val segmentEnd = minOf(time, end)
+                                    if (segmentStart < segmentEnd) {
+                                        usageMap[p] = (usageMap[p] ?: 0L) + (segmentEnd - segmentStart)
+                                    }
+                                }
+                                activePkg = null
+                                activeStartTime = 0L
                             }
-                        }
-                        activePkg = null
-                        activeStartTime = 0L
-                    }
-                    UsageEvents.Event.ACTIVITY_RESUMED,
-                    UsageEvents.Event.MOVE_TO_FOREGROUND -> {
-                        if (isScreenOn) {
-                            if (activePkg != null) {
-                                val segmentStart = maxOf(activeStartTime, start)
-                                val segmentEnd = minOf(time, end)
-                                if (segmentStart < segmentEnd) {
-                                    usageMap[activePkg!!] = (usageMap[activePkg!!] ?: 0L) + (segmentEnd - segmentStart)
+                            UsageEvents.Event.ACTIVITY_RESUMED,
+                            UsageEvents.Event.MOVE_TO_FOREGROUND -> {
+                                if (isScreenOn) {
+                                    if (activePkg != null) {
+                                        val segmentStart = maxOf(activeStartTime, start)
+                                        val segmentEnd = minOf(time, end)
+                                        if (segmentStart < segmentEnd) {
+                                            usageMap[activePkg!!] = (usageMap[activePkg!!] ?: 0L) + (segmentEnd - segmentStart)
+                                        }
+                                    }
+                                    activePkg = pkg
+                                    activeStartTime = time
                                 }
                             }
-                            activePkg = pkg
-                            activeStartTime = time
-                        }
-                    }
-                    UsageEvents.Event.ACTIVITY_PAUSED,
-                    UsageEvents.Event.MOVE_TO_BACKGROUND -> {
-                        if (activePkg == pkg) {
-                            val segmentStart = maxOf(activeStartTime, start)
-                            val segmentEnd = minOf(time, end)
-                            if (segmentStart < segmentEnd) {
-                                usageMap[pkg] = (usageMap[pkg] ?: 0L) + (segmentEnd - segmentStart)
+                            UsageEvents.Event.ACTIVITY_PAUSED,
+                            UsageEvents.Event.MOVE_TO_BACKGROUND -> {
+                                if (activePkg == pkg) {
+                                    val segmentStart = maxOf(activeStartTime, start)
+                                    val segmentEnd = minOf(time, end)
+                                    if (segmentStart < segmentEnd) {
+                                        usageMap[pkg] = (usageMap[pkg] ?: 0L) + (segmentEnd - segmentStart)
+                                    }
+                                    activePkg = null
+                                    activeStartTime = 0L
+                                }
                             }
-                            activePkg = null
-                            activeStartTime = 0L
                         }
                     }
+
+                    if (activePkg != null && isScreenOn) {
+                        val segmentStart = maxOf(activeStartTime, start)
+                        val segmentEnd = minOf(now, end)
+                        if (segmentStart < segmentEnd) {
+                            usageMap[activePkg!!] = (usageMap[activePkg!!] ?: 0L) + (segmentEnd - segmentStart)
+                        }
+                    }
+
+                    val dayRecords = mutableListOf<UsageRecord.Live>()
+                    var dayTotalSum = 0L
+                    val maxAllowedForDay = if (i == 0) (now - start).coerceAtLeast(0L) else 86400000L
+
+                    usageMap.forEach { (pkg, time) ->
+                        if (pkg in excludePackages || pkg !in launcherApps) return@forEach
+                        if (time > 0) {
+                            val cappedTime = time.coerceAtMost(maxAllowedForDay)
+                            dayTotalSum += cappedTime
+                            dayRecords.add(UsageRecord.Live(pkg, cappedTime))
+                        }
+                    }
+
+                    if (dayTotalSum > 0) {
+                        val finalTotal = dayTotalSum.coerceAtMost(maxAllowedForDay)
+                        dayRecords.add(UsageRecord.Live("TOTAL", finalTotal))
+                        dateStr to dayRecords.sortedByDescending { it.usageTimeMillis }
+                    } else {
+                        dateStr to emptyList<UsageRecord.Live>()
+                    }
                 }
-            }
-
-            if (activePkg != null && isScreenOn) {
-                val segmentStart = maxOf(activeStartTime, start)
-                val segmentEnd = minOf(now, end)
-                if (segmentStart < segmentEnd) {
-                    usageMap[activePkg!!] = (usageMap[activePkg!!] ?: 0L) + (segmentEnd - segmentStart)
-                }
-            }
-
-            val dayRecords = mutableListOf<UsageRecord.Live>()
-            var dayTotalSum = 0L
-
-            val maxAllowedForDay = if (i == 0) (now - start).coerceAtLeast(0L) else 86400000L
-
-            usageMap.forEach { (pkg, time) ->
-                if (pkg in excludePackages || pkg !in launcherApps) return@forEach
-                if (time > 0) {
-                    val cappedTime = time.coerceAtMost(maxAllowedForDay)
-                    dayTotalSum += cappedTime
-                    dayRecords.add(UsageRecord.Live(pkg, cappedTime))
-                }
-            }
-
-            if (dayTotalSum > 0) {
-                val finalTotal = dayTotalSum.coerceAtMost(maxAllowedForDay)
-                dayRecords.add(UsageRecord.Live("TOTAL", finalTotal))
-                resultMap[dateStr] = dayRecords.sortedByDescending { it.usageTimeMillis }
-            } else {
-                resultMap[dateStr] = emptyList()
-            }
+            }.awaitAll()
         }
 
-        _globalFallbackMap.value = resultMap
-        if (isFullNeeded) lastFullFallbackRefresh = now
+        _globalFallbackMap.update { current ->
+            current + results.toMap()
+        }
     }
 
     private suspend fun updatePackageFallback(packageName: String) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
@@ -896,8 +910,6 @@ class HomeViewModel(
     private fun refreshUsageStats(showLoading: Boolean = true) {
         if (showLoading) _uiState.update { it.copy(isLoading = true) }
 
-        if (!showLoading && refreshJob?.isActive == true && !_uiState.value.isLoading) return
-
         refreshJob?.cancel()
         refreshJob = viewModelScope.launch(kotlinx.coroutines.Dispatchers.Default) {
             val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
@@ -999,6 +1011,24 @@ class HomeViewModel(
             }
 
             val totalToday = todayDetailed.totalGlobalUsage.coerceAtMost(timeSinceMidnight)
+
+            val missingPkgs = appTotals.keys.filter { !appInfoCache.containsKey(it) }
+            if (missingPkgs.isNotEmpty()) {
+                withContext(Dispatchers.IO) {
+                    coroutineScope {
+                        missingPkgs.map { pkg ->
+                            async {
+                                try {
+                                    val appInfo = pm.getApplicationInfo(pkg, 0)
+                                    val label = pm.getApplicationLabel(appInfo).toString()
+                                    val icon = pm.getApplicationIcon(appInfo)
+                                    appInfoCache[pkg] = label to icon
+                                } catch (_: Exception) {}
+                            }
+                        }.awaitAll()
+                    }
+                }
+            }
 
             val appList = appTotals.mapNotNull { (pkg, time) ->
                 val sessions = appSessionCounts[pkg] ?: (if (time > 4000) 1 else 0)
