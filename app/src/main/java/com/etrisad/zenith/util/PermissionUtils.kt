@@ -75,3 +75,8 @@ fun canScheduleExactAlarms(context: Context): Boolean {
         true
     }
 }
+
+fun isAndroidGo(context: Context): Boolean {
+    val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+    return activityManager.isLowRamDevice
+}

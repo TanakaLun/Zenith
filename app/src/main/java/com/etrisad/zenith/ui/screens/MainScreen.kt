@@ -147,9 +147,14 @@ fun MainScreen(
         }
     }
 
-    val preferences by userPreferencesRepository.userPreferencesFlow.collectAsState(
-        initial = UserPreferences()
+    val preferencesResult by userPreferencesRepository.userPreferencesFlow.collectAsState(
+        initial = null
     )
+
+    if (preferencesResult == null) return
+
+    val preferences = preferencesResult!!
+
     val homeUiState by homeViewModel.uiState.collectAsState()
     val focusUiState by focusViewModel.uiState.collectAsState()
 

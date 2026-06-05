@@ -43,6 +43,7 @@ import com.etrisad.zenith.util.canScheduleExactAlarms
 import com.etrisad.zenith.util.hasNotificationPermission
 import com.etrisad.zenith.util.hasUsageStatsPermission
 import com.etrisad.zenith.util.isAccessibilityServiceEnabled
+import com.etrisad.zenith.util.isAndroidGo
 import com.etrisad.zenith.util.isIgnoringBatteryOptimizations
 import com.etrisad.zenith.util.isNotificationListenerEnabled
 import kotlinx.coroutines.launch
@@ -206,7 +207,7 @@ fun PermissionBottomSheet(
 
             PermissionItemRow(
                 title = "System Overlay",
-                description = "To show the shield over apps",
+                description = if (isAndroidGo(context)) "Required to show shields. May require ADB on some Go devices." else "To show the shield over apps",
                 isGranted = hasOverlay,
                 onClick = {
                     val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION).apply {

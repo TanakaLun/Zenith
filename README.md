@@ -74,6 +74,8 @@ Without these, Zenith won't be able to track your usage or help you stay mindful
 
 1. **Usage Stats (`PACKAGE_USAGE_STATS`)**: This lets Zenith see how much time you spend in your apps so it can help you stick to your limits.
 2. **System Overlay (`SYSTEM_ALERT_WINDOW`)**: This allows Zenith to show a "Shield" or a timer over other apps when you've reached your limit or need a mindful pause.
+   - **Note for Android Go users**: Some Android Go devices do not allow granting this permission through settings. You may need to grant it via ADB:
+     `adb shell pm grant com.etrisad.zenith android.permission.SYSTEM_ALERT_WINDOW`
 3. **App List (`QUERY_ALL_PACKAGES`)**: Zenith needs this to show you a list of your apps so you can choose which ones you want to track or block.
 4. **Notifications (`POST_NOTIFICATIONS`)**: Used to send you goal reminders and keep you updated on your focus progress throughout the day.
 5. **Do Not Disturb (`ACCESS_NOTIFICATION_POLICY`)**: This allows Bedtime Mode to automatically silence your phone so you can get a better night's sleep.

@@ -468,8 +468,15 @@ class InterceptOverlayManager(
 
         try {
             requestMediaPause()
-            windowManager.addView(composeView, params)
-            overlayView = composeView
+            
+            synchronized(this) {
+                if (!isShowing) {
+                    composeView.disposeComposition()
+                    return
+                }
+                windowManager.addView(composeView, params)
+                overlayView = composeView
+            }
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 composeView.post {
@@ -492,8 +499,11 @@ class InterceptOverlayManager(
                 lastOverlayError = e.message
                 lastOverlayErrorTime = currentTime
             }
-            isShowing = false
-            currentPackage = null
+            synchronized(this) {
+                isShowing = false
+                currentPackage = null
+                overlayView = null
+            }
         }
     }
 
@@ -509,6 +519,8 @@ class InterceptOverlayManager(
 
     fun hideOverlay() {
         synchronized(this) {
+            if (!isShowing && overlayView == null) return
+            
             isShowing = false
             val target = currentPackage
             currentPackage = null
@@ -544,6 +556,10 @@ class InterceptOverlayManager(
                     viewModelStore = null
                     overlayUsageState = null
                 }
+            } else {
+                lifecycleOwner = null
+                viewModelStore = null
+                overlayUsageState = null
             }
         }
     }
