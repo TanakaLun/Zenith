@@ -565,7 +565,8 @@ class HomeViewModel(
         shields: List<ShieldEntity>,
         usage: List<DailyUsageEntity>,
         global: List<DailyUsageEntity>,
-        prefs: UserPreferences
+        prefs: UserPreferences,
+        fallbackMap: Map<String, List<UsageRecord.Live>>
     ) {
         val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
         val todayStr = dateFormat.format(Date())
@@ -576,7 +577,7 @@ class HomeViewModel(
         val dbApps = todayUsage.filter { it.packageName !in setOf("TOTAL", "SHIELD_TOTAL", "GOAL_TOTAL", "OTHER_TOTAL") }
         
         val allApps = if (dbApps.isEmpty() && prefs.preferSystemUsageHistory) {
-            val fallbackToday = _globalFallbackMap.value[todayStr]
+            val fallbackToday = fallbackMap[todayStr]
             fallbackToday?.filter { it.packageName != "TOTAL" }?.map { record ->
                 val cached = appInfoCache[record.packageName]
                 AppUsageInfo(
@@ -603,7 +604,7 @@ class HomeViewModel(
 
         val totalTodayFromDb = todayUsage.find { it.packageName == "TOTAL" }?.usageTimeMillis ?: 0L
         val totalToday = if (prefs.preferSystemUsageHistory && totalTodayFromDb == 0L) {
-            _globalFallbackMap.value[todayStr]?.find { it.packageName == "TOTAL" }?.usageTimeMillis ?: 0L
+            fallbackMap[todayStr]?.find { it.packageName == "TOTAL" }?.usageTimeMillis ?: 0L
         } else totalTodayFromDb
 
         val shieldToday = todayUsage.find { it.packageName == "SHIELD_TOTAL" }?.usageTimeMillis ?: 0L
@@ -614,9 +615,9 @@ class HomeViewModel(
             val dStart = getMidnight(i)
             val dStr = dateFormat.format(Date(dStart))
             val dbEntry = global.find { it.date == dStr }
-            val hasSys = _globalFallbackMap.value[dStr] != null
+            val hasSys = fallbackMap[dStr] != null
             val fallbackTotal = if (prefs.preferSystemUsageHistory) {
-                _globalFallbackMap.value[dStr]?.find { it.packageName == "TOTAL" }?.usageTimeMillis
+                fallbackMap[dStr]?.find { it.packageName == "TOTAL" }?.usageTimeMillis
             } else null
 
             DailyUsage(
@@ -639,14 +640,14 @@ class HomeViewModel(
                 val top = dbDayApps.maxByOrNull { it.usageTimeMillis }
                 top?.packageName to top?.usageTimeMillis
             } else if (prefs.preferSystemUsageHistory) {
-                val fallbackTop = _globalFallbackMap.value[dStr]?.filter { it.packageName != "TOTAL" }?.maxByOrNull { it.usageTimeMillis }
+                val fallbackTop = fallbackMap[dStr]?.filter { it.packageName != "TOTAL" }?.maxByOrNull { it.usageTimeMillis }
                 fallbackTop?.packageName to fallbackTop?.usageTimeMillis
             } else null
 
             val topPkg = topPkgEntry?.first
             val usageT = topPkgEntry?.second ?: 0L
             val hasDb = dbDayApps.isNotEmpty()
-            val hasSys = _globalFallbackMap.value[dStr] != null
+            val hasSys = fallbackMap[dStr] != null
 
             if (topPkg != null) {
                 val cached = appInfoCache[topPkg]
@@ -696,7 +697,7 @@ class HomeViewModel(
                 shieldRepository.getLastNDaysGlobalUsage(60),
                 userPreferencesRepository.userPreferencesFlow,
                 _globalFallbackMap
-            ) { shields, usage, global, prefs, _ ->
+            ) { shields, usage, global, prefs, fallbackMap ->
                 val forceUpdate = (lastPreferSystem != null && lastPreferSystem != prefs.preferSystemUsageHistory) ||
                                 (lastOnboardingCompleted != null && lastOnboardingCompleted != prefs.onboardingStatsCompleted)
                 
@@ -718,7 +719,7 @@ class HomeViewModel(
                     bedtimeDays = prefs.bedtimeDays
                 ) }
 
-                updateUiStateFromDatabase(shields, usage, global, prefs)
+                updateUiStateFromDatabase(shields, usage, global, prefs, fallbackMap)
 
                 val currentPkg = _appDetailUiState.value.packageName
                 if (currentPkg.isNotEmpty()) {
@@ -861,8 +862,12 @@ class HomeViewModel(
 
         if (isFullNeeded && !isUpdatingFullHistory) {
             lastFullFallbackRefresh = now
-            viewModelScope.launch(Dispatchers.IO) {
+            if (forceFull) {
                 updateFullHistoryFallbackInternal()
+            } else {
+                viewModelScope.launch(Dispatchers.IO) {
+                    updateFullHistoryFallbackInternal()
+                }
             }
         }
 
