@@ -1,9 +1,14 @@
 package com.etrisad.zenith.ui.screens.settings
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.animation.*
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -31,6 +36,8 @@ import com.etrisad.zenith.ui.components.UsageHistoryList
 import com.etrisad.zenith.ui.components.ZenithContainedLoadingIndicator
 import com.etrisad.zenith.ui.viewmodel.HomeViewModel
 import com.etrisad.zenith.ui.viewmodel.UsageRecord
+import com.etrisad.zenith.data.local.entity.HourlyUsageEntity
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -146,7 +153,7 @@ fun DatabaseDebugScreen(
                             todayHourlyGrouped.forEach { (hour, entities) ->
                                 item(key = "hour_$hour") {
                                     Text(
-                                        text = String.format("%02d:00 - %02d:59", hour, hour),
+                                        text = String.format(Locale.getDefault(), "%02d:00 - %02d:59", hour, hour),
                                         style = MaterialTheme.typography.labelMedium,
                                         color = MaterialTheme.colorScheme.primary,
                                         fontWeight = FontWeight.Black,

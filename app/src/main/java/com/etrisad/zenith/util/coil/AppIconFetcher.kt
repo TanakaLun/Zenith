@@ -36,10 +36,6 @@ class AppIconFetcher(
         }
     }
 }
-
-/**
- * Mengubah string "app-icon://pkg" menjadi object AppIconData secara otomatis.
- */
 class AppIconMapper : Mapper<String, AppIconData> {
     override fun map(data: String, options: Options): AppIconData? {
         if (!data.startsWith("app-icon://")) return null
