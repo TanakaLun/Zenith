@@ -32,7 +32,8 @@ fun FeaturesSettings(
     onSessionUsageOverlayOpacityChange: (Int) -> Unit,
     onMindfulGatewayEnabledChange: (Boolean) -> Unit,
     onEarlyKickEnabledChange: (Boolean) -> Unit,
-    onInterceptAudioFocusEnabledChange: (Boolean) -> Unit
+    onInterceptAudioFocusEnabledChange: (Boolean) -> Unit,
+    onBatteryStatsResetEnabledChange: (Boolean) -> Unit
 ) {
     Column {
         PreferenceCategory(title = "Interface Overlays")
@@ -102,6 +103,16 @@ fun FeaturesSettings(
             checked = preferences.interceptAudioFocusEnabled,
             onCheckedChange = onInterceptAudioFocusEnabledChange,
             icon = Icons.Outlined.MusicNote,
+            shape = RoundedCornerShape(8.dp)
+        )
+
+        Spacer(modifier = Modifier.height(4.dp))
+        SettingsToggle(
+            title = "Battery Usage Reset",
+            description = "Track app usage since last charge and provide a reset option in app details",
+            checked = preferences.batteryStatsResetEnabled,
+            onCheckedChange = onBatteryStatsResetEnabledChange,
+            icon = Icons.Outlined.BatteryChargingFull,
             shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
         )
     }

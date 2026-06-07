@@ -65,6 +65,9 @@ data class AppDetailUiState(
     val shieldEntity: ShieldEntity? = null,
     val isPaused: Boolean = false,
     val pauseEndTimestamp: Long = 0L,
+    val sinceLastChargeUsage: Long = 0L,
+    val lastResetTimestamp: Long = 0L,
+    val batteryStatsResetEnabled: Boolean = false,
     val isSettingsSheetOpen: Boolean = false,
     val isLoading: Boolean = true
 )
@@ -1475,7 +1478,40 @@ class HomeViewModel(
                 val yesterdayStr = dateFormat.format(Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }.time)
                 val yesterdayU = historyDB.find { it.date == yesterdayStr }?.usageTimeMillis ?: if (prefs.preferSystemUsageHistory) detailFallbackMap[yesterdayStr] ?: 0L else 0L
                 val history = (0 until 21).map { i -> val dStart = getMidnight(i); val dStr = dateFormat.format(Date(dStart)); val dbE = historyDB.find { it.date == dStr }; val dTotal = if (i == 0) todayU else dbE?.usageTimeMillis ?: if (prefs.preferSystemUsageHistory) detailFallbackMap[dStr] ?: 0L else 0L; DailyUsage(dStart, dTotal, dbE != null, detailFallbackMap[dStr] != null, i == 0) }
-                _appDetailUiState.update { it.copy(packageName = packageName, appName = appName, icon = icon, type = shield?.type, todayUsage = todayU, yesterdayUsage = yesterdayU, averageUsage = if (history.any { it.totalTime > 0 }) history.filter { it.totalTime > 0 }.map { it.totalTime }.average().toLong() else 0L, totalSessions = sessions.coerceAtLeast(if (todayU > 0) 1 else 0), peakHour = peakH, percentageChange = if (yesterdayU > 0) (todayU - yesterdayU).toFloat() / yesterdayU * 100 else if (todayU > 0) 100f else 0f, usageHistory = history.reversed(), hourlyUsage = hourlyU, currentStreak = shield?.currentStreak ?: 0, bestStreak = shield?.bestStreak ?: 0, shieldEntity = shield, isPaused = shield?.isPaused ?: false, pauseEndTimestamp = shield?.pauseEndTimestamp ?: 0L, isLoading = false) }
+                
+                val lastCharge = prefs.lastChargeTimestamp
+                val manualReset = prefs.manualResetTimestamps[packageName] ?: 0L
+                val resetTime = maxOf(lastCharge, manualReset)
+                var sinceLastCharge = 0L
+                
+                if (resetTime > 0) {
+                    val usageSince = withContext(Dispatchers.IO) { ScreenUsageHelper.fetchAppUsageSince(usm, resetTime) }
+                    sinceLastCharge = usageSince[packageName] ?: 0L
+                }
+
+                _appDetailUiState.update { it.copy(
+                    packageName = packageName, 
+                    appName = appName, 
+                    icon = icon, 
+                    type = shield?.type, 
+                    todayUsage = todayU, 
+                    yesterdayUsage = yesterdayU, 
+                    averageUsage = if (history.any { it.totalTime > 0 }) history.filter { it.totalTime > 0 }.map { it.totalTime }.average().toLong() else 0L, 
+                    totalSessions = sessions.coerceAtLeast(if (todayU > 0) 1 else 0), 
+                    peakHour = peakH, 
+                    percentageChange = if (yesterdayU > 0) (todayU - yesterdayU).toFloat() / yesterdayU * 100 else if (todayU > 0) 100f else 0f, 
+                    usageHistory = history.reversed(), 
+                    hourlyUsage = hourlyU, 
+                    currentStreak = shield?.currentStreak ?: 0, 
+                    bestStreak = shield?.bestStreak ?: 0, 
+                    shieldEntity = shield, 
+                    isPaused = shield?.isPaused ?: false, 
+                    pauseEndTimestamp = shield?.pauseEndTimestamp ?: 0L, 
+                    sinceLastChargeUsage = sinceLastCharge,
+                    lastResetTimestamp = resetTime,
+                    batteryStatsResetEnabled = prefs.batteryStatsResetEnabled,
+                    isLoading = false
+                ) }
             }.collect()
         }
     }
@@ -1493,6 +1529,18 @@ class HomeViewModel(
         val updated = shield.copy(isPaused = false, pauseEndTimestamp = 0L)
         _appDetailUiState.update { it.copy(shieldEntity = updated, isPaused = false, pauseEndTimestamp = 0L) }
         viewModelScope.launch { shieldRepository.updateShield(updated) }
+    }
+
+    fun resetAppUsage(packageName: String) {
+        viewModelScope.launch {
+            userPreferencesRepository.resetAppStats(packageName)
+        }
+    }
+
+    fun setBatteryStatsResetEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            userPreferencesRepository.setBatteryStatsResetEnabled(enabled)
+        }
     }
 
     fun onShieldSortTypeChange(sortType: ShieldSortType) {

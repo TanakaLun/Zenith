@@ -111,6 +111,9 @@ class UserPreferencesRepository(private val context: Context) {
         val MINDFUL_GATEWAY_ENABLED = booleanPreferencesKey("mindful_gateway_enabled")
         val REFRESH_ON_OPEN_USAGE_STATS = booleanPreferencesKey("refresh_on_open_usage_stats")
         val CHECK_UPDATE_ON_START = booleanPreferencesKey("check_update_on_start")
+        val BATTERY_STATS_RESET_ENABLED = booleanPreferencesKey("battery_stats_reset_enabled")
+        val LAST_CHARGE_TIMESTAMP = longPreferencesKey("last_charge_timestamp")
+        val MANUAL_RESET_TIMESTAMPS = stringPreferencesKey("manual_reset_timestamps")
 
         val GS_FLEX_PRESET = stringPreferencesKey("gs_flex_preset")
         val GS_D_WGHT = floatPreferencesKey("gs_d_wght")
@@ -204,6 +207,14 @@ class UserPreferencesRepository(private val context: Context) {
                 mindfulGatewayEnabled = preferences[PreferencesKeys.MINDFUL_GATEWAY_ENABLED] ?: false,
                 refreshOnOpenUsageStats = preferences[PreferencesKeys.REFRESH_ON_OPEN_USAGE_STATS] ?: false,
                 checkUpdateOnStart = preferences[PreferencesKeys.CHECK_UPDATE_ON_START] ?: false,
+                batteryStatsResetEnabled = preferences[PreferencesKeys.BATTERY_STATS_RESET_ENABLED] ?: false,
+                lastChargeTimestamp = preferences[PreferencesKeys.LAST_CHARGE_TIMESTAMP] ?: 0L,
+                manualResetTimestamps = preferences[PreferencesKeys.MANUAL_RESET_TIMESTAMPS]?.split(",")
+                    ?.filter { it.contains(":") }
+                    ?.associate { 
+                        val parts = it.split(":")
+                        parts[0] to (parts[1].toLongOrNull() ?: 0L)
+                    } ?: emptyMap(),
                 gsFlexSettings = GSFlexSettings(
                     preset = GSFlexPreset.valueOf(preferences[PreferencesKeys.GS_FLEX_PRESET] ?: GSFlexPreset.ZENITH.name),
                     display = FontAxes(
@@ -833,6 +844,28 @@ class UserPreferencesRepository(private val context: Context) {
         context.dataStore.edit { preferences -> preferences[PreferencesKeys.CHECK_UPDATE_ON_START] = enabled }
     }
 
+    suspend fun setBatteryStatsResetEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.BATTERY_STATS_RESET_ENABLED] = enabled }
+    }
+
+    suspend fun updateLastChargeTimestamp(timestamp: Long) {
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.LAST_CHARGE_TIMESTAMP] = timestamp }
+    }
+
+    suspend fun resetAppStats(packageName: String) {
+        context.dataStore.edit { preferences ->
+            val currentMap = preferences[PreferencesKeys.MANUAL_RESET_TIMESTAMPS]?.split(",")
+                ?.filter { it.contains(":") }
+                ?.associate { 
+                    val parts = it.split(":")
+                    parts[0] to parts[1]
+                }?.toMutableMap() ?: mutableMapOf()
+            
+            currentMap[packageName] = System.currentTimeMillis().toString()
+            preferences[PreferencesKeys.MANUAL_RESET_TIMESTAMPS] = currentMap.entries.joinToString(",") { "${it.key}:${it.value}" }
+        }
+    }
+
     suspend fun setGSFlexSettings(settings: GSFlexSettings) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.GS_FLEX_PRESET] = settings.preset.name
@@ -1055,6 +1088,9 @@ data class UserPreferences(
     val mindfulGatewayEnabled: Boolean = false,
     val refreshOnOpenUsageStats: Boolean = false,
     val checkUpdateOnStart: Boolean = false,
+    val batteryStatsResetEnabled: Boolean = false,
+    val lastChargeTimestamp: Long = 0L,
+    val manualResetTimestamps: Map<String, Long> = emptyMap(),
     val gsFlexSettings: GSFlexSettings = GSFlexSettings(),
     val streakRecoveryPerformed: Boolean = false
 )

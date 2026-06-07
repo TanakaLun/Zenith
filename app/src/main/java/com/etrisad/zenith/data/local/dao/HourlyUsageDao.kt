@@ -35,4 +35,7 @@ interface HourlyUsageDao {
 
     @Query("DELETE FROM hourly_usage WHERE date = :date AND hour = :hour AND packageName = :packageName")
     suspend fun deleteHourlyUsageAtHour(date: String, hour: Int, packageName: String)
+
+    @Query("SELECT SUM(usageTimeMillis) FROM hourly_usage WHERE packageName = :packageName AND (date > :date OR (date = :date AND hour >= :hour))")
+    suspend fun getUsageSince(packageName: String, date: String, hour: Int): Long?
 }

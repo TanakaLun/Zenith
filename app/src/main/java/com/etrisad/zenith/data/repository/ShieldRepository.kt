@@ -108,6 +108,10 @@ class ShieldRepository(
         hourlyUsageDao.deleteHourlyUsageAtHour(date, hour, packageName)
     }
 
+    suspend fun getUsageSince(packageName: String, date: String, hour: Int): Long {
+        return hourlyUsageDao.getUsageSince(packageName, date, hour) ?: 0L
+    }
+
     suspend fun deleteDailyUsageForDate(date: String) {
         dailyUsageDao.deleteUsageForDate(date)
     }

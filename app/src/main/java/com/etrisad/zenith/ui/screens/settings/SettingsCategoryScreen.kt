@@ -138,7 +138,8 @@ fun SettingsCategoryScreen(
                         onSessionUsageOverlayOpacityChange = { opacity -> coroutineScope.launch { preferencesRepository.setSessionUsageOverlayOpacity(opacity) } },
                         onMindfulGatewayEnabledChange = { enabled -> coroutineScope.launch { preferencesRepository.setMindfulGatewayEnabled(enabled) } },
                         onEarlyKickEnabledChange = { enabled -> coroutineScope.launch { preferencesRepository.setEarlyKickEnabled(enabled) } },
-                        onInterceptAudioFocusEnabledChange = { enabled -> coroutineScope.launch { preferencesRepository.setInterceptAudioFocusEnabled(enabled) } }
+                        onInterceptAudioFocusEnabledChange = { enabled -> coroutineScope.launch { preferencesRepository.setInterceptAudioFocusEnabled(enabled) } },
+                        onBatteryStatsResetEnabledChange = { enabled -> coroutineScope.launch { preferencesRepository.setBatteryStatsResetEnabled(enabled) } }
                     )
                     "appearance" -> AppearanceSettings(
                         preferences = preferences,

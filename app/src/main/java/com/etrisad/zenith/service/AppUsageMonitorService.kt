@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -143,6 +144,13 @@ class AppUsageMonitorService : Service() {
                 }
                 android.os.PowerManager.ACTION_POWER_SAVE_MODE_CHANGED -> {
                     isPowerSaveMode = powerManager.isPowerSaveMode
+                }
+                Intent.ACTION_POWER_DISCONNECTED -> {
+                    serviceScope.launch {
+                        preferencesRepository.updateLastChargeTimestamp(System.currentTimeMillis())
+                        com.etrisad.zenith.util.ScreenUsageHelper.clearCache()
+                        refreshData()
+                    }
                 }
             }
         }
@@ -348,8 +356,13 @@ class AppUsageMonitorService : Service() {
             addAction(Intent.ACTION_SCREEN_ON)
             addAction(Intent.ACTION_SCREEN_OFF)
             addAction(android.os.PowerManager.ACTION_POWER_SAVE_MODE_CHANGED)
+            addAction(Intent.ACTION_POWER_DISCONNECTED)
         }
-        registerReceiver(screenStateReceiver, filter)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(screenStateReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(screenStateReceiver, filter)
+        }
         isScreenOn = powerManager.isInteractive
         isPowerSaveMode = powerManager.isPowerSaveMode
 

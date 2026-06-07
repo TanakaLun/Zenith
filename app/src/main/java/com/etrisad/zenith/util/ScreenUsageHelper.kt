@@ -220,6 +220,84 @@ object ScreenUsageHelper {
         return fetchDetailedUsageToday(usageStatsManager).appUsageMap
     }
 
+    fun fetchAppUsageSince(
+        usageStatsManager: UsageStatsManager,
+        startTime: Long
+    ): Map<String, Long> {
+        val currentTime = System.currentTimeMillis()
+        if (startTime >= currentTime) return emptyMap()
+
+        val usageMap = mutableMapOf<String, Long>()
+        var activePkg: String? = null
+        var activeStartTime = 0L
+        var isScreenOn = false
+
+        val events = try {
+            usageStatsManager.queryEvents(startTime - 300000L, currentTime)
+        } catch (e: Exception) {
+            null
+        }
+        val event = UsageEvents.Event()
+
+        while (events?.hasNextEvent() == true) {
+            events.getNextEvent(event)
+            val pkg = event.packageName
+            val time = event.timeStamp
+
+            when (event.eventType) {
+                UsageEvents.Event.SCREEN_INTERACTIVE -> isScreenOn = true
+                UsageEvents.Event.SCREEN_NON_INTERACTIVE -> {
+                    isScreenOn = false
+                    activePkg?.let { p ->
+                        val segmentStart = maxOf(activeStartTime, startTime)
+                        val segmentEnd = minOf(time, currentTime)
+                        if (segmentStart < segmentEnd) {
+                            usageMap[p] = (usageMap[p] ?: 0L) + (segmentEnd - segmentStart)
+                        }
+                    }
+                    activePkg = null
+                    activeStartTime = 0L
+                }
+                UsageEvents.Event.ACTIVITY_RESUMED,
+                UsageEvents.Event.MOVE_TO_FOREGROUND -> {
+                    if (isScreenOn) {
+                        if (activePkg != null) {
+                            val segmentStart = maxOf(activeStartTime, startTime)
+                            val segmentEnd = minOf(time, currentTime)
+                            if (segmentStart < segmentEnd) {
+                                usageMap[activePkg!!] = (usageMap[activePkg!!] ?: 0L) + (segmentEnd - segmentStart)
+                            }
+                        }
+                        activePkg = pkg
+                        activeStartTime = time
+                    }
+                }
+                UsageEvents.Event.ACTIVITY_PAUSED,
+                UsageEvents.Event.MOVE_TO_BACKGROUND -> {
+                    if (activePkg == pkg) {
+                        val segmentStart = maxOf(activeStartTime, startTime)
+                        val segmentEnd = minOf(time, currentTime)
+                        if (segmentStart < segmentEnd) {
+                            usageMap[pkg] = (usageMap[pkg] ?: 0L) + (segmentEnd - segmentStart)
+                        }
+                        activePkg = null
+                        activeStartTime = 0L
+                    }
+                }
+            }
+        }
+
+        if (isScreenOn && activePkg != null) {
+            val segmentStart = maxOf(activeStartTime, startTime)
+            val segmentEnd = currentTime
+            if (segmentStart < segmentEnd) {
+                usageMap[activePkg!!] = (usageMap[activePkg!!] ?: 0L) + (segmentEnd - segmentStart)
+            }
+        }
+
+        return usageMap
+    }
+
     fun clearCache() {
         lastResult = null
         lastQueryTime = 0L

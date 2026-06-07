@@ -103,6 +103,7 @@
             </intent-filter>
         </receiver>
 
+
         <activity
             android:name=".ui.widget.AppStreakWidgetConfigurationActivity"
             android:exported="true"

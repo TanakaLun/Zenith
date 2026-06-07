@@ -276,6 +276,18 @@ fun AppDetailScreen(
                         Spacer(modifier = Modifier.height(4.dp))
                     }
 
+                    if (uiState.batteryStatsResetEnabled) {
+                        item {
+                            BatteryUsageCard(
+                                sinceLastCharge = formatDuration(uiState.sinceLastChargeUsage),
+                                lastResetTimestamp = uiState.lastResetTimestamp,
+                                onReset = { viewModel.resetAppUsage(packageName) },
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                        }
+                    }
+
                     item {
                         PeakHourCard(
                             peakHour = uiState.peakHour,
@@ -1313,6 +1325,83 @@ fun HourlyUsageChart(
                 Text("00:00", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("12:00", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("23:59", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+@Composable
+fun BatteryUsageCard(
+    sinceLastCharge: String,
+    lastResetTimestamp: Long,
+    onReset: () -> Unit,
+    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(8.dp)
+) {
+    val lastResetText = remember(lastResetTimestamp) {
+        if (lastResetTimestamp <= 0L) "Never"
+        else {
+            val sdf = java.text.SimpleDateFormat("MMM d, HH:mm", java.util.Locale.getDefault())
+            sdf.format(java.util.Date(lastResetTimestamp))
+        }
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = shape,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.BatteryChargingFull,
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        "Since Last Charge/Reset",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        sinceLastCharge,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Last: $lastResetText",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                }
+            }
+            
+            IconButton(
+                onClick = onReset,
+                colors = IconButtonDefaults.iconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f),
+                    contentColor = MaterialTheme.colorScheme.primary
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Refresh,
+                    contentDescription = "Reset",
+                    modifier = Modifier.size(18.dp)
+                )
             }
         }
     }
