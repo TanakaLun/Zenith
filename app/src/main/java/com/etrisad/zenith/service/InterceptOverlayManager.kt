@@ -55,6 +55,10 @@ class InterceptOverlayManager(
         private var viewModelStore: ViewModelStore? = null
         @Volatile
         var currentPackage: String? = null
+        @Volatile
+        var lastKickedPackage: String? = null
+        @Volatile
+        var lastKickTime: Long = 0L
         private var audioFocusRequest: AudioFocusRequest? = null
         private var focusRequestJob: kotlinx.coroutines.Job? = null
         private val afChangeListener = AudioManager.OnAudioFocusChangeListener { }

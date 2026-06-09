@@ -483,7 +483,7 @@ class ZenithAccessibilityService : AccessibilityService() {
     private suspend fun checkIfAppIsShielded(targetPackageName: String) {
         if (targetPackageName != lastForegroundApp) return
 
-        if (targetPackageName == lastKickedPackage && System.currentTimeMillis() - lastKickTime < 3000) {
+        if (targetPackageName == InterceptOverlayManager.lastKickedPackage && System.currentTimeMillis() - InterceptOverlayManager.lastKickTime < 4000) {
             return
         }
 
@@ -617,6 +617,11 @@ class ZenithAccessibilityService : AccessibilityService() {
                         }
                     },
                     onCloseApp = {
+                        val now = System.currentTimeMillis()
+                        InterceptOverlayManager.lastKickTime = now
+                        InterceptOverlayManager.lastKickedPackage = targetPackageName
+                        lastKickTime = now
+                        lastKickedPackage = targetPackageName
                         serviceScope.launch {
                             val s = currentShieldCache ?: allShieldsCache.find { it.packageName == targetPackageName } ?: shieldRepository.getShieldByPackageName(targetPackageName)
                             if (s != null && s.isDelayAppEnabled) {
@@ -625,8 +630,6 @@ class ZenithAccessibilityService : AccessibilityService() {
                                 currentShieldCache = updated
                             }
                         }
-                        lastKickTime = System.currentTimeMillis()
-                        lastKickedPackage = targetPackageName
                         goToHomeScreen()
                     },
                     onGoalDismiss = {
@@ -852,7 +855,10 @@ class ZenithAccessibilityService : AccessibilityService() {
                 packageName = packageName,
                 appName = appName,
                 onCloseApp = {
-                    lastKickTime = System.currentTimeMillis()
+                    val now = System.currentTimeMillis()
+                    InterceptOverlayManager.lastKickTime = now
+                    InterceptOverlayManager.lastKickedPackage = packageName
+                    lastKickTime = now
                     lastKickedPackage = packageName
                     goToHomeScreen()
                 }
@@ -876,7 +882,10 @@ class ZenithAccessibilityService : AccessibilityService() {
                     windDownUsedPackages[packageName] = true
                 },
                 onCloseApp = {
-                    lastKickTime = System.currentTimeMillis()
+                    val now = System.currentTimeMillis()
+                    InterceptOverlayManager.lastKickTime = now
+                    InterceptOverlayManager.lastKickedPackage = packageName
+                    lastKickTime = now
                     lastKickedPackage = packageName
                     goToHomeScreen()
                 }
@@ -1002,7 +1011,10 @@ class ZenithAccessibilityService : AccessibilityService() {
                     }
                 },
                 onCloseApp = {
-                    lastKickTime = System.currentTimeMillis()
+                    val now = System.currentTimeMillis()
+                    InterceptOverlayManager.lastKickTime = now
+                    InterceptOverlayManager.lastKickedPackage = packageName
+                    lastKickTime = now
                     lastKickedPackage = packageName
                     goToHomeScreen()
                 }

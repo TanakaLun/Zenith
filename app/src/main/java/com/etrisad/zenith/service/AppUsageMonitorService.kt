@@ -864,6 +864,8 @@ class AppUsageMonitorService : Service() {
     }
 
     private suspend fun checkBlockingInstant(currentApp: String, shield: ShieldEntity?) {
+        if (ZenithAccessibilityService.isServiceRunning) return
+        
         val currentTime = System.currentTimeMillis()
         val isAppPaused = shield != null && isPaused(shield)
         val allowedUntil = allowedApps[currentApp]
@@ -1144,7 +1146,7 @@ class AppUsageMonitorService : Service() {
             return
         }
 
-        if (targetPackageName == lastKickedPackage && System.currentTimeMillis() - lastKickTime < 3000) {
+        if (targetPackageName == InterceptOverlayManager.lastKickedPackage && System.currentTimeMillis() - InterceptOverlayManager.lastKickTime < 4000) {
             return
         }
 
@@ -1298,7 +1300,10 @@ class AppUsageMonitorService : Service() {
                         }
                     },
                     onCloseApp = {
-                        lastKickTime = System.currentTimeMillis()
+                        val now = System.currentTimeMillis()
+                        InterceptOverlayManager.lastKickTime = now
+                        InterceptOverlayManager.lastKickedPackage = targetPackageName
+                        lastKickTime = now
                         lastKickedPackage = targetPackageName
                         serviceScope.launch {
                             val s = currentShieldCache ?: allShieldsCache[targetPackageName] ?: shieldRepository.getShieldByPackageName(targetPackageName)
@@ -1628,7 +1633,14 @@ class AppUsageMonitorService : Service() {
             overlayManager.showBedtimeOverlay(
                 packageName = packageName,
                 appName = appName,
-                onCloseApp = { goToHomeScreen() }
+                onCloseApp = {
+                    val now = System.currentTimeMillis()
+                    InterceptOverlayManager.lastKickTime = now
+                    InterceptOverlayManager.lastKickedPackage = packageName
+                    lastKickTime = now
+                    lastKickedPackage = packageName
+                    goToHomeScreen()
+                }
             )
         }
     }
@@ -1673,7 +1685,14 @@ class AppUsageMonitorService : Service() {
                         }
                     }
                 },
-                onCloseApp = { goToHomeScreen() }
+                onCloseApp = {
+                    val now = System.currentTimeMillis()
+                    InterceptOverlayManager.lastKickTime = now
+                    InterceptOverlayManager.lastKickedPackage = packageName
+                    lastKickTime = now
+                    lastKickedPackage = packageName
+                    goToHomeScreen()
+                }
             )
         }
     }
@@ -1691,6 +1710,10 @@ class AppUsageMonitorService : Service() {
 
     private fun shouldBypassBlocking(packageName: String): Boolean {
         if (packageName == this.packageName) return true
+
+        if (packageName == InterceptOverlayManager.lastKickedPackage && System.currentTimeMillis() - InterceptOverlayManager.lastKickTime < 5000) {
+            return true
+        }
 
         val prefs = currentPreferences
         val isBedtimeOrWindDown = isBedtimeActive || (isWindDownActive && prefs?.bedtimeWindDownEnabled == true)
@@ -1801,7 +1824,14 @@ class AppUsageMonitorService : Service() {
                         }
                     }
                 },
-                onCloseApp = { goToHomeScreen() }
+                onCloseApp = {
+                    val now = System.currentTimeMillis()
+                    InterceptOverlayManager.lastKickTime = now
+                    InterceptOverlayManager.lastKickedPackage = packageName
+                    lastKickTime = now
+                    lastKickedPackage = packageName
+                    goToHomeScreen()
+                }
             )
         }
     }
