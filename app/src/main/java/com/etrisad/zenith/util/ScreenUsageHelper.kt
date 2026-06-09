@@ -17,9 +17,9 @@ object ScreenUsageHelper {
 
     private var lastResult: UsageResult? = null
     private var lastQueryTime = 0L
-    private const val CACHE_DURATION = 5000L
+    private const val CACHE_DURATION = 10000L
 
-    private const val MIDNIGHT_LOOKBACK_MS = 1800000L
+    private const val MIDNIGHT_LOOKBACK_MS = 600000L
     private const val SESSION_MIN_DURATION = 4000L
     private const val MIN_SEGMENT_DURATION = 100L
     private const val SESSION_TIMEOUT_MS = 60000L
@@ -55,17 +55,7 @@ object ScreenUsageHelper {
 
         var activePkg: String? = null
         var activeStartTime = 0L
-
-        var isScreenOn = false
-        try {
-            val preEvents = usageStatsManager.queryEvents(start - 12 * 3600000L, start - MIDNIGHT_LOOKBACK_MS)
-            val tempEvent = UsageEvents.Event()
-            while (preEvents?.hasNextEvent() == true) {
-                preEvents.getNextEvent(tempEvent)
-                if (tempEvent.eventType == UsageEvents.Event.SCREEN_INTERACTIVE) isScreenOn = true
-                else if (tempEvent.eventType == UsageEvents.Event.SCREEN_NON_INTERACTIVE) isScreenOn = false
-            }
-        } catch (_: Exception) {}
+        var isScreenOn = true
 
         val events = try {
             usageStatsManager.queryEvents(start - MIDNIGHT_LOOKBACK_MS, end)

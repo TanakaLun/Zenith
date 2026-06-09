@@ -77,24 +77,26 @@ class DailyUsageWorker(context: Context, params: WorkerParameters) : CoroutineWo
         } catch (_: Exception) { null }
         val excludePackages = setOfNotNull(applicationContext.packageName, launcherPackage)
 
-        val stats = try {
-            usm.queryAndAggregateUsageStats(startTime, endTime)
-        } catch (e: Exception) {
-            null
-        }
         val timeSinceMidnight = if (isDateToday) (System.currentTimeMillis() - startTime).coerceAtLeast(0L) else (24 * 60 * 60 * 1000L)
         
-        val detailedUsage = if (isDateToday) com.etrisad.zenith.util.ScreenUsageHelper.fetchDetailedUsageToday(usm) else null
-
-        stats?.forEach { (pkg, stat) ->
-            if (pkg !in excludePackages && pkg in launcherApps) {
-                var time = stat.totalTimeVisible.coerceAtLeast(stat.totalTimeInForeground)
-
-                if (isDateToday && detailedUsage != null) {
-                    time = detailedUsage.appUsageMap[pkg] ?: 0L
+        if (isDateToday) {
+            val detailedUsage = com.etrisad.zenith.util.ScreenUsageHelper.fetchDetailedUsageToday(usm)
+            detailedUsage.appUsageMap.forEach { (pkg, time) ->
+                if (pkg !in excludePackages && pkg in launcherApps && time > 0) {
+                    finalAppUsages[pkg] = time.coerceAtMost(timeSinceMidnight)
                 }
-                
-                if (time > 0) finalAppUsages[pkg] = time.coerceAtMost(timeSinceMidnight)
+            }
+        } else {
+            val stats = try {
+                usm.queryAndAggregateUsageStats(startTime, endTime)
+            } catch (e: Exception) {
+                null
+            }
+            stats?.forEach { (pkg, stat) ->
+                if (pkg !in excludePackages && pkg in launcherApps) {
+                    val time = stat.totalTimeVisible.coerceAtLeast(stat.totalTimeInForeground)
+                    if (time > 0) finalAppUsages[pkg] = time.coerceAtMost(timeSinceMidnight)
+                }
             }
         }
 

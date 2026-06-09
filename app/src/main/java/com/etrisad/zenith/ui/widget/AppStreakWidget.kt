@@ -63,6 +63,13 @@ class AppStreakWidget : GlanceAppWidget() {
         val SELECTED_PACKAGE_KEY = stringPreferencesKey("selected_package")
         val EXTRA_WIDGET_ID_KEY = ActionParameters.Key<Int>(AppWidgetManager.EXTRA_APPWIDGET_ID)
         val PACKAGE_NAME_KEY = ActionParameters.Key<String>("package_name")
+        
+        private val bitmapCache = mutableMapOf<String, Bitmap>()
+        
+        fun clearCache() {
+            bitmapCache.values.forEach { it.recycle() }
+            bitmapCache.clear()
+        }
     }
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
@@ -199,6 +206,15 @@ class AppStreakWidget : GlanceAppWidget() {
         alpha: Int = 255,
         sourceBitmap: Bitmap? = null
     ): Bitmap {
+        val uiMode = context.resources.configuration.uiMode
+        val cacheKey = if (sourceBitmap != null) {
+            "pkg_${sourceBitmap.hashCode()}_${sizeDp}_${shape.hashCode()}_$uiMode"
+        } else {
+            "shape_${sizeDp}_${shape.hashCode()}_$uiMode"
+        }
+
+        bitmapCache[cacheKey]?.let { if (!it.isRecycled) return it }
+
         val density = context.resources.displayMetrics.density
         val sizePx = (sizeDp * density).toInt().coerceAtLeast(1)
         val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
@@ -222,6 +238,7 @@ class AppStreakWidget : GlanceAppWidget() {
             canvas.drawBitmap(it, null, Rect(0, 0, sizePx, sizePx), paint)
         }
 
+        bitmapCache[cacheKey] = bitmap
         return bitmap
     }
 

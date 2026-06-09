@@ -695,7 +695,7 @@ class HomeViewModel(
         viewModelScope.launch {
             var lastPreferSystem: Boolean? = null
             var lastOnboardingCompleted: Boolean? = null
-            
+
             combine(
                 shieldRepository.allShields,
                 shieldRepository.getRecentUsage(60),

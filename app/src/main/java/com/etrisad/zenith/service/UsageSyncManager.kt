@@ -21,6 +21,9 @@ class UsageSyncManager(
 ) {
     companion object {
         private val syncMutex = Mutex()
+        private var cachedLauncherPackage: String? = null
+        private var cachedLauncherApps: Set<String>? = null
+        private var lastLauncherRefresh = 0L
     }
 
     private val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
@@ -35,6 +38,20 @@ class UsageSyncManager(
         if (currentTime - lastSyncTime < 30000) return@withLock
 
         val pm = context.packageManager
+        
+        if (currentTime - lastLauncherRefresh > 3600000L || cachedLauncherApps == null) {
+            val launcherIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+            cachedLauncherPackage = pm.resolveActivity(launcherIntent, PackageManager.MATCH_DEFAULT_ONLY)
+                ?.activityInfo?.packageName
+            cachedLauncherApps = pm.queryIntentActivities(
+                Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0
+            )?.map { it.activityInfo.packageName }?.toSet() ?: emptySet()
+            lastLauncherRefresh = currentTime
+        }
+
+        val launcherPackage = cachedLauncherPackage
+        val launcherApps = cachedLauncherApps ?: emptySet()
+        val excludePackages = setOfNotNull(context.packageName, launcherPackage)
 
         val startOfToday = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 0)
@@ -43,21 +60,13 @@ class UsageSyncManager(
             set(Calendar.MILLISECOND, 0)
         }.timeInMillis
 
-        val queryStart = maxOf(startOfToday, lastSyncTime - 1800000L)
+        val queryStart = maxOf(startOfToday, lastSyncTime - 600000L) 
         val events = try {
             usageStatsManager.queryEvents(queryStart, currentTime)
         } catch (e: Exception) {
             null
         }
         val event = UsageEvents.Event()
-
-        val launcherIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
-        val launcherPackage = pm.resolveActivity(launcherIntent, PackageManager.MATCH_DEFAULT_ONLY)
-            ?.activityInfo?.packageName
-        val launcherApps = pm.queryIntentActivities(
-            Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0
-        )?.map { it.activityInfo.packageName }?.toSet() ?: emptySet()
-        val excludePackages = setOfNotNull(context.packageName, launcherPackage)
 
         val activeSessions = mutableMapOf<String, Long>()
         val hourlyBuckets = mutableMapOf<String, MutableMap<Int, MutableList<UsageChunk>>>()

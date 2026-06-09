@@ -37,6 +37,14 @@ class GlobalStreakWidget : GlanceAppWidget() {
     override val sizeMode: SizeMode = SizeMode.Exact
     override val stateDefinition: GlanceStateDefinition<*> = PreferencesGlanceStateDefinition
 
+    companion object {
+        private val bitmapCache = mutableMapOf<String, Bitmap>()
+        fun clearCache() {
+            bitmapCache.values.forEach { it.recycle() }
+            bitmapCache.clear()
+        }
+    }
+
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val app = context.applicationContext as ZenithApplication
         val repository = app.userPreferencesRepository
@@ -81,6 +89,10 @@ class GlobalStreakWidget : GlanceAppWidget() {
         shape: RoundedPolygon,
         alpha: Int = 255
     ): Bitmap {
+        val uiMode = context.resources.configuration.uiMode
+        val cacheKey = "shape_${sizeDp}_${shape.hashCode()}_$uiMode"
+        bitmapCache[cacheKey]?.let { if (!it.isRecycled) return it }
+
         val density = context.resources.displayMetrics.density
         val sizePx = (sizeDp * density).toInt().coerceAtLeast(1)
         val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
@@ -98,6 +110,8 @@ class GlobalStreakWidget : GlanceAppWidget() {
             style = Paint.Style.FILL
         }
         canvas.drawPath(path, paint)
+        
+        bitmapCache[cacheKey] = bitmap
         return bitmap
     }
 
