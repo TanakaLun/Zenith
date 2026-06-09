@@ -44,6 +44,7 @@ import androidx.navigation.compose.rememberNavController
 import com.etrisad.zenith.data.preferences.ThemeConfig
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -209,7 +210,7 @@ fun MainScreen(
         }
     }
 
-    fun checkPermissions() {
+    val currentCheckPermissions by rememberUpdatedState {
         val hasUsageStats = com.etrisad.zenith.util.hasUsageStatsPermission(context)
         val hasOverlay = android.provider.Settings.canDrawOverlays(context)
         val hasNotifications = com.etrisad.zenith.util.hasNotificationPermission(context)
@@ -220,13 +221,22 @@ fun MainScreen(
 
         if (!mainGranted) {
             showPermissionSheet = true
-        }
-        
-        val allOnboardingGranted = mainGranted && (hasAccessibility || preferences.accessibilityDisabled)
-        if (allOnboardingGranted && !preferences.onboardingStatsCompleted) {
-            showOnboardingStatsSheet = true
-        } else if (allOnboardingGranted && !preferences.onboardingUpdateCompleted && com.etrisad.zenith.BuildConfig.SHOW_UPDATES) {
-            showOnboardingUpdateSheet = true
+        } else {
+            scope.launch {
+                val latestPrefs = userPreferencesRepository.userPreferencesFlow.first()
+                val allOnboardingGranted = hasAccessibility || latestPrefs.accessibilityDisabled
+                
+                if (allOnboardingGranted) {
+                    if (!latestPrefs.onboardingStatsCompleted) {
+                        showOnboardingStatsSheet = true
+                    } else {
+                        showOnboardingStatsSheet = false
+                        if (!latestPrefs.onboardingUpdateCompleted && com.etrisad.zenith.BuildConfig.SHOW_UPDATES) {
+                            showOnboardingUpdateSheet = true
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -239,7 +249,7 @@ fun MainScreen(
         preferences.onboardingUpdateCompleted,
         preferences.whitelistInitialized
     ) {
-        checkPermissions()
+        currentCheckPermissions()
 
         if (!preferences.whitelistInitialized) {
             val hasUsageStats = com.etrisad.zenith.util.hasUsageStatsPermission(context)
@@ -253,7 +263,7 @@ fun MainScreen(
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                checkPermissions()
+                currentCheckPermissions()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -268,20 +278,12 @@ fun MainScreen(
             onDismissRequest = {
                 showPermissionSheet = false
                 scope.launch { userPreferencesRepository.initializeDefaultWhitelist() }
-                if (!preferences.onboardingStatsCompleted) {
-                    showOnboardingStatsSheet = true
-                } else if (!preferences.onboardingUpdateCompleted && com.etrisad.zenith.BuildConfig.SHOW_UPDATES) {
-                    showOnboardingUpdateSheet = true
-                }
+                currentCheckPermissions()
             },
             onAllPermissionsGranted = {
                 showPermissionSheet = false
                 scope.launch { userPreferencesRepository.initializeDefaultWhitelist() }
-                if (!preferences.onboardingStatsCompleted) {
-                    showOnboardingStatsSheet = true
-                } else if (!preferences.onboardingUpdateCompleted && com.etrisad.zenith.BuildConfig.SHOW_UPDATES) {
-                    showOnboardingUpdateSheet = true
-                }
+                currentCheckPermissions()
             }
         )
     }
