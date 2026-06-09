@@ -40,8 +40,9 @@ class ZenithApplication : Application(), ImageLoaderFactory {
         lastUiMode = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
         com.etrisad.zenith.service.UsageSyncWorker.enqueue(this)
 
-        CoroutineScope(Dispatchers.Main).launch {
+        CoroutineScope(Dispatchers.Default).launch {
             try {
+                kotlinx.coroutines.delay(1000)
                 AppStreakWidget().updateAll(this@ZenithApplication)
                 GlobalStreakWidget().updateAll(this@ZenithApplication)
             } catch (_: Exception) {}

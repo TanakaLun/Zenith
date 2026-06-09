@@ -32,9 +32,7 @@ import com.etrisad.zenith.data.local.Converters
     autoMigrations = [
         androidx.room.AutoMigration(from = 12, to = 13),
         androidx.room.AutoMigration(from = 13, to = 14),
-        androidx.room.AutoMigration(from = 14, to = 15),
-        androidx.room.AutoMigration(from = 15, to = 16),
-        androidx.room.AutoMigration(from = 17, to = 18)
+        androidx.room.AutoMigration(from = 14, to = 15)
     ]
 )
 @TypeConverters(Converters::class)
@@ -189,21 +187,13 @@ abstract class ZenithDatabase : RoomDatabase() {
 
                 db.execSQL("CREATE TABLE IF NOT EXISTS `hourly_usage` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `date` TEXT NOT NULL, `hour` INTEGER NOT NULL, `packageName` TEXT NOT NULL, `usageTimeMillis` INTEGER NOT NULL, `lastUpdated` INTEGER NOT NULL)")
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_hourly_usage_date_hour_packageName` ON `hourly_usage` (`date`, `hour`, `packageName`)")
-
-                try { db.execSQL("ALTER TABLE shields ADD COLUMN isPaused INTEGER NOT NULL DEFAULT 0") } catch (_: Exception) {}
-                try { db.execSQL("ALTER TABLE shields ADD COLUMN pauseEndTimestamp INTEGER NOT NULL DEFAULT 0") } catch (_: Exception) {}
             }
         }
 
         private val MIGRATION_19_20 = object : Migration(19, 20) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("CREATE TABLE IF NOT EXISTS `daily_usage` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `date` TEXT NOT NULL, `packageName` TEXT NOT NULL, `usageTimeMillis` INTEGER NOT NULL, `lastUpdated` INTEGER NOT NULL)")
-                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_daily_usage_date_packageName` ON `daily_usage` (`date`, `packageName`)")
                 db.execSQL("CREATE TABLE IF NOT EXISTS `hourly_usage` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `date` TEXT NOT NULL, `hour` INTEGER NOT NULL, `packageName` TEXT NOT NULL, `usageTimeMillis` INTEGER NOT NULL, `lastUpdated` INTEGER NOT NULL)")
-                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_hourly_usage_date_hour_packageName` ON `hourly_usage` (`date`, `hour`, `packageName`)")
-
-                try { db.execSQL("ALTER TABLE shields ADD COLUMN isPaused INTEGER NOT NULL DEFAULT 0") } catch (_: Exception) {}
-                try { db.execSQL("ALTER TABLE shields ADD COLUMN pauseEndTimestamp INTEGER NOT NULL DEFAULT 0") } catch (_: Exception) {}
             }
         }
 
@@ -231,6 +221,7 @@ abstract class ZenithDatabase : RoomDatabase() {
                         MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21,
                         MIGRATION_21_22
                     )
+                    .enableMultiInstanceInvalidation()
                     .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
                     .fallbackToDestructiveMigrationOnDowngrade()
                     .build()

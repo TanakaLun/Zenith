@@ -68,9 +68,13 @@ class DailyUsageWorker(context: Context, params: WorkerParameters) : CoroutineWo
         val allShields = database.shieldDao().getAllShields().first()
         val finalAppUsages = mutableMapOf<String, Long>()
         
-        val launcherApps = pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
-            .map { it.activityInfo.packageName }.toSet()
-        val launcherPackage = pm.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName
+        val launcherApps = try {
+            pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
+                .map { it.activityInfo.packageName }.toSet()
+        } catch (_: Exception) { emptySet() }
+        val launcherPackage = try {
+            pm.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName
+        } catch (_: Exception) { null }
         val excludePackages = setOfNotNull(applicationContext.packageName, launcherPackage)
 
         val stats = try {

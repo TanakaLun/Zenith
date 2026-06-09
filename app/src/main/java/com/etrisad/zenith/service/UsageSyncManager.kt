@@ -56,7 +56,7 @@ class UsageSyncManager(
             ?.activityInfo?.packageName
         val launcherApps = pm.queryIntentActivities(
             Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0
-        ).map { it.activityInfo.packageName }.toSet()
+        )?.map { it.activityInfo.packageName }?.toSet() ?: emptySet()
         val excludePackages = setOfNotNull(context.packageName, launcherPackage)
 
         val activeSessions = mutableMapOf<String, Long>()
