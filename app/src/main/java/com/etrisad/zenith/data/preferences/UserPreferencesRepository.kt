@@ -170,7 +170,7 @@ class UserPreferencesRepository(private val context: Context) {
                 totalUsagePillEnabled = preferences[PreferencesKeys.TOTAL_USAGE_PILL_ENABLED] ?: false,
                 foregroundNotificationStatusMode = preferences[PreferencesKeys.FOREGROUND_NOTIFICATION_STATUS_MODE]
                     ?.let { runCatching { ForegroundNotificationStatusMode.valueOf(it) }.getOrNull() }
-                    ?: ForegroundNotificationStatusMode.DAILY_USAGE,
+                    ?: ForegroundNotificationStatusMode.DEFAULT,
                 lastKnownDailyUsage = preferences[PreferencesKeys.LAST_KNOWN_DAILY_USAGE] ?: 0L,
                 lastKnownDailyUsageDate = preferences[PreferencesKeys.LAST_KNOWN_DAILY_USAGE_DATE] ?: "",
                 bedtimeEnabled = preferences[PreferencesKeys.BEDTIME_ENABLED] ?: false,
@@ -1026,7 +1026,7 @@ data class UserPreferences(
     val floatingTabBarEnabled: Boolean = false,
     val expressiveColors: Boolean = false,
     val totalUsagePillEnabled: Boolean = false,
-    val foregroundNotificationStatusMode: ForegroundNotificationStatusMode = ForegroundNotificationStatusMode.DAILY_USAGE,
+    val foregroundNotificationStatusMode: ForegroundNotificationStatusMode = ForegroundNotificationStatusMode.DEFAULT,
     val lastKnownDailyUsage: Long = 0L,
     val lastKnownDailyUsageDate: String = "",
     val bedtimeEnabled: Boolean = false,

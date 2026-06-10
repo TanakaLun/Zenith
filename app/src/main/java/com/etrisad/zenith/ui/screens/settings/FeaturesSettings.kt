@@ -52,13 +52,6 @@ fun FeaturesSettings(
         )
 
         Spacer(modifier = Modifier.height(4.dp))
-        ForegroundNotificationStatusSelector(
-            selectedMode = preferences.foregroundNotificationStatusMode,
-            onModeChange = onForegroundNotificationStatusModeChange,
-            shape = RoundedCornerShape(8.dp)
-        )
-
-        Spacer(modifier = Modifier.height(4.dp))
         SettingsToggle(
             title = "Session Usage Overlay",
             description = "Show a floating HUD with remaining time when an app is allowed",
@@ -84,6 +77,15 @@ fun FeaturesSettings(
                 )
             }
         }
+
+        Spacer(modifier = Modifier.height(16.dp))
+        PreferenceCategory(title = "Status Notifications")
+
+        ForegroundNotificationStatusSelector(
+            selectedMode = preferences.foregroundNotificationStatusMode,
+            onModeChange = onForegroundNotificationStatusModeChange,
+            shape = RoundedCornerShape(24.dp)
+        )
 
         Spacer(modifier = Modifier.height(16.dp))
         PreferenceCategory(title = "Advanced Control")
