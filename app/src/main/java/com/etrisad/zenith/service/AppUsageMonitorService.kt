@@ -247,17 +247,9 @@ class AppUsageMonitorService : Service() {
         val pendingIntent = PendingIntent.getBroadcast(
             this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val triggerAt = System.currentTimeMillis() + 30 * 60 * 1000L
+        val triggerAt = System.currentTimeMillis() + 60 * 60 * 1000L
 
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
-            alarmManager.setAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
-        } else {
-            try {
-                alarmManager.setExactAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
-            } catch (e: SecurityException) {
-                alarmManager.setAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
-            }
-        }
+        alarmManager.setAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
     }
 
     private fun onMidnightReset() {
@@ -994,7 +986,7 @@ class AppUsageMonitorService : Service() {
                 currentShieldCache = finalShield
             }
 
-            if (currentTime - lastDbUpdateTime > 15000 || force) {
+            if (currentTime - lastDbUpdateTime > 30000 || force) {
                 lastDbUpdateTime = currentTime
                 serviceScope.launch {
                     try {
@@ -1846,7 +1838,7 @@ class AppUsageMonitorService : Service() {
 
     private fun getForegroundApp(): String? {
         val time = System.currentTimeMillis()
-        if (time - cachedForegroundAppTime < 5000 && cachedForegroundApp != null) {
+        if (time - cachedForegroundAppTime < 10000 && cachedForegroundApp != null) {
             return cachedForegroundApp
         }
 

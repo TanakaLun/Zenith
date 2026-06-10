@@ -110,17 +110,18 @@ object ScreenUsageHelper {
                         }
 
                         if (activePkg != null) {
+                            val pkg = activePkg
                             val segmentStart = if (activeStartTime > start) activeStartTime else start
                             val segmentEnd = if (time < end) time else end
                             if (segmentStart < segmentEnd) {
                                 val duration = segmentEnd - segmentStart
                                 if (duration > 0) {
-                                    usageMap[activePkg!!] = (usageMap[activePkg!!] ?: 0L) + duration
+                                    usageMap[pkg] = (usageMap[pkg] ?: 0L) + duration
                                     if (duration > SESSION_MIN_DURATION) {
-                                        sessionCounts[activePkg!!] = (sessionCounts[activePkg!!] ?: 0) + 1
+                                        sessionCounts[pkg] = (sessionCounts[pkg] ?: 0) + 1
                                     }
                                     if (includeHourly) {
-                                        addHourlyUsage(hourlyMap, activePkg!!, segmentStart, segmentEnd, zoneId)
+                                        addHourlyUsage(hourlyMap, pkg, segmentStart, segmentEnd, zoneId)
                                     }
                                 }
                             }
@@ -263,10 +264,11 @@ object ScreenUsageHelper {
                 UsageEvents.Event.MOVE_TO_FOREGROUND -> {
                     if (isScreenOn) {
                         if (activePkg != null) {
+                            val pkg = activePkg
                             val segmentStart = maxOf(activeStartTime, startTime)
                             val segmentEnd = minOf(time, currentTime)
                             if (segmentStart < segmentEnd) {
-                                usageMap[activePkg!!] = (usageMap[activePkg!!] ?: 0L) + (segmentEnd - segmentStart)
+                                usageMap[pkg] = (usageMap[pkg] ?: 0L) + (segmentEnd - segmentStart)
                             }
                         }
                         activePkg = pkg

@@ -386,10 +386,11 @@ class HomeViewModel(
                         UsageEvents.Event.MOVE_TO_FOREGROUND -> {
                             if (isScreenOn) {
                                 if (activePkg != null) {
+                                    val pkg = activePkg
                                     val segmentStart = maxOf(activeStartTime, start)
                                     val segmentEnd = minOf(time, end)
                                     if (segmentStart < segmentEnd) {
-                                        usageMap[activePkg!!] = (usageMap[activePkg!!] ?: 0L) + (segmentEnd - segmentStart)
+                                        usageMap[pkg] = (usageMap[pkg] ?: 0L) + (segmentEnd - segmentStart)
                                     }
                                 }
                                 activePkg = pkg
@@ -415,7 +416,7 @@ class HomeViewModel(
                     val segmentStart = maxOf(activeStartTime, start)
                     val segmentEnd = minOf(now, end)
                     if (segmentStart < segmentEnd) {
-                        usageMap[activePkg!!] = (usageMap[activePkg!!] ?: 0L) + (segmentEnd - segmentStart)
+                        usageMap[activePkg] = (usageMap[activePkg] ?: 0L) + (segmentEnd - segmentStart)
                     }
                 }
 
@@ -854,14 +855,25 @@ class HomeViewModel(
         }
     }
 
+    private val midnightCache = arrayOfNulls<Long>(31)
+    private var midnightCacheTime = 0L
+
     private fun getMidnight(offsetDaysFromToday: Int = 0): Long {
+        val now = System.currentTimeMillis()
+        if (now - midnightCacheTime > 60000) {
+            midnightCache.fill(null)
+            midnightCacheTime = now
+        }
+        midnightCache[offsetDaysFromToday]?.let { return it }
         val cal = Calendar.getInstance()
         cal.set(Calendar.HOUR_OF_DAY, 0)
         cal.set(Calendar.MINUTE, 0)
         cal.set(Calendar.SECOND, 0)
         cal.set(Calendar.MILLISECOND, 0)
         cal.add(Calendar.DAY_OF_YEAR, -offsetDaysFromToday)
-        return cal.timeInMillis
+        val result = cal.timeInMillis
+        midnightCache[offsetDaysFromToday] = result
+        return result
     }
 
     private var lastFullFallbackRefresh = 0L
@@ -953,7 +965,7 @@ class HomeViewModel(
                                 if (activePkg != null) {
                                     val segmentStart = maxOf(activeStartTime, start)
                                     val segmentEnd = minOf(time, end)
-                                    if (segmentStart < segmentEnd) usageMap[activePkg!!] = (usageMap[activePkg!!] ?: 0L) + (segmentEnd - segmentStart)
+                                    if (segmentStart < segmentEnd) usageMap[activePkg] = (usageMap[activePkg] ?: 0L) + (segmentEnd - segmentStart)
                                 }
                                 activePkg = pkg
                                 activeStartTime = time
@@ -972,7 +984,7 @@ class HomeViewModel(
                 if (activePkg != null && isScreenOn) {
                     val segmentStart = maxOf(activeStartTime, start)
                     val segmentEnd = minOf(now, end)
-                    if (segmentStart < segmentEnd) usageMap[activePkg!!] = (usageMap[activePkg!!] ?: 0L) + (segmentEnd - segmentStart)
+                    if (segmentStart < segmentEnd) usageMap[activePkg] = (usageMap[activePkg] ?: 0L) + (segmentEnd - segmentStart)
                 }
                 val dayRecords = mutableListOf<UsageRecord.Live>()
                 var dayTotalSum = 0L
