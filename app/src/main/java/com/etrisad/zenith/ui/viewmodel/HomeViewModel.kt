@@ -551,20 +551,34 @@ class HomeViewModel(
 
     init {
         viewModelScope.launch {
-            shieldRepository.isShieldsLoaded.first { it }
+            try {
+                shieldRepository.isShieldsLoaded.first { it }
 
-            val cal = Calendar.getInstance()
-            cal.add(Calendar.DAY_OF_YEAR, -21)
-            val thresholdDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(cal.time)
-            shieldRepository.deleteOldHourlyUsage(thresholdDate)
+                val cal = Calendar.getInstance()
+                cal.add(Calendar.DAY_OF_YEAR, -21)
+                val thresholdDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(cal.time)
+                try {
+                    shieldRepository.deleteOldHourlyUsage(thresholdDate)
+                } catch (e: Exception) {
+                    android.util.Log.e("HomeVM", "Failed to delete old hourly usage", e)
+                }
 
-            setupDataObservers()
+                setupDataObservers()
 
-            viewModelScope.launch(Dispatchers.Default) {
-                syncDataNowInternal(isInitial = true)
+                viewModelScope.launch(Dispatchers.Default) {
+                    try {
+                        syncDataNowInternal(isInitial = true)
+                    } catch (e: Exception) {
+                        android.util.Log.e("HomeVM", "Initial sync failed", e)
+                        _uiState.update { it.copy(isLoading = false) }
+                    }
+                }
+
+                startRealTimeUpdates()
+            } catch (e: Exception) {
+                android.util.Log.e("HomeVM", "ViewModel init failed", e)
+                _uiState.update { it.copy(isLoading = false) }
             }
-
-            startRealTimeUpdates()
         }
     }
 

@@ -26,13 +26,25 @@ class ZenithApplication : Application(), ImageLoaderFactory {
     }
 
     val shieldRepository: ShieldRepository by lazy {
-        val database = ZenithDatabase.getDatabase(this)
-        ShieldRepository(
-            database.shieldDao(),
-            database.scheduleDao(),
-            database.dailyUsageDao(),
-            database.hourlyUsageDao()
-        )
+        try {
+            val database = ZenithDatabase.getDatabase(this)
+            ShieldRepository(
+                database.shieldDao(),
+                database.scheduleDao(),
+                database.dailyUsageDao(),
+                database.hourlyUsageDao()
+            )
+        } catch (e: Exception) {
+            android.util.Log.e("ZenithApp", "Failed to initialize DB, trying destructive rebuild", e)
+            ZenithDatabase.closeDatabase()
+            val database = ZenithDatabase.getDatabase(this)
+            ShieldRepository(
+                database.shieldDao(),
+                database.scheduleDao(),
+                database.dailyUsageDao(),
+                database.hourlyUsageDao()
+            )
+        }
     }
 
     override fun onCreate() {

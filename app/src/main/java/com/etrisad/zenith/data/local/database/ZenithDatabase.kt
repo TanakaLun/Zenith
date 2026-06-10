@@ -223,6 +223,7 @@ abstract class ZenithDatabase : RoomDatabase() {
                     )
                     .enableMultiInstanceInvalidation()
                     .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
+                    .fallbackToDestructiveMigration()
                     .fallbackToDestructiveMigrationOnDowngrade()
                     .build()
                 INSTANCE = instance
