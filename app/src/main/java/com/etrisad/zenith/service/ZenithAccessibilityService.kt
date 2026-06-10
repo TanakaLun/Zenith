@@ -946,7 +946,7 @@ class ZenithAccessibilityService : AccessibilityService() {
 
     private fun updateRestrictedPackages() {
         val shieldPkgs = allShieldsCache.map { it.packageName }.toSet()
-        val schedulePkgs = activeSchedules.filter { it.mode == ScheduleMode.BLOCK }
+        val schedulePkgs = activeSchedules.asSequence().filter { it.mode == ScheduleMode.BLOCK }
             .flatMap { it.packageNames }.toSet()
         hasGlobalAllowSchedule = activeSchedules.any { it.mode == ScheduleMode.ALLOW }
         restrictedPackages = shieldPkgs + schedulePkgs + BLOCKABLE_SYSTEM_APPS

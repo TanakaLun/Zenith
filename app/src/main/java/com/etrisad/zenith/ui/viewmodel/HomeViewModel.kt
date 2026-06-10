@@ -470,8 +470,8 @@ class HomeViewModel(
             shieldRepository.isShieldsLoaded.first { it }
 
             val allShields = shieldRepository.allShields.first()
-            val shieldPkgs = allShields.filter { it.type == FocusType.SHIELD }.map { it.packageName }.toSet()
-            val goalPkgs = allShields.filter { it.type == FocusType.GOAL }.map { it.packageName }.toSet()
+            val shieldPkgs = allShields.asSequence().filter { it.type == FocusType.SHIELD }.map { it.packageName }.toSet()
+            val goalPkgs = allShields.asSequence().filter { it.type == FocusType.GOAL }.map { it.packageName }.toSet()
 
             var sUsage = 0L
             var gUsage = 0L
@@ -1233,8 +1233,8 @@ class HomeViewModel(
         }
 
         val (finalShieldUsage, finalGoalUsage, finalOtherUsage) = if (isSelectedToday || (storedShieldUsage == null && storedGoalUsage == null)) {
-            val shieldPkgs = liveShields.filter { it.type == FocusType.SHIELD }.map { it.packageName }.toSet()
-            val goalPkgs = liveShields.filter { it.type == FocusType.GOAL }.map { it.packageName }.toSet()
+            val shieldPkgs = liveShields.asSequence().filter { it.type == FocusType.SHIELD }.map { it.packageName }.toSet()
+            val goalPkgs = liveShields.asSequence().filter { it.type == FocusType.GOAL }.map { it.packageName }.toSet()
 
             var s = 0L
             var g = 0L
@@ -1329,7 +1329,7 @@ class HomeViewModel(
                     val durationForThisHour = if (dbEntry != null) {
                         dbEntry.usageTimeMillis
                     } else {
-                        val lockedHours = allHourlyData.filter { it.packageName == pkg }.map { it.hour }.toSet()
+                        val lockedHours = allHourlyData.asSequence().filter { it.packageName == pkg }.map { it.hour }.toSet()
                         if (hour in lockedHours) {
                             0L
                         } else {

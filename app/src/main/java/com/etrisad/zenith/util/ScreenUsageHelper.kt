@@ -205,7 +205,7 @@ object ScreenUsageHelper {
             val duration = segmentEnd - currentMillis
 
             if (duration > 0) {
-                val pkgMap = hourlyMap.getOrPut(hour) { mutableMapOf() }
+                val pkgMap = hourlyMap.getOrPut(hour) { hashMapOf() }
                 pkgMap[packageName] = (pkgMap[packageName] ?: 0L) + duration
             }
 

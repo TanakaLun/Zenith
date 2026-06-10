@@ -173,7 +173,7 @@ class UsageSyncManager(
             val duration = chunkEnd - current
 
             if (duration > 0) {
-                buckets.getOrPut(dateStr) { mutableMapOf() }
+                buckets.getOrPut(dateStr) { hashMapOf() }
                     .getOrPut(hour) { mutableListOf() }
                     .add(UsageChunk(pkg, duration))
             }
@@ -221,7 +221,7 @@ class UsageSyncManager(
 
             val existingRecords = repository.getHourlyUsageForDateSync(date)
             val existingMap = existingRecords.associateBy { it.hour to it.packageName }
-            val dayBuckets = buckets[date] ?: mutableMapOf()
+            val dayBuckets = buckets[date] ?: hashMapOf()
 
             for (hour in 0..23) {
                 if (date == currentDateStr && hour > currentHour) {
@@ -330,8 +330,8 @@ class UsageSyncManager(
 
         repository.isShieldsLoaded.first { it }
         val allShields = repository.allShields.first()
-        val shieldPkgs = allShields.filter { it.type == com.etrisad.zenith.data.local.entity.FocusType.SHIELD }.map { it.packageName }.toSet()
-        val goalPkgs = allShields.filter { it.type == com.etrisad.zenith.data.local.entity.FocusType.GOAL }.map { it.packageName }.toSet()
+        val shieldPkgs = allShields.asSequence().filter { it.type == com.etrisad.zenith.data.local.entity.FocusType.SHIELD }.map { it.packageName }.toSet()
+        val goalPkgs = allShields.asSequence().filter { it.type == com.etrisad.zenith.data.local.entity.FocusType.GOAL }.map { it.packageName }.toSet()
 
         dates.forEach { date ->
             val hourlyData = repository.getHourlyUsageForDateSync(date)

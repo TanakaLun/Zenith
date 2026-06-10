@@ -544,13 +544,6 @@ class AppUsageMonitorService : Service() {
 
                     var currentApp = getForegroundApp()
 
-                    val isSystemTransient = currentApp == "com.android.systemui" || currentApp == "android"
-
-                    if ((currentApp == null || isSystemTransient) && isScreenOn && lastForegroundApp != null &&
-                        lastForegroundApp != packageName && !launcherPackages.contains(lastForegroundApp)) {
-                        currentApp = lastForegroundApp
-                    }
-
                     if (currentApp != null) {
                         if (launcherPackages.contains(currentApp) || currentApp == packageName) {
                             overlayManager.hideOverlay()
@@ -570,7 +563,7 @@ class AppUsageMonitorService : Service() {
                         } else {
                             overlayManager.checkAndHide(currentApp)
                         }
-                    } else if (lastForegroundApp != null && !InterceptOverlayManager.isShowing) {
+                    } else {
                         overlayManager.hideOverlay()
                         currentShieldCache?.let { shield ->
                             if (shield.isDelayAppEnabled) {
@@ -584,7 +577,7 @@ class AppUsageMonitorService : Service() {
 
                     if (InterceptOverlayManager.isShowing) {
                         lastForegroundApp = currentApp
-                        delay(5000)
+                        delay(2000)
                         continue
                     }
 
@@ -1454,6 +1447,10 @@ class AppUsageMonitorService : Service() {
     }
 
     private fun goToHomeScreen() {
+        lastForegroundApp = null
+        cachedForegroundApp = null
+        cachedForegroundAppTime = 0L
+        lastEventQueryTime = 0L
         val intent = Intent(Intent.ACTION_MAIN)
         intent.addCategory(Intent.CATEGORY_HOME)
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
@@ -1768,7 +1765,7 @@ class AppUsageMonitorService : Service() {
 
     private fun updateRestrictedPackages() {
         val shieldPkgs = allShieldsCache.keys
-        val schedulePkgs = activeSchedules.filter { it.mode == com.etrisad.zenith.data.local.entity.ScheduleMode.BLOCK }
+        val schedulePkgs = activeSchedules.asSequence().filter { it.mode == com.etrisad.zenith.data.local.entity.ScheduleMode.BLOCK }
             .flatMap { it.packageNames }.toSet()
         hasGlobalAllowSchedule = activeSchedules.any { it.mode == com.etrisad.zenith.data.local.entity.ScheduleMode.ALLOW }
         restrictedPackages = shieldPkgs + schedulePkgs + BLOCKABLE_SYSTEM_APPS
@@ -1838,7 +1835,7 @@ class AppUsageMonitorService : Service() {
 
     private fun getForegroundApp(): String? {
         val time = System.currentTimeMillis()
-        if (time - cachedForegroundAppTime < 10000 && cachedForegroundApp != null) {
+        if (time - cachedForegroundAppTime < 4000 && cachedForegroundApp != null) {
             return cachedForegroundApp
         }
 

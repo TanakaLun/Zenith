@@ -215,8 +215,8 @@ class DailyUsageWorker(context: Context, params: WorkerParameters) : CoroutineWo
 
         usagesToInsert.add(DailyUsageEntity(date = dateString, packageName = "TOTAL", usageTimeMillis = totalUsage))
 
-        val shieldPkgs = allShields.filter { it.type == FocusType.SHIELD }.map { it.packageName }.toSet()
-        val goalPkgs = allShields.filter { it.type == FocusType.GOAL }.map { it.packageName }.toSet()
+        val shieldPkgs = allShields.asSequence().filter { it.type == FocusType.SHIELD }.map { it.packageName }.toSet()
+        val goalPkgs = allShields.asSequence().filter { it.type == FocusType.GOAL }.map { it.packageName }.toSet()
         var sUsage = 0L; var gUsage = 0L
         finalAppUsages.forEach { (pkg, time) ->
             if (pkg in shieldPkgs) sUsage += time else if (pkg in goalPkgs) gUsage += time

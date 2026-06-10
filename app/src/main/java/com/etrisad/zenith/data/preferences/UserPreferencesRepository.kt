@@ -919,7 +919,7 @@ class UserPreferencesRepository(private val context: Context) {
                 ?.associate { 
                     val parts = it.split(":")
                     parts[0] to parts[1]
-                }?.toMutableMap() ?: mutableMapOf()
+                }                ?.toMutableMap() ?: hashMapOf()
             
             currentMap[packageName] = System.currentTimeMillis().toString()
             preferences[PreferencesKeys.MANUAL_RESET_TIMESTAMPS] = currentMap.entries.joinToString(",") { "${it.key}:${it.value}" }
