@@ -67,6 +67,23 @@ class ZenithAccessibilityService : AccessibilityService() {
     @Volatile
     private var usageStatsCache: List<UsageStats>? = null
     private var lastUsageCacheTime = 0L
+    private var lastStartOfDayUpdate = 0L
+    private var cachedStartOfDayField = 0L
+    private val cachedStartOfDay: Long
+        get() {
+            val now = System.currentTimeMillis()
+            if (now - lastStartOfDayUpdate < 60000) return cachedStartOfDayField
+            synchronized(reusableCalendar) {
+                reusableCalendar.timeInMillis = now
+                reusableCalendar.set(Calendar.HOUR_OF_DAY, 0)
+                reusableCalendar.set(Calendar.MINUTE, 0)
+                reusableCalendar.set(Calendar.SECOND, 0)
+                reusableCalendar.set(Calendar.MILLISECOND, 0)
+                cachedStartOfDayField = reusableCalendar.timeInMillis
+            }
+            lastStartOfDayUpdate = now
+            return cachedStartOfDayField
+        }
 
     private var lastMonitoringError: String? = null
     private var lastMonitoringErrorTime = 0L
@@ -663,7 +680,7 @@ class ZenithAccessibilityService : AccessibilityService() {
 
     private fun getTotalGlobalUsageToday(): Long {
         val currentTime = System.currentTimeMillis()
-        if (currentTime - lastGlobalUsageCacheTime < 5000) {
+        if (currentTime - lastGlobalUsageCacheTime < 30000) {
             return cachedTotalGlobalUsage
         }
 
@@ -685,14 +702,8 @@ class ZenithAccessibilityService : AccessibilityService() {
             }
         }
 
-        val todayStart = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
 
-        cachedTotalGlobalUsage = totalToday.coerceAtMost(currentTime - todayStart)
+        cachedTotalGlobalUsage = totalToday.coerceAtMost(currentTime - cachedStartOfDay)
         lastGlobalUsageCacheTime = currentTime
         return cachedTotalGlobalUsage
     }
@@ -705,12 +716,7 @@ class ZenithAccessibilityService : AccessibilityService() {
             val tempMap = detailedUsage.appUsageMap
 
             dailyUsageCache.clear()
-            val todayStart = Calendar.getInstance().apply {
-                set(Calendar.HOUR_OF_DAY, 0)
-                set(Calendar.MINUTE, 0)
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
-            }.timeInMillis
+            val todayStart = cachedStartOfDay
             val timeSinceMidnight = currentTime - todayStart
 
             tempMap.forEach { (pkg, time) ->
@@ -731,17 +737,14 @@ class ZenithAccessibilityService : AccessibilityService() {
         val currentTime = System.currentTimeMillis()
         val currentDay: Int
         val currentMinutes: Int
-
-        val yesterdayCalendar = Calendar.getInstance().apply {
-            timeInMillis = currentTime
-            add(Calendar.DAY_OF_YEAR, -1)
-        }
-        val yesterdayDay = yesterdayCalendar.get(Calendar.DAY_OF_WEEK)
+        val yesterdayDay: Int
 
         synchronized(reusableCalendar) {
             reusableCalendar.timeInMillis = currentTime
             currentDay = reusableCalendar.get(Calendar.DAY_OF_WEEK)
             currentMinutes = reusableCalendar.get(Calendar.HOUR_OF_DAY) * 60 + reusableCalendar.get(Calendar.MINUTE)
+            reusableCalendar.add(Calendar.DAY_OF_YEAR, -1)
+            yesterdayDay = reusableCalendar.get(Calendar.DAY_OF_WEEK)
         }
 
         val startMinutes = cachedBedtimeStartMinutes

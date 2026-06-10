@@ -48,12 +48,8 @@ fun BedtimeAlertPill(
         val now = Calendar.getInstance()
         val currentMinutes = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE)
         val currentDay = now.get(Calendar.DAY_OF_WEEK)
-        
-        val yesterdayCalendar = Calendar.getInstance().apply {
-            timeInMillis = now.timeInMillis
-            add(Calendar.DAY_OF_YEAR, -1)
-        }
-        val yesterdayDay = yesterdayCalendar.get(Calendar.DAY_OF_WEEK)
+        now.add(Calendar.DAY_OF_YEAR, -1)
+        val yesterdayDay = now.get(Calendar.DAY_OF_WEEK)
         
         val startParts = userPreferences.bedtimeStartTime.split(":")
         val endParts = userPreferences.bedtimeEndTime.split(":")

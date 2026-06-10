@@ -15,15 +15,17 @@ object ScreenUsageHelper {
         val totalGlobalUsage: Long = 0L
     )
 
+    @Volatile
     private var lastResult: UsageResult? = null
     private var lastQueryTime = 0L
-    private const val CACHE_DURATION = 20000L
+    private const val CACHE_DURATION = 60000L
 
     private const val MIDNIGHT_LOOKBACK_MS = 600000L
     private const val SESSION_MIN_DURATION = 4000L
     private const val MIN_SEGMENT_DURATION = 100L
     private const val SESSION_TIMEOUT_MS = 60000L
 
+    @Synchronized
     fun fetchDetailedUsageToday(
         usageStatsManager: UsageStatsManager,
         includeHourly: Boolean = false
@@ -297,6 +299,7 @@ object ScreenUsageHelper {
         return usageMap
     }
 
+    @Synchronized
     fun clearCache() {
         lastResult = null
         lastQueryTime = 0L

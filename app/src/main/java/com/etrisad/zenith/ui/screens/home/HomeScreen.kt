@@ -1018,17 +1018,17 @@ fun rememberBedtimeStatus(prefs: UserPreferences): BedtimeStatus {
     var status by remember { mutableStateOf(BedtimeStatus(false, "", 1f)) }
     
     LaunchedEffect(prefs) {
+        val cal = Calendar.getInstance()
         while (true) {
-            val now = Calendar.getInstance()
+            cal.timeInMillis = System.currentTimeMillis()
             if (!prefs.bedtimeEnabled) {
                 status = BedtimeStatus(false, "", 1f)
             } else {
-                val currentDay = now.get(Calendar.DAY_OF_WEEK)
-                val yesterdayCalendar = Calendar.getInstance().apply {
-                    timeInMillis = now.timeInMillis
-                    add(Calendar.DAY_OF_YEAR, -1)
-                }
-                val yesterdayDay = yesterdayCalendar.get(Calendar.DAY_OF_WEEK)
+                val currentDay = cal.get(Calendar.DAY_OF_WEEK)
+                val currentMinutes = cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE)
+                cal.add(Calendar.DAY_OF_YEAR, -1)
+                val yesterdayDay = cal.get(Calendar.DAY_OF_WEEK)
+                cal.add(Calendar.DAY_OF_YEAR, 1)
                 
                 val startParts = prefs.bedtimeStartTime.split(":")
                 val endParts = prefs.bedtimeEndTime.split(":")
@@ -1036,8 +1036,6 @@ fun rememberBedtimeStatus(prefs: UserPreferences): BedtimeStatus {
                 val endMinutes = (endParts.getOrNull(0)?.toIntOrNull() ?: 7) * 60 + (endParts.getOrNull(1)?.toIntOrNull() ?: 0)
 
                 val effectiveStartMinutes = startMinutes - 30
-                
-                val currentMinutes = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE)
 
                 var isActive = false
                 if (effectiveStartMinutes <= endMinutes) {

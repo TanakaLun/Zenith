@@ -22,10 +22,10 @@ class DailyUsageWorker(context: Context, params: WorkerParameters) : CoroutineWo
 
     override suspend fun doWork(): Result {
         val isBackup = inputData.getBoolean("is_backup", false)
-        val calendar = Calendar.getInstance()
         val nowCal = Calendar.getInstance()
         val currentHour = nowCal.get(Calendar.HOUR_OF_DAY)
         val currentMinute = nowCal.get(Calendar.MINUTE)
+        val calendar = nowCal.clone() as Calendar
 
         if (isBackup) {
             val isLateNight = currentHour == 23

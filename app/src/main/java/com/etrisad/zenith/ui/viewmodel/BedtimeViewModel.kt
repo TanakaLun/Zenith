@@ -114,29 +114,27 @@ class BedtimeViewModel(
             val calendar = Calendar.getInstance()
             val currentHour = calendar.get(Calendar.HOUR_OF_DAY)
 
-            val sessionStartCal = Calendar.getInstance().apply {
-                if (currentHour < startH && startH > endH) {
-                    add(Calendar.DAY_OF_YEAR, -1)
-                } else if (currentHour >= startH) {
-                } else {
-                    add(Calendar.DAY_OF_YEAR, -1)
-                }
-                set(Calendar.HOUR_OF_DAY, startH)
-                set(Calendar.MINUTE, startM)
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
+            calendar.set(Calendar.HOUR_OF_DAY, startH)
+            calendar.set(Calendar.MINUTE, startM)
+            calendar.set(Calendar.SECOND, 0)
+            calendar.set(Calendar.MILLISECOND, 0)
+            if (currentHour < startH && startH > endH) {
+                calendar.add(Calendar.DAY_OF_YEAR, -1)
+            } else if (currentHour >= startH) {
+            } else {
+                calendar.add(Calendar.DAY_OF_YEAR, -1)
             }
 
-            val sessionEndCal = Calendar.getInstance().apply {
-                timeInMillis = sessionStartCal.timeInMillis
-                if (endH < startH || (endH == startH && endM <= startM)) {
-                    add(Calendar.DAY_OF_YEAR, 1)
-                }
-                set(Calendar.HOUR_OF_DAY, endH)
-                set(Calendar.MINUTE, endM)
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
+            val sessionStartCal = calendar.clone() as Calendar
+            val sessionEndCal = calendar.clone() as Calendar
+            sessionEndCal.timeInMillis = sessionStartCal.timeInMillis
+            if (endH < startH || (endH == startH && endM <= startM)) {
+                sessionEndCal.add(Calendar.DAY_OF_YEAR, 1)
             }
+            sessionEndCal.set(Calendar.HOUR_OF_DAY, endH)
+            sessionEndCal.set(Calendar.MINUTE, endM)
+            sessionEndCal.set(Calendar.SECOND, 0)
+            sessionEndCal.set(Calendar.MILLISECOND, 0)
 
             val startDateStr = dateFormat.format(sessionStartCal.time)
             val nextDateCal = (sessionStartCal.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, 1) }

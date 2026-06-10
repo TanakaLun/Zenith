@@ -1590,9 +1590,11 @@ class HomeViewModel(
 
     private fun startRealTimeUpdates() {
         viewModelScope.launch {
-            var lastUpdateDay = Calendar.getInstance().get(Calendar.DAY_OF_YEAR)
+            val cal = Calendar.getInstance()
+            var lastUpdateDay = cal.get(Calendar.DAY_OF_YEAR)
             while (true) {
-                val currentDay = Calendar.getInstance().get(Calendar.DAY_OF_YEAR)
+                cal.timeInMillis = System.currentTimeMillis()
+                val currentDay = cal.get(Calendar.DAY_OF_YEAR)
                 if (currentDay != lastUpdateDay) {
                     appInfoCache.clear(); _globalFallbackMap.value = emptyMap(); detailFallbackMap = emptyMap()
                     val today = getMidnight(0); val yesterday = getMidnight(1)
@@ -1603,7 +1605,7 @@ class HomeViewModel(
                     performUsageStatsRefresh(showLoading = false)
                     refreshCurrentAppDetailUsage()
                 }
-                delay(30000)
+                delay(60000)
             }
         }
     }

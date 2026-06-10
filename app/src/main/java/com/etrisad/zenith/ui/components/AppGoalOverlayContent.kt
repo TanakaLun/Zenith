@@ -71,7 +71,7 @@ fun AppGoalOverlayContent(
                 
                 progressState.snapTo(currentProgress)
                 savedProgress = currentProgress
-                delay(50)
+                delay(200)
             }
             
             progressState.snapTo(1f)

@@ -70,15 +70,21 @@ fun ScheduleOverlay(
         totalGlobalUsageToday
     ) {
         val usm = context.getSystemService(android.content.Context.USAGE_STATS_SERVICE) as android.app.usage.UsageStatsManager
+        val cal = Calendar.getInstance()
+        var lastOfDay = 0L
+        var cachedOfDay = 0L
         while (true) {
             val now = System.currentTimeMillis()
-            val startOfDay = Calendar.getInstance().apply {
-                set(Calendar.HOUR_OF_DAY, 0)
-                set(Calendar.MINUTE, 0)
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
-            }.timeInMillis
-            val timeSinceMidnight = (now - startOfDay).coerceAtLeast(0L)
+            if (now - lastOfDay > 60000) {
+                cal.timeInMillis = now
+                cal.set(Calendar.HOUR_OF_DAY, 0)
+                cal.set(Calendar.MINUTE, 0)
+                cal.set(Calendar.SECOND, 0)
+                cal.set(Calendar.MILLISECOND, 0)
+                cachedOfDay = cal.timeInMillis
+                lastOfDay = now
+            }
+            val timeSinceMidnight = (now - cachedOfDay).coerceAtLeast(0L)
 
             val detailedUsage = withContext(kotlinx.coroutines.Dispatchers.IO) {
                 com.etrisad.zenith.util.ScreenUsageHelper.fetchDetailedUsageToday(usm)

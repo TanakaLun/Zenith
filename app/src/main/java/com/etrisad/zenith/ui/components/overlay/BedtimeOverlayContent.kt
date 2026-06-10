@@ -67,9 +67,10 @@ fun BedtimeOverlayContent(
         initialValue = Triple(0f, "0m", ""),
         key1 = userPreferences
     ) {
+        val cal = Calendar.getInstance()
         while (true) {
-            val now = Calendar.getInstance()
-            val currentMinutes = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE)
+            cal.timeInMillis = System.currentTimeMillis()
+            val currentMinutes = cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE)
             
             val startParts = userPreferences.bedtimeStartTime.split(":")
             val endParts = userPreferences.bedtimeEndTime.split(":")

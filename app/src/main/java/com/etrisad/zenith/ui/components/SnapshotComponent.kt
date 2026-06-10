@@ -305,15 +305,14 @@ fun SnapshotCard(
         val target = cal.timeInMillis
 
         stamps.indices.find { i ->
-            val dCal = Calendar.getInstance()
-            dCal.timeInMillis = referenceTime
+            cal.timeInMillis = referenceTime
             val daysAgo = (stamps.size - 1) - i
-            dCal.add(Calendar.DAY_OF_YEAR, -daysAgo)
-            dCal.set(Calendar.HOUR_OF_DAY, 0)
-            dCal.set(Calendar.MINUTE, 0)
-            dCal.set(Calendar.SECOND, 0)
-            dCal.set(Calendar.MILLISECOND, 0)
-            dCal.timeInMillis == target
+            cal.add(Calendar.DAY_OF_YEAR, -daysAgo)
+            cal.set(Calendar.HOUR_OF_DAY, 0)
+            cal.set(Calendar.MINUTE, 0)
+            cal.set(Calendar.SECOND, 0)
+            cal.set(Calendar.MILLISECOND, 0)
+            cal.timeInMillis == target
         }
     }
 
