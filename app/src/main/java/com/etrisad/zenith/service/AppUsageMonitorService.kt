@@ -54,6 +54,8 @@ class AppUsageMonitorService : Service() {
     private val reusableEvent = UsageEvents.Event()
     private var lastEventQueryTime = 0L
     private var lastForegroundApp: String? = null
+    private var cachedForegroundApp: String? = null
+    private var cachedForegroundAppTime = 0L
     private var currentShieldCache: ShieldEntity? = null
     private var currentSessionPackage: String? = null
     private var lastUsageFetchTime = 0L
@@ -109,7 +111,6 @@ class AppUsageMonitorService : Service() {
     private var cachedStartOfDay = 0L
     private var lastStartOfDayDate = -1
 
-    private var usageStatsCache: List<android.app.usage.UsageStats>? = null
     private var lastUsageCacheTime = 0L
 
     private var lastMonitoringError: String? = null
@@ -132,7 +133,6 @@ class AppUsageMonitorService : Service() {
                     isScreenOn = false
                     currentShieldCache = null
                     currentSessionPackage = null
-                    usageStatsCache = null
 
                     monitoringWakeLock?.let { if (it.isHeld) it.release() }
                 }
@@ -222,7 +222,6 @@ class AppUsageMonitorService : Service() {
                 preferencesRepository.refreshAllAppStreaks(shieldRepository)
 
                 dailyUsageCache.clear()
-                usageStatsCache = null
                 lastUsageCacheTime = 0L
                 lastUsageFetchTime = 0L
 
@@ -268,7 +267,6 @@ class AppUsageMonitorService : Service() {
             earlyKickManager.reset()
             dailyUsageCache.clear()
             lastAllowedRemainingTime.clear()
-            usageStatsCache = null
             lastUsageCacheTime = 0L
             lastUsageFetchTime = 0L
             cachedTotalUsage = 0L
@@ -374,24 +372,25 @@ class AppUsageMonitorService : Service() {
     private fun startGoalReminderCheck() {
         serviceScope.launch {
             while (true) {
+                delay(60000)
+                if (!isScreenOn || goalShieldsCache.isEmpty()) continue
+
                 try {
                     val currentTime = System.currentTimeMillis()
                     val goals = goalShieldsCache
                     val triggeredGoals = mutableListOf<ShieldEntity>()
 
-                    if (goals.isNotEmpty()) {
-                        goals.forEach { goal ->
-                            if (goal.packageName == lastForegroundApp) return@forEach
-                            if (isPaused(goal)) return@forEach
+                    goals.forEach { goal ->
+                        if (goal.packageName == lastForegroundApp) return@forEach
+                        if (isPaused(goal)) return@forEach
 
-                            val usageToday = dailyUsageCache[goal.packageName] ?: getTotalUsageToday(goal.packageName)
-                            val limitMillis = goal.timeLimitMinutes * 60 * 1000L
-                            if (usageToday >= limitMillis) return@forEach
+                        val usageToday = dailyUsageCache[goal.packageName] ?: getTotalUsageToday(goal.packageName)
+                        val limitMillis = goal.timeLimitMinutes * 60 * 1000L
+                        if (usageToday >= limitMillis) return@forEach
 
-                            val periodMillis = goal.goalReminderPeriodMinutes * 60 * 1000L
-                            if (periodMillis > 0 && currentTime - goal.lastGoalReminderTimestamp >= periodMillis) {
-                                triggeredGoals.add(goal)
-                            }
+                        val periodMillis = goal.goalReminderPeriodMinutes * 60 * 1000L
+                        if (periodMillis > 0 && currentTime - goal.lastGoalReminderTimestamp >= periodMillis) {
+                            triggeredGoals.add(goal)
                         }
                     }
 
@@ -425,7 +424,6 @@ class AppUsageMonitorService : Service() {
                 } catch (e: Exception) {
                     Log.e("ZenithAUMS", "Error in goal reminder check: ${e.message}")
                 }
-                delay(60000)
             }
         }
     }
@@ -520,7 +518,6 @@ class AppUsageMonitorService : Service() {
                         earlyKickManager.reset()
                         dailyUsageCache.clear()
                         lastAllowedRemainingTime.clear()
-                        usageStatsCache = null
                         lastUsageCacheTime = 0L
                         lastUsageFetchTime = 0L
                         cachedTotalUsage = 0L
@@ -550,7 +547,10 @@ class AppUsageMonitorService : Service() {
                     }
 
                     if (!isScreenOn) {
-                        delay(5000)
+                        lastForegroundApp = null
+                        currentShieldCache = null
+                        currentSessionPackage = null
+                        delay(15000)
                         continue
                     }
 
@@ -600,7 +600,7 @@ class AppUsageMonitorService : Service() {
                         continue
                     }
 
-                    if (launcherPackages.isEmpty() || currentTime - lastLauncherRefreshTime > 600000) {
+                    if (launcherPackages.isEmpty() || currentTime - lastLauncherRefreshTime > 1800000) {
                         refreshLauncherCache()
                     }
 
@@ -622,7 +622,6 @@ class AppUsageMonitorService : Service() {
 
                             currentShieldCache = allShieldsCache[currentApp]
 
-                            com.etrisad.zenith.util.ScreenUsageHelper.clearCache()
                             lastUsageFetchTime = 0L
                             lastHUDUpdateTime = 0L
                             sessionStartTime = currentTime
@@ -893,59 +892,56 @@ class AppUsageMonitorService : Service() {
         cachedTotalGlobalUsage = baseGlobalUsageAtSessionStart + sessionElapsed
 
         val shield = currentShieldCache ?: return
+        val shieldType = shield.type
 
-        if (shield.type == FocusType.GOAL) {
+        val needsDetailedFetch = if (shieldType == FocusType.GOAL) {
             val limitMillis = shield.timeLimitMinutes * 60 * 1000L
             val remaining = (limitMillis - cachedTotalUsage).coerceAtLeast(0L)
-
             val uiUpdateInterval = when {
                 remaining < 60000 -> 5000L
                 remaining < 300000 -> 10000L
                 remaining < 900000 -> 20000L
                 else -> 30000L
             }
+            currentTime - lastHUDUpdateTime > uiUpdateInterval || lastHUDUpdateTime == 0L
+        } else {
+            currentTime - lastUsageFetchTime > 30000
+        }
 
-            if (currentTime - lastHUDUpdateTime > uiUpdateInterval || lastHUDUpdateTime == 0L) {
-                lastHUDUpdateTime = currentTime
+        if (needsDetailedFetch) {
+            val isGoal = shieldType == FocusType.GOAL
+            if (isGoal) lastHUDUpdateTime = currentTime
+            else lastUsageFetchTime = currentTime
 
-                serviceScope.launch {
-                    try {
-                        val detailedUsage = com.etrisad.zenith.util.ScreenUsageHelper.fetchDetailedUsageToday(usageStatsManager)
-                        val realUsage = (detailedUsage.appUsageMap[packageName] ?: 0L).coerceAtMost(System.currentTimeMillis() - getStartOfDay())
-
-                        val systemGlobal = getFilteredGlobalUsage(detailedUsage.appUsageMap)
-                        baseGlobalUsageAtSessionStart = systemGlobal
-                        cachedTotalGlobalUsage = systemGlobal
-
-                        baseUsageAtSessionStart = realUsage
-                        sessionStartTime = System.currentTimeMillis()
-                        cachedTotalUsage = realUsage
-
-                        withContext(Dispatchers.Main) {
-                            sessionUsageOverlayManager.updateHUDUsage(packageName, realUsage)
-                        }
-                    } catch (_: Exception) {}
-                }
-            }
-        } else if (System.currentTimeMillis() - lastUsageFetchTime > 30000) {
             serviceScope.launch {
                 try {
                     val detailedUsage = com.etrisad.zenith.util.ScreenUsageHelper.fetchDetailedUsageToday(usageStatsManager)
+
                     val systemUsage = detailedUsage.appUsageMap[packageName] ?: 0L
                     val systemGlobal = getFilteredGlobalUsage(detailedUsage.appUsageMap)
                     val startOfDay = getStartOfDay()
                     val now = System.currentTimeMillis()
                     val timeSinceMidnight = (now - startOfDay).coerceAtLeast(0L)
 
-                    baseUsageAtSessionStart = systemUsage.coerceAtMost(timeSinceMidnight) - (now - sessionStartTime)
-                    baseGlobalUsageAtSessionStart = systemGlobal.coerceAtMost(timeSinceMidnight) - (now - sessionStartTime)
-                    lastUsageFetchTime = now
+                    baseUsageAtSessionStart = systemUsage.coerceAtMost(timeSinceMidnight)
+                    baseGlobalUsageAtSessionStart = systemGlobal.coerceAtMost(timeSinceMidnight)
+                    sessionStartTime = now
+                    cachedTotalUsage = baseUsageAtSessionStart
+                    cachedTotalGlobalUsage = baseGlobalUsageAtSessionStart
+
+                    if (isGoal) {
+                        withContext(Dispatchers.Main) {
+                            sessionUsageOverlayManager.updateHUDUsage(packageName, systemUsage)
+                        }
+                    }
                 } catch (_: Exception) {}
             }
         }
 
         updateShieldInDatabase(shield)
     }
+
+    private var lastDbUpdateTime = 0L
 
     private fun updateShieldInDatabase(shield: ShieldEntity, force: Boolean = false) {
         val currentTime = System.currentTimeMillis()
@@ -988,7 +984,7 @@ class AppUsageMonitorService : Service() {
 
         val timeSinceLastUsed = currentTime - shield.lastUsedTimestamp
         val isNearLimit = remainingMillis < 60000
-        val shouldUpdateDB = force || timeSinceLastUsed > 30000 || (isNearLimit && timeSinceLastUsed > 10000) || updatedShield != shield
+        val shouldUpdateDB = force || timeSinceLastUsed > 60000 || (isNearLimit && timeSinceLastUsed > 30000) || updatedShield != shield
 
         if (shouldUpdateDB) {
             val finalShield = updatedShield.copy(
@@ -1001,18 +997,21 @@ class AppUsageMonitorService : Service() {
                 currentShieldCache = finalShield
             }
 
-            serviceScope.launch {
-                try {
-                    val exists = shieldRepository.getShieldByPackageName(finalShield.packageName)
-                    if (exists != null) {
-                        shieldRepository.updateShield(finalShield)
-                    } else {
-                        if (currentSessionPackage == finalShield.packageName) {
-                            currentShieldCache = null
+            if (currentTime - lastDbUpdateTime > 15000 || force) {
+                lastDbUpdateTime = currentTime
+                serviceScope.launch {
+                    try {
+                        val exists = shieldRepository.getShieldByPackageName(finalShield.packageName)
+                        if (exists != null) {
+                            shieldRepository.updateShield(finalShield)
+                        } else {
+                            if (currentSessionPackage == finalShield.packageName) {
+                                currentShieldCache = null
+                            }
                         }
+                    } catch (t: Throwable) {
+                        Log.e("ZenithAUMS", "Failed background DB update for ${shield.packageName}: ${t.message}")
                     }
-                } catch (t: Throwable) {
-                    Log.e("ZenithAUMS", "Failed background DB update for ${shield.packageName}: ${t.message}")
                 }
             }
 
@@ -1374,7 +1373,7 @@ class AppUsageMonitorService : Service() {
         val todayStart = getStartOfDay()
         val timeSinceMidnight = (currentTime - todayStart).coerceAtLeast(0L)
 
-        if (currentTime - lastLauncherAppsRefreshTime > 3600000 || launcherAppsCache.isEmpty()) {
+        if (currentTime - lastLauncherAppsRefreshTime > 7200000 || launcherAppsCache.isEmpty()) {
             refreshLauncherCache()
         }
 
@@ -1424,40 +1423,31 @@ class AppUsageMonitorService : Service() {
         return dailyUsageCache[packageName] ?: 0L
     }
 
-    private fun getUsageStatsList(): List<android.app.usage.UsageStats>? {
+    private fun getCachedUsageToday(packageName: String): Long {
+        val cached = dailyUsageCache[packageName]
+        if (cached != null) return cached
+        return getSystemUsageToday(packageName)
+    }
+
+    private fun getUsageStatsList() {
         val currentTime = System.currentTimeMillis()
-        if (usageStatsCache != null && currentTime - lastUsageCacheTime < 5000) {
-            return usageStatsCache
+        if (currentTime - lastUsageCacheTime < 30000 && dailyUsageCache.isNotEmpty()) {
+            return
         }
 
         val startTime = getStartOfDay()
         val timeSinceMidnight = currentTime - startTime
 
         try {
-            val tempUsageMap = mutableMapOf<String, Long>()
-            val statsList = mutableListOf<android.app.usage.UsageStats>()
-
             val detailedUsage = com.etrisad.zenith.util.ScreenUsageHelper.fetchDetailedUsageToday(usageStatsManager)
-            detailedUsage.appUsageMap.forEach { (pkg, millis) ->
-                tempUsageMap[pkg] = millis
-            }
-
-            usageStatsManager.queryAndAggregateUsageStats(startTime, currentTime)?.forEach { (_, stat) ->
-                statsList.add(stat)
-            }
-
             dailyUsageCache.clear()
-            tempUsageMap.forEach { (pkg, time) ->
+            detailedUsage.appUsageMap.forEach { (pkg, time) ->
                 val cappedTime = if (time > timeSinceMidnight) timeSinceMidnight else time
                 if (cappedTime > 0) dailyUsageCache[pkg] = cappedTime
             }
-            usageStatsCache = statsList
-        } catch (e: Exception) {
-            usageStatsCache = null
-        }
+        } catch (_: Exception) { }
 
         lastUsageCacheTime = currentTime
-        return usageStatsCache
     }
 
     private fun getStartOfDay(): Long {
@@ -1756,7 +1746,7 @@ class AppUsageMonitorService : Service() {
 
     private fun isKeyboardApp(packageName: String): Boolean {
         val currentTime = System.currentTimeMillis()
-        if (keyboardPackages.isEmpty() || currentTime - lastKeyboardRefreshTime > 300000) {
+        if (keyboardPackages.isEmpty() || currentTime - lastKeyboardRefreshTime > 600000) {
             try {
                 val imm = getSystemService(android.view.inputmethod.InputMethodManager::class.java)
                 keyboardPackages = imm.enabledInputMethodList.map { it.packageName }.toSet()
@@ -1838,6 +1828,10 @@ class AppUsageMonitorService : Service() {
 
     private fun getForegroundApp(): String? {
         val time = System.currentTimeMillis()
+        if (time - cachedForegroundAppTime < 2000 && cachedForegroundApp != null) {
+            return cachedForegroundApp
+        }
+
         val queryStart = if (lastEventQueryTime == 0L) time - 10000 else lastEventQueryTime
         val usageEvents = try {
             usageStatsManager.queryEvents(queryStart, time)
@@ -1868,10 +1862,10 @@ class AppUsageMonitorService : Service() {
             lastEventQueryTime = time
         }
 
-        if (foundPackage == null) {
-            return lastForegroundApp
-        }
-        return foundPackage
+        val result = foundPackage ?: lastForegroundApp
+        cachedForegroundApp = result
+        cachedForegroundAppTime = time
+        return result
     }
 
     override fun onLowMemory() {
@@ -1886,7 +1880,6 @@ class AppUsageMonitorService : Service() {
             lastUsageFetchTime = 0L
             systemAppCache.clear()
             launcherPackages = emptySet()
-            usageStatsCache = null
             lastUsageCacheTime = 0L
             lastLauncherRefreshTime = 0L
             try {
