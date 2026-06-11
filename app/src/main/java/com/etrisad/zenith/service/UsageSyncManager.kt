@@ -160,8 +160,6 @@ class UsageSyncManager(
             cal.timeInMillis = current
             val dateStr = dateFormat.format(cal.time)
             val hour = cal.get(Calendar.HOUR_OF_DAY)
-
-            // calculate next hour boundary using arithmetic, avoids Calendar.clone()
             val nextHourStart = ((current / 3600000) + 1) * 3600000
 
             val chunkEnd = minOf(end, nextHourStart)

@@ -89,6 +89,7 @@ class AppUsageMonitorService : Service() {
     private var lastCheckedDayTimestamp = 0L
     private var isScreenOn = true
     private var isPowerSaveMode = false
+    private var lastStreakRefreshDate: LocalDate? = null
 
     private var restrictedPackages = emptySet<String>()
     private var hasGlobalAllowSchedule = false
@@ -222,8 +223,12 @@ class AppUsageMonitorService : Service() {
                 }
 
                 updateRestrictedPackages()
-                preferencesRepository.refreshGlobalStreak(shieldRepository)
-                preferencesRepository.refreshAllAppStreaks(shieldRepository)
+                val today = LocalDate.now()
+                if (lastStreakRefreshDate != today) {
+                    preferencesRepository.refreshGlobalStreak(shieldRepository)
+                    preferencesRepository.refreshAllAppStreaks(shieldRepository)
+                    lastStreakRefreshDate = today
+                }
 
                 dailyUsageCache.clear()
                 lastUsageCacheTime = 0L
@@ -248,8 +253,7 @@ class AppUsageMonitorService : Service() {
             this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val triggerAt = System.currentTimeMillis() + 2 * 60 * 60 * 1000L
-
-        alarmManager.setAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
+        alarmManager.setWindow(android.app.AlarmManager.RTC, triggerAt, 15 * 60 * 1000L, pendingIntent)
     }
 
     private fun onMidnightReset() {
@@ -536,6 +540,11 @@ class AppUsageMonitorService : Service() {
                         lastCheckedDayTimestamp = currentTime
                     }
 
+                    if (ZenithAccessibilityService.isServiceRunning) {
+                        delay(60000)
+                        continue
+                    }
+
                     if (!isScreenOn) {
                         lastForegroundApp = null
                         currentShieldCache = null
@@ -639,7 +648,7 @@ class AppUsageMonitorService : Service() {
 
                         if (shouldBypassBlocking(currentApp)) {
                             lastForegroundApp = currentApp
-                            val delayTime = if (isPowerSaveMode) 5000L else 3000L
+                            val delayTime = if (isPowerSaveMode) 7000L else 4000L
                             delay(delayTime)
                             continue
                         }
@@ -671,7 +680,7 @@ class AppUsageMonitorService : Service() {
                                 }
                                 goToHomeScreen()
                                 lastForegroundApp = currentApp
-                                delay(3000)
+                                delay(4000)
                                 continue
                             }
                         }
@@ -802,16 +811,16 @@ class AppUsageMonitorService : Service() {
                                 val remaining = (limitMillis - cachedTotalUsage).coerceAtLeast(0L)
                                 if (shield.type == FocusType.GOAL) {
                                     when {
-                                        remaining < 60000 -> prefs.delayGoalNear.coerceIn(5000L, 15000L)
-                                        remaining < 300000 -> prefs.delayGoalMid.coerceIn(8000L, 20000L)
-                                        else -> prefs.delayGoalFar.coerceIn(10000L, 30000L)
+                                        remaining < 60000 -> prefs.delayGoalNear.coerceIn(5000L, 10000L)
+                                        remaining < 300000 -> prefs.delayGoalMid.coerceIn(7000L, 15000L)
+                                        else -> prefs.delayGoalFar.coerceIn(10000L, 25000L)
                                     }
                                 } else {
                                     when {
                                         remaining > 3600000 -> prefs.delayShieldVeryFar.coerceIn(15000L, 30000L)
-                                        remaining > 600000 -> prefs.delayShieldFar.coerceIn(12000L, 25000L)
-                                        remaining > 60000 -> prefs.delayShieldMid.coerceIn(10000L, 20000L)
-                                        else -> prefs.delayShieldNear.coerceIn(5000L, 15000L)
+                                        remaining > 600000 -> prefs.delayShieldFar.coerceIn(10000L, 25000L)
+                                        remaining > 60000 -> prefs.delayShieldMid.coerceIn(7000L, 15000L)
+                                        else -> prefs.delayShieldNear.coerceIn(5000L, 10000L)
                                     }
                                 }
                             }
@@ -825,23 +834,23 @@ class AppUsageMonitorService : Service() {
                                 val remaining = (limitMillis - cachedTotalUsage).coerceAtLeast(0L)
                                 if (shield.type == FocusType.GOAL) {
                                     when {
-                                        remaining < 60000 -> 10000L
-                                        remaining < 300000 -> 15000L
-                                        else -> 25000L
+                                        remaining < 60000 -> 6000L
+                                        remaining < 300000 -> 10000L
+                                        else -> 20000L
                                     }
                                 } else {
                                     when {
-                                        remaining > 3600000 -> 30000L
-                                        remaining > 600000 -> 25000L
-                                        remaining > 60000 -> 20000L
-                                        else -> 12000L
+                                        remaining > 3600000 -> 25000L
+                                        remaining > 600000 -> 20000L
+                                        remaining > 60000 -> 12000L
+                                        else -> 6000L
                                     }
                                 }
                             }
-                            else -> 20000L
+                            else -> 15000L
                         }
                     }
-                } catch (_: Exception) { 10000L }
+                } catch (_: Exception) { 7000L }
                 delay(delayTime)
             }
         }

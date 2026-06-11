@@ -1038,7 +1038,6 @@ class ZenithAccessibilityService : AccessibilityService() {
             try {
                 ZenithDatabase.getDatabase(this).openHelper.writableDatabase.execSQL("PRAGMA shrink_memory")
             } catch (_: Exception) {}
-            System.gc()
         }
     }
 

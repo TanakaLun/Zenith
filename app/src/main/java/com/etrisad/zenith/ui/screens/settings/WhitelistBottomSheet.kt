@@ -40,7 +40,6 @@ import kotlinx.coroutines.withContext
 data class WhitelistAppInfo(
     val packageName: String,
     val appName: String,
-    val icon: Drawable?,
     val isSystemApp: Boolean,
     val isPreinstalledApp: Boolean = false
 )
@@ -100,7 +99,6 @@ fun WhitelistBottomSheet(
                 WhitelistAppInfo(
                     packageName = pkg,
                     appName = pm.getApplicationLabel(it).toString(),
-                    icon = pm.getApplicationIcon(it),
                     isSystemApp = isSystemFlag && (!hasLauncher || isCoreComponent),
                     isPreinstalledApp = isSystemFlag && hasLauncher && !isCoreComponent
                 )
@@ -439,15 +437,14 @@ fun WhitelistAppItem(
                 }
             },
             leadingContent = {
-                app.icon?.let {
-                    Image(
-                        painter = BitmapPainter(it.toBitmap().asImageBitmap()),
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                    )
-                }
+                coil.compose.AsyncImage(
+                    model = "app-icon://${app.packageName}",
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                )
             },
             trailingContent = {
                 Checkbox(

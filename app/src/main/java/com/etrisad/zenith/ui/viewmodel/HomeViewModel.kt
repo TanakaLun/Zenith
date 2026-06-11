@@ -31,7 +31,6 @@ data class AppUsageInfo(
     val packageName: String,
     val appName: String,
     val totalTimeVisible: Long,
-    val icon: android.graphics.drawable.Drawable? = null,
     val hasDatabaseRecord: Boolean = false,
     val hasSystemData: Boolean = false,
     val isLive: Boolean = false,
@@ -50,7 +49,6 @@ data class DailyUsage(
 data class AppDetailUiState(
     val packageName: String = "",
     val appName: String = "",
-    val icon: android.graphics.drawable.Drawable? = null,
     val type: FocusType? = null,
     val todayUsage: Long = 0L,
     val yesterdayUsage: Long = 0L,
@@ -154,7 +152,7 @@ class HomeViewModel(
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
-    private val appInfoCache = java.util.concurrent.ConcurrentHashMap<String, Pair<String, android.graphics.drawable.Drawable?>>()
+    private val appInfoCache = java.util.concurrent.ConcurrentHashMap<String, String>()
     private var refreshJob: Job? = null
     private val refreshMutex = Mutex()
 
@@ -610,9 +608,8 @@ class HomeViewModel(
             val existing = _uiState.value.allAppsUsage.find { it.packageName == pkg }
             AppUsageInfo(
                 packageName = pkg,
-                appName = cached?.first ?: pkg,
+                appName = cached ?: pkg,
                 totalTimeVisible = time,
-                icon = cached?.second,
                 hasDatabaseRecord = dbApps.any { it.packageName == pkg },
                 hasSystemData = fallbackDayApps.any { it.packageName == pkg },
                 sessionCount = existing?.sessionCount ?: (if (time > 4000) 1 else 0),
@@ -674,9 +671,8 @@ class HomeViewModel(
                 val cached = appInfoCache[topPkg]
                 AppUsageInfo(
                     packageName = topPkg,
-                    appName = cached?.first ?: topPkg,
+                    appName = cached ?: topPkg,
                     totalTimeVisible = usageT,
-                    icon = cached?.second,
                     hasDatabaseRecord = hasDb,
                     hasSystemData = hasSys,
                     isLive = i == 0
@@ -904,7 +900,30 @@ class HomeViewModel(
             }
         }
 
-        val results = fetchFallbackForDays(0..0, usm, launcherApps, excludePackages, now)
+        val todayStart = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(todayStart))
+
+        val results = if (now - todayStart < 86400000) {
+            val todayDetailed = ScreenUsageHelper.fetchDetailedUsageToday(usm)
+            val todayLiveRecords = todayDetailed.appUsageMap.mapNotNull { (pkg, time) ->
+                if (pkg in excludePackages || pkg !in launcherApps) null
+                else UsageRecord.Live(pkg, time)
+            }.toMutableList()
+            
+            val todayTotal = todayDetailed.totalGlobalUsage.coerceAtMost(now - todayStart)
+            if (todayTotal > 0) {
+                todayLiveRecords.add(UsageRecord.Live("TOTAL", todayTotal))
+            }
+            listOf(todayStr to todayLiveRecords)
+        } else {
+            fetchFallbackForDays(0..0, usm, launcherApps, excludePackages, now)
+        }
+
         _globalFallbackMap.update { current ->
             current + results.toMap()
         }
@@ -1177,8 +1196,7 @@ class HomeViewModel(
                             try {
                                 val appInfo = pm.getApplicationInfo(pkg, 0)
                                 val label = pm.getApplicationLabel(appInfo).toString()
-                                val icon = pm.getApplicationIcon(appInfo)
-                                appInfoCache[pkg] = label to icon
+                                appInfoCache[pkg] = label
                             } catch (_: Exception) {}
                         }
                     }.awaitAll()
@@ -1192,14 +1210,13 @@ class HomeViewModel(
             val lastUsed = lastUsedMap[pkg] ?: existing?.lastTimeUsed ?: 0L
             val cached = appInfoCache[pkg]
             if (cached != null) {
-                AppUsageInfo(pkg, cached.first, time, cached.second, sessionCount = sessions, lastTimeUsed = lastUsed)
+                AppUsageInfo(pkg, cached, time, sessionCount = sessions, lastTimeUsed = lastUsed)
             } else {
                 try {
                     val appInfo = pm.getApplicationInfo(pkg, 0)
                     val label = pm.getApplicationLabel(appInfo).toString()
-                    val icon = pm.getApplicationIcon(appInfo)
-                    appInfoCache[pkg] = label to icon
-                    AppUsageInfo(pkg, label, time, icon, sessionCount = sessions, lastTimeUsed = lastUsed)
+                    appInfoCache[pkg] = label
+                    AppUsageInfo(pkg, label, time, sessionCount = sessions, lastTimeUsed = lastUsed)
                 } catch (_: Exception) { null }
             }
         }
@@ -1319,7 +1336,7 @@ class HomeViewModel(
                 pkgMap.mapNotNull { (pkg, duration) ->
                     if (duration > 0) {
                         val cached = appInfoCache[pkg]
-                        AppUsageInfo(pkg, cached?.first ?: pkg, duration, icon = cached?.second, lastTimeUsed = lastUsedMap[pkg] ?: 0L)
+                        AppUsageInfo(pkg, cached ?: pkg, duration, lastTimeUsed = lastUsedMap[pkg] ?: 0L)
                     } else null
                 }
             } else {
@@ -1348,7 +1365,7 @@ class HomeViewModel(
 
                     if (durationForThisHour > 0) {
                         val cached = appInfoCache[pkg]
-                        AppUsageInfo(pkg, cached?.first ?: pkg, durationForThisHour, icon = cached?.second, lastTimeUsed = lastUsedMap[pkg] ?: 0L)
+                        AppUsageInfo(pkg, cached ?: pkg, durationForThisHour, lastTimeUsed = lastUsedMap[pkg] ?: 0L)
                     } else null
                 }
             }.let { list ->
@@ -1450,7 +1467,7 @@ class HomeViewModel(
             
             if (topPkg != null && (i == 0 || hasDb || (preferSystemUsageHistory && hasSys))) {
                 val cached = appInfoCache[topPkg]
-                snapshotStamps.add(AppUsageInfo(topPkg, cached?.first ?: topPkg, usageT, icon = cached?.second, hasDatabaseRecord = hasDb, hasSystemData = hasSys, isLive = i == 0))
+                snapshotStamps.add(AppUsageInfo(topPkg, cached ?: topPkg, usageT, hasDatabaseRecord = hasDb, hasSystemData = hasSys, isLive = i == 0))
             } else {
                 snapshotStamps.add(AppUsageInfo("", "", 0L, hasDatabaseRecord = hasDb, hasSystemData = hasSys, isLive = i == 0))
             }
@@ -1492,15 +1509,13 @@ class HomeViewModel(
             val usm = this@HomeViewModel.context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
             val pm = this@HomeViewModel.context.packageManager; val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
             var appName = packageName
-            var icon: android.graphics.drawable.Drawable? = null
             try {
                 val appInfo = pm.getApplicationInfo(packageName, 0)
                 appName = pm.getApplicationLabel(appInfo).toString()
-                icon = pm.getApplicationIcon(appInfo)
-                appInfoCache[packageName] = appName to icon
+                appInfoCache[packageName] = appName
             } catch (_: Exception) {}
             
-            _appDetailUiState.update { it.copy(appName = appName, icon = icon) }
+            _appDetailUiState.update { it.copy(appName = appName) }
             withContext(Dispatchers.IO) { if (detailFallbackMap.isEmpty() || forceRefresh || isNew) updatePackageFallback(packageName) }
             combine(shieldRepository.getLastNDaysUsageForPackage(packageName, 21), shieldRepository.getShieldByPackageNameFlow(packageName), userPreferencesRepository.userPreferencesFlow) { historyDB, shield, prefs ->
                 val detailed = withContext(Dispatchers.IO) { kotlinx.coroutines.withTimeoutOrNull(5000) { ScreenUsageHelper.fetchDetailedUsageToday(usm, includeHourly = true) } }
@@ -1523,7 +1538,6 @@ class HomeViewModel(
                 _appDetailUiState.update { it.copy(
                     packageName = packageName, 
                     appName = appName, 
-                    icon = icon, 
                     type = shield?.type, 
                     todayUsage = todayU, 
                     yesterdayUsage = yesterdayU, 
@@ -1706,7 +1720,7 @@ class HomeViewModel(
             }
             val topApps = appUsageMap.entries.sortedByDescending { it.value }.take(3).map { (pkg, time) ->
                 val cached = appInfoCache[pkg]
-                AppUsageInfo(pkg, cached?.first ?: pkg, time, icon = cached?.second)
+                AppUsageInfo(pkg, cached ?: pkg, time)
             }
             _uiState.update { it.copy(weeklyAvgTime = avg, weeklyTopApps = topApps) }
         }

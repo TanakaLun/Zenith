@@ -6,7 +6,6 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -22,13 +21,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.core.graphics.drawable.toBitmap
 import com.etrisad.zenith.ui.components.ZenithContainedLoadingIndicator
 import com.etrisad.zenith.ui.screens.settings.WhitelistAppInfo
 import kotlinx.coroutines.Dispatchers
@@ -92,7 +88,6 @@ fun AllowedBedAppsBottomSheet(
                     WhitelistAppInfo(
                         packageName = pkg,
                         appName = pm.getApplicationLabel(it).toString(),
-                        icon = pm.getApplicationIcon(it),
                         isSystemApp = isSystemFlag && (!hasLauncher || isCoreComponent),
                         isPreinstalledApp = isSystemFlag && hasLauncher && !isCoreComponent
                     )
@@ -303,15 +298,14 @@ fun AllowedAppItem(
                 }
             },
             leadingContent = {
-                app.icon?.let {
-                    Image(
-                        painter = BitmapPainter(it.toBitmap().asImageBitmap()),
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                    )
-                }
+                coil.compose.AsyncImage(
+                    model = "app-icon://${app.packageName}",
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                )
             },
             trailingContent = {
                 Checkbox(

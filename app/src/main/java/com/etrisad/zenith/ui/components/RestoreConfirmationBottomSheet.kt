@@ -503,11 +503,9 @@ private fun PiechartDetail(preferences: UserPreferences, metadata: BackupUtils.B
                 
                 metadata.latestPiechartData.forEach { (pkg, duration) ->
                     var appName = pkg
-                    var icon: android.graphics.drawable.Drawable? = null
                     try {
                         val appInfo = pm.getApplicationInfo(pkg, 0)
                         appName = pm.getApplicationLabel(appInfo).toString()
-                        icon = pm.getApplicationIcon(appInfo)
                     } catch (_: Exception) {}
                     
                     Row(
@@ -518,15 +516,14 @@ private fun PiechartDetail(preferences: UserPreferences, metadata: BackupUtils.B
                             modifier = Modifier.size(24.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant),
                             contentAlignment = Alignment.Center
                         ) {
-                            if (icon != null) {
-                                androidx.compose.foundation.Image(
-                                    painter = com.google.accompanist.drawablepainter.rememberDrawablePainter(icon),
-                                    contentDescription = null,
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            } else {
-                                Icon(Icons.Outlined.Android, null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.outline)
-                            }
+                            coil.compose.SubcomposeAsyncImage(
+                                model = "app-icon://$pkg",
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize(),
+                                error = {
+                                    Icon(Icons.Outlined.Android, null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.outline)
+                                }
+                            )
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
