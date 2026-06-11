@@ -82,7 +82,7 @@ class AppGoalOverlayActivity : ComponentActivity() {
                     onSnooze = {
                         val shieldRepo = (application as com.etrisad.zenith.ZenithApplication).shieldRepository
                         val packagesToSnooze = activePackageNames.toList()
-                        CoroutineScope(Dispatchers.IO).launch {
+                        lifecycleScope.launch(Dispatchers.IO) {
                             packagesToSnooze.forEach { pkg ->
                                 val shield = shieldRepo.getShieldByPackageName(pkg)
                                 if (shield != null) {
@@ -106,7 +106,7 @@ class AppGoalOverlayActivity : ComponentActivity() {
     private fun playGoalSound(packageName: String?) {
         if (packageName == null) return
         val shieldRepo = (application as com.etrisad.zenith.ZenithApplication).shieldRepository
-        CoroutineScope(Dispatchers.IO).launch {
+        lifecycleScope.launch(Dispatchers.IO) {
             val shield = shieldRepo.getShieldByPackageName(packageName)
             if (shield == null || (shield.isGoalCallerEnabled && shield.isGoalCallerSoundEnabled)) {
                 withContext(Dispatchers.Main) {

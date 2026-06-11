@@ -71,7 +71,7 @@ fun AppDetailScreen(
     )
     val nowMillis by produceState(initialValue = System.currentTimeMillis()) {
         while (true) {
-            delay(30000)
+            delay(60000)
             value = System.currentTimeMillis()
         }
     }

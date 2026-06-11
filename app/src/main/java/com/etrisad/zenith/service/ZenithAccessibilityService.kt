@@ -277,7 +277,7 @@ class ZenithAccessibilityService : AccessibilityService() {
                         }
                     }
                 }
-                delay(5000)
+                delay(15000)
             }
         }
     }

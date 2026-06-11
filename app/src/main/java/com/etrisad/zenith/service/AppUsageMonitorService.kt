@@ -247,7 +247,7 @@ class AppUsageMonitorService : Service() {
         val pendingIntent = PendingIntent.getBroadcast(
             this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val triggerAt = System.currentTimeMillis() + 60 * 60 * 1000L
+        val triggerAt = System.currentTimeMillis() + 2 * 60 * 60 * 1000L
 
         alarmManager.setAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
     }
@@ -263,6 +263,8 @@ class AppUsageMonitorService : Service() {
             earlyKickManager.reset()
             dailyUsageCache.clear()
             lastAllowedRemainingTime.clear()
+            systemAppCache.clear()
+            launcherPackages = emptySet()
             lastUsageCacheTime = 0L
             lastUsageFetchTime = 0L
             cachedTotalUsage = 0L
@@ -403,14 +405,6 @@ class AppUsageMonitorService : Service() {
                     val isNightTime = hour >= 22 || hour < 5
 
                     if ((!isBedtimeActive || hour >= 6) && !isNightTime) {
-                        try {
-                            val wakeLock = powerManager.newWakeLock(
-                                android.os.PowerManager.PARTIAL_WAKE_LOCK,
-                                "Zenith:GoalWakeLock"
-                            )
-                            wakeLock.acquire(3000)
-                        } catch (_: Exception) {}
-
                         AppGoalOverlayActivity.start(this@AppUsageMonitorService, overlayGoals.map { it.packageName })
                     }
                 }
@@ -432,15 +426,18 @@ class AppUsageMonitorService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
+        val isCustomBitmap: Boolean
         val iconBitmap = try {
             val drawable = packageManager.getApplicationIcon(goal.packageName)
             if (drawable is BitmapDrawable) {
+                isCustomBitmap = false
                 drawable.bitmap
             } else {
                 val width = drawable.intrinsicWidth.coerceAtLeast(1)
                 val height = drawable.intrinsicHeight.coerceAtLeast(1)
-                if (width > 2000 || height > 2000) null
+                if (width > 2000 || height > 2000) { isCustomBitmap = false; null }
                 else {
+                    isCustomBitmap = true
                     val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
                     val canvas = Canvas(bitmap)
                     drawable.setBounds(0, 0, canvas.width, canvas.height)
@@ -449,6 +446,7 @@ class AppUsageMonitorService : Service() {
                 }
             }
         } catch (e: Throwable) {
+            isCustomBitmap = false
             null
         }
 
@@ -463,6 +461,8 @@ class AppUsageMonitorService : Service() {
             .build()
 
         manager.notify(goal.packageName.hashCode() + 1000, notification)
+
+        if (isCustomBitmap) iconBitmap?.recycle()
     }
 
     private fun createGoalNotificationChannel() {
@@ -497,7 +497,7 @@ class AppUsageMonitorService : Service() {
                     lastLoopTick = System.currentTimeMillis()
                     val currentTime = System.currentTimeMillis()
 
-                    if (currentTime - lastCheckedDayTimestamp > 60000 && lastCheckedDayDate != null) {
+                    if (currentTime - lastCheckedDayTimestamp > 120000 && lastCheckedDayDate != null) {
                         val today = LocalDate.now()
                         if (today != lastCheckedDayDate) {
                             withContext(Dispatchers.IO) {
@@ -510,6 +510,8 @@ class AppUsageMonitorService : Service() {
                             earlyKickManager.reset()
                             dailyUsageCache.clear()
                             lastAllowedRemainingTime.clear()
+                            systemAppCache.clear()
+                            launcherPackages = emptySet()
                             lastUsageCacheTime = 0L
                             lastUsageFetchTime = 0L
                             cachedTotalUsage = 0L
@@ -529,7 +531,8 @@ class AppUsageMonitorService : Service() {
                         }
 
                         currentPreferences?.let { updateBedtimeStatus(it) }
-                        checkSchedulesTransition(LocalTime.now().hour * 60 + LocalTime.now().minute)
+                        val nowTime = LocalTime.now()
+                        checkSchedulesTransition(nowTime.hour * 60 + nowTime.minute)
                         lastCheckedDayTimestamp = currentTime
                     }
 
@@ -581,7 +584,7 @@ class AppUsageMonitorService : Service() {
                         continue
                     }
 
-                    if (launcherPackages.isEmpty() || currentTime - lastLauncherRefreshTime > 1800000) {
+                    if (launcherPackages.isEmpty() || currentTime - lastLauncherRefreshTime > 3600000) {
                         refreshLauncherCache()
                     }
 
@@ -784,10 +787,12 @@ class AppUsageMonitorService : Service() {
                 checkGoalReminders()
 
                 val delayTime = try {
-                    if (!isScreenOn || isPowerSaveMode) {
-                        30000L
+                    if (!isScreenOn) {
+                        60000L
+                    } else if (isPowerSaveMode) {
+                        90000L
                     } else if (InterceptOverlayManager.isShowing) {
-                        8000L
+                        15000L
                     } else if (currentPreferences?.customDelayEnabled == true) {
                         val prefs = currentPreferences!!
                         when {
@@ -820,20 +825,20 @@ class AppUsageMonitorService : Service() {
                                 val remaining = (limitMillis - cachedTotalUsage).coerceAtLeast(0L)
                                 if (shield.type == FocusType.GOAL) {
                                     when {
-                                        remaining < 60000 -> 2000L
-                                        remaining < 300000 -> 4000L
-                                        else -> 5000L
+                                        remaining < 60000 -> 4000L
+                                        remaining < 300000 -> 6000L
+                                        else -> 10000L
                                     }
                                 } else {
                                     when {
-                                        remaining > 3600000 -> 8000L
-                                        remaining > 600000 -> 6000L
-                                        remaining > 60000 -> 4000L
-                                        else -> 2000L
+                                        remaining > 3600000 -> 12000L
+                                        remaining > 600000 -> 10000L
+                                        remaining > 60000 -> 8000L
+                                        else -> 5000L
                                     }
                                 }
                             }
-                            else -> 5000L
+                            else -> 8000L
                         }
                     }
                 } catch (_: Exception) { 5000L }
@@ -879,14 +884,14 @@ class AppUsageMonitorService : Service() {
         val isNearLimit = remaining < 60000
         val needsDetailedFetch = if (shieldType == FocusType.GOAL) {
             val uiUpdateInterval = when {
-                isNearLimit -> 5000L
-                remaining < 300000 -> 10000L
-                remaining < 900000 -> 20000L
-                else -> 30000L
+                isNearLimit -> 15000L
+                remaining < 300000 -> 30000L
+                remaining < 900000 -> 45000L
+                else -> 60000L
             }
             currentTime - lastHUDUpdateTime > uiUpdateInterval || lastHUDUpdateTime == 0L
         } else {
-            val fetchInterval = if (isNearLimit) 10000L else 30000L
+            val fetchInterval = if (isNearLimit) 30000L else 60000L
             currentTime - lastUsageFetchTime > fetchInterval
         }
 
@@ -979,7 +984,7 @@ class AppUsageMonitorService : Service() {
                 currentShieldCache = finalShield
             }
 
-            if (currentTime - lastDbUpdateTime > 30000 || force) {
+            if (currentTime - lastDbUpdateTime > 60000 || force) {
                 lastDbUpdateTime = currentTime
                 serviceScope.launch {
                     try {
@@ -1317,6 +1322,7 @@ class AppUsageMonitorService : Service() {
             shieldRepository.resetAllRemainingTimes()
             notifiedGoals.clear()
             dailyUsageCache.clear()
+            systemAppCache.clear()
             com.etrisad.zenith.util.ScreenUsageHelper.clearCache()
             lastAllowedRemainingTime.clear()
         }

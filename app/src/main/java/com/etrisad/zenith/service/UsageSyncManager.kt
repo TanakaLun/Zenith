@@ -161,13 +161,8 @@ class UsageSyncManager(
             val dateStr = dateFormat.format(cal.time)
             val hour = cal.get(Calendar.HOUR_OF_DAY)
 
-            val nextHourStartCal = (cal.clone() as Calendar).apply {
-                add(Calendar.HOUR_OF_DAY, 1)
-                set(Calendar.MINUTE, 0)
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
-            }
-            val nextHourStart = nextHourStartCal.timeInMillis
+            // calculate next hour boundary using arithmetic, avoids Calendar.clone()
+            val nextHourStart = ((current / 3600000) + 1) * 3600000
 
             val chunkEnd = minOf(end, nextHourStart)
             val duration = chunkEnd - current
@@ -204,10 +199,9 @@ class UsageSyncManager(
                 sortedDates[dateIdx]
             } else {
                 val lastDate = sortedDates.lastOrNull() ?: break
-                val cal = Calendar.getInstance()
-                cal.time = try { dateFormat.parse(lastDate) } catch (_: Exception) { null } ?: break
-                cal.add(Calendar.DAY_OF_YEAR, 1)
-                val nextDate = dateFormat.format(cal.time)
+                calendarNow.time = try { dateFormat.parse(lastDate) } catch (_: Exception) { null } ?: break
+                calendarNow.add(Calendar.DAY_OF_YEAR, 1)
+                val nextDate = dateFormat.format(calendarNow.time)
 
                 if (nextDate > currentDateStr) {
                     carryOver.clear()
