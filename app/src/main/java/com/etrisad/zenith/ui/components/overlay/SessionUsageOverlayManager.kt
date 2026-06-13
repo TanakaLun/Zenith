@@ -50,10 +50,12 @@ import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.roundToInt
 
-class SessionUsageOverlayManager(private val context: Context) {
+class SessionUsageOverlayManager(
+    private val context: Context,
+    private val preferencesRepository: UserPreferencesRepository
+) {
 
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-    private val preferencesRepository = UserPreferencesRepository(context)
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private val mainHandler = Handler(Looper.getMainLooper())

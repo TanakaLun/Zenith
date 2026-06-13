@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 22,
-    "identityHash": "ad6711e4f917048f667a6da5980a630b",
+    "identityHash": "1bbca7c7945f8be7c15f55674a312d95",
     "entities": [
       {
         "tableName": "shields",
@@ -318,6 +318,15 @@
             ],
             "orders": [],
             "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_daily_usage_date_packageName` ON `${TABLE_NAME}` (`date`, `packageName`)"
+          },
+          {
+            "name": "index_daily_usage_date",
+            "unique": false,
+            "columnNames": [
+              "date"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_daily_usage_date` ON `${TABLE_NAME}` (`date`)"
           }
         ]
       },
@@ -379,6 +388,17 @@
             ],
             "orders": [],
             "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_hourly_usage_date_hour_packageName` ON `${TABLE_NAME}` (`date`, `hour`, `packageName`)"
+          },
+          {
+            "name": "index_hourly_usage_packageName_date_hour",
+            "unique": false,
+            "columnNames": [
+              "packageName",
+              "date",
+              "hour"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_hourly_usage_packageName_date_hour` ON `${TABLE_NAME}` (`packageName`, `date`, `hour`)"
           }
         ]
       },
@@ -431,7 +451,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'ad6711e4f917048f667a6da5980a630b')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '1bbca7c7945f8be7c15f55674a312d95')"
     ]
   }
 }

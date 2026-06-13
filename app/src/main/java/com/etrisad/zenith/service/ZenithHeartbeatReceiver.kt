@@ -12,8 +12,7 @@ class ZenithHeartbeatReceiver : BroadcastReceiver() {
             "com.etrisad.zenith.action.HEARTBEAT",
             "com.etrisad.zenith.action.REFRESH_SERVICES",
             Intent.ACTION_BOOT_COMPLETED,
-            Intent.ACTION_MY_PACKAGE_REPLACED,
-            Intent.ACTION_USER_PRESENT
+            Intent.ACTION_MY_PACKAGE_REPLACED
         )
 
         if (action in validActions) {

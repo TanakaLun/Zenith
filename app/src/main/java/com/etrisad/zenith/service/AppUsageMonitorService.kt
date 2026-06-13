@@ -18,7 +18,6 @@ import android.util.Log
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import com.etrisad.zenith.data.local.entity.FocusType
-import com.etrisad.zenith.data.local.entity.ScheduleMode
 import com.etrisad.zenith.data.local.entity.ShieldEntity
 import com.etrisad.zenith.data.local.database.ZenithDatabase
 import com.etrisad.zenith.data.preferences.UserPreferences
@@ -37,13 +36,12 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.time.temporal.ChronoUnit
 import java.util.concurrent.ConcurrentHashMap
 
 class AppUsageMonitorService : Service() {
 
     private val serviceJob = SupervisorJob()
-    private val serviceScope = CoroutineScope(Dispatchers.Default + serviceJob)
+    private val serviceScope = CoroutineScope(Dispatchers.IO + serviceJob)
     private lateinit var shieldRepository: ShieldRepository
     private lateinit var preferencesRepository: UserPreferencesRepository
     private lateinit var overlayManager: InterceptOverlayManager
@@ -71,36 +69,16 @@ class AppUsageMonitorService : Service() {
     private var baseUsageAtSessionStart = 0L
     private val allowedApps get() = shieldRepository.allowedApps
     private val lastAllowedRemainingTime = ConcurrentHashMap<String, Long>()
-    private var activeSchedules = listOf<com.etrisad.zenith.data.local.entity.ScheduleEntity>()
-    private var whitelistedPackages = emptySet<String>()
-    private var launcherPackages = emptySet<String>()
-    private val systemAppCache = ConcurrentHashMap<String, Boolean>()
     private var lastLauncherRefreshTime = 0L
-    private var currentPreferences: UserPreferences? = null
-    private var allShieldsCache = emptyMap<String, ShieldEntity>()
-    private var goalShieldsCache = listOf<ShieldEntity>()
     private val systemZone by lazy { ZoneId.systemDefault() }
     private val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
     private var lastCheckedDayDate: LocalDate? = null
     private var keyboardPackages = emptySet<String>()
     private var lastKeyboardRefreshTime = 0L
 
-    private var isBedtimeActive = false
-    private var isWindDownActive = false
-    private var isBedtimeBlockingActive = false
     private var lastDndFilter: Int? = null
-    private var cachedBedtimeStartMinutes = -1
-    private var cachedBedtimeEndMinutes = -1
-    private val windDownUsedPackages = ConcurrentHashMap<String, Boolean>()
-    private var bedtimeWhitelistedPackages = emptySet<String>()
     private var lastCheckedDayTimestamp = 0L
     private var isScreenOn = true
-
-    private var restrictedPackages = emptySet<String>()
-    private var hasGlobalAllowSchedule = false
-    private var launcherAppsCache = emptySet<String>()
-    private var defaultLauncherPackage: String? = null
-    private var lastLauncherAppsRefreshTime = 0L
 
     private var previouslyActiveScheduleIds = setOf<Long>()
 
@@ -116,10 +94,6 @@ class AppUsageMonitorService : Service() {
     @Volatile
     private var lastHUDUpdateTime = 0L
     private val HUD_UPDATE_INTERVAL = 1000L
-    private val dailyUsageCache = ConcurrentHashMap<String, Long>()
-    private var cachedStartOfDay = 0L
-    private var lastStartOfDayDate = -1
-
     private var lastUsageCacheTime = 0L
 
     private var lastMonitoringError: String? = null
@@ -161,15 +135,6 @@ class AppUsageMonitorService : Service() {
         }
     }
 
-    private class ParsedSchedule(
-        val id: Long,
-        val startMinutes: Int,
-        val endMinutes: Int,
-        val mode: ScheduleMode,
-        val packageNames: Set<String>
-    )
-    private var parsedSchedulesCache = listOf<ParsedSchedule>()
-
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             "SEND_TEST_NOTIFICATION" -> sendTestNotification()
@@ -195,9 +160,9 @@ class AppUsageMonitorService : Service() {
                         preferencesRepository.userPreferencesFlow.first()
                     }
                     if (prefs != null) {
-                        currentPreferences = prefs
-                        whitelistedPackages = prefs.whitelistedPackages
-                        bedtimeWhitelistedPackages = prefs.bedtimeWhitelistedPackages
+                        SharedMonitoringState.currentPreferences = prefs
+                        SharedMonitoringState.whitelistedPackages = prefs.whitelistedPackages
+                        SharedMonitoringState.bedtimeWhitelistedPackages = prefs.bedtimeWhitelistedPackages
                         updateBedtimeStatus(prefs)
                     }
 
@@ -206,15 +171,15 @@ class AppUsageMonitorService : Service() {
                         shieldRepository.allShields.first()
                     }
                     if (shields != null) {
-                        allShieldsCache = shields.associateBy { it.packageName }
+                        SharedMonitoringState.allShieldsCache = shields.associateBy { it.packageName }
                     }
 
                     val schedules = kotlinx.coroutines.withTimeoutOrNull(3000) {
                         shieldRepository.allSchedules.first()
                     }
                     if (schedules != null) {
-                        activeSchedules = schedules.filter { it.isActive }
-                        parsedSchedulesCache = activeSchedules.map { s ->
+                        SharedMonitoringState.activeSchedules = schedules.filter { it.isActive }
+                        SharedMonitoringState.parsedSchedulesCache = SharedMonitoringState.activeSchedules.map { s ->
                             val startParts = s.startTime.split(":")
                             val endParts = s.endTime.split(":")
                             ParsedSchedule(
@@ -230,7 +195,7 @@ class AppUsageMonitorService : Service() {
 
                 updateRestrictedPackages()
 
-                dailyUsageCache.clear()
+                SharedMonitoringState.dailyUsageCache.clear()
                 lastUsageCacheTime = 0L
                 lastUsageFetchTime = 0L
 
@@ -263,12 +228,12 @@ class AppUsageMonitorService : Service() {
             preferencesRepository.refreshGlobalStreak(shieldRepository)
             preferencesRepository.refreshAllAppStreaks(shieldRepository)
             shieldRepository.resetAllRemainingTimes()
-            notifiedGoals.clear()
+            SharedMonitoringState.notifiedGoals.clear()
             earlyKickManager.reset()
-            dailyUsageCache.clear()
+            SharedMonitoringState.dailyUsageCache.clear()
             lastAllowedRemainingTime.clear()
-            systemAppCache.clear()
-            launcherPackages = emptySet()
+            SharedMonitoringState.systemAppCache.clear()
+            SharedMonitoringState.launcherPackages = emptySet()
             lastUsageCacheTime = 0L
             lastUsageFetchTime = 0L
             cachedTotalUsage = 0L
@@ -292,16 +257,16 @@ class AppUsageMonitorService : Service() {
         shieldRepository = app.shieldRepository
         preferencesRepository = app.userPreferencesRepository
         overlayManager = InterceptOverlayManager(this, preferencesRepository)
-        sessionUsageOverlayManager = SessionUsageOverlayManager(this)
+        sessionUsageOverlayManager = SessionUsageOverlayManager(this, preferencesRepository)
 
         serviceScope.launch {
             shieldRepository.isShieldsLoaded.first { it }
             shieldRepository.allShields.collect { shields ->
-                allShieldsCache = shields.associateBy { it.packageName }
+                SharedMonitoringState.allShieldsCache = shields.associateBy { it.packageName }
                 lastForegroundApp?.let { currentPkg ->
-                    currentShieldCache = allShieldsCache[currentPkg]
+                    currentShieldCache = SharedMonitoringState.allShieldsCache[currentPkg]
                 }
-                goalShieldsCache = shields.filter {
+                SharedMonitoringState.goalShieldsCache = shields.filter {
                     it.type == FocusType.GOAL && it.goalReminderPeriodMinutes > 0
                 }
                 updateRestrictedPackages()
@@ -311,8 +276,8 @@ class AppUsageMonitorService : Service() {
         serviceScope.launch {
             shieldRepository.isShieldsLoaded.first { it }
             shieldRepository.allSchedules.collect { schedules ->
-                activeSchedules = schedules.filter { it.isActive }
-                parsedSchedulesCache = activeSchedules.map { s ->
+                SharedMonitoringState.activeSchedules = schedules.filter { it.isActive }
+                SharedMonitoringState.parsedSchedulesCache = SharedMonitoringState.activeSchedules.map { s ->
                     val startParts = s.startTime.split(":")
                     val endParts = s.endTime.split(":")
                     ParsedSchedule(
@@ -329,14 +294,14 @@ class AppUsageMonitorService : Service() {
 
         serviceScope.launch {
             preferencesRepository.userPreferencesFlow.collect { preferences ->
-                currentPreferences = preferences
-                whitelistedPackages = preferences.whitelistedPackages
-                bedtimeWhitelistedPackages = preferences.bedtimeWhitelistedPackages
+                SharedMonitoringState.currentPreferences = preferences
+                SharedMonitoringState.whitelistedPackages = preferences.whitelistedPackages
+                SharedMonitoringState.bedtimeWhitelistedPackages = preferences.bedtimeWhitelistedPackages
 
                 val startParts = preferences.bedtimeStartTime.split(":")
                 val endParts = preferences.bedtimeEndTime.split(":")
-                cachedBedtimeStartMinutes = (startParts.getOrNull(0)?.toIntOrNull() ?: 22) * 60 + (startParts.getOrNull(1)?.toIntOrNull() ?: 0)
-                cachedBedtimeEndMinutes = (endParts.getOrNull(0)?.toIntOrNull() ?: 7) * 60 + (endParts.getOrNull(1)?.toIntOrNull() ?: 0)
+                SharedMonitoringState.cachedBedtimeStartMinutes = (startParts.getOrNull(0)?.toIntOrNull() ?: 22) * 60 + (startParts.getOrNull(1)?.toIntOrNull() ?: 0)
+                SharedMonitoringState.cachedBedtimeEndMinutes = (endParts.getOrNull(0)?.toIntOrNull() ?: 7) * 60 + (endParts.getOrNull(1)?.toIntOrNull() ?: 0)
 
                 updateBedtimeStatus(preferences)
             }
@@ -363,7 +328,7 @@ class AppUsageMonitorService : Service() {
         lastCheckedDayDate = LocalDate.now()
 
         serviceScope.launch {
-            currentPreferences = preferencesRepository.userPreferencesFlow.first()
+            SharedMonitoringState.currentPreferences = preferencesRepository.userPreferencesFlow.first()
             com.etrisad.zenith.util.AlarmTasksSchedulingHelper.scheduleMidnightResetTask(this@AppUsageMonitorService)
             startMonitoring()
             scheduleHeartbeatAlarm()
@@ -373,20 +338,20 @@ class AppUsageMonitorService : Service() {
     private var lastGoalReminderCheckTime = 0L
 
     private suspend fun checkGoalReminders() {
-        if (!isScreenOn || goalShieldsCache.isEmpty()) return
+        val goals = SharedMonitoringState.goalShieldsCache
+        if (!isScreenOn || goals.isEmpty()) return
         val currentTime = System.currentTimeMillis()
         if (currentTime - lastGoalReminderCheckTime < 60000) return
         lastGoalReminderCheckTime = currentTime
 
         try {
-            val goals = goalShieldsCache
             val triggeredGoals = mutableListOf<ShieldEntity>()
 
             goals.forEach { goal ->
                 if (goal.packageName == lastForegroundApp) return@forEach
                 if (isPaused(goal)) return@forEach
 
-                val usageToday = dailyUsageCache[goal.packageName] ?: getTotalUsageToday(goal.packageName)
+                val usageToday = SharedMonitoringState.dailyUsageCache[goal.packageName] ?: getTotalUsageToday(goal.packageName)
                 val limitMillis = goal.timeLimitMinutes * 60 * 1000L
                 if (usageToday >= limitMillis) return@forEach
 
@@ -408,7 +373,7 @@ class AppUsageMonitorService : Service() {
                     val hour = now.hour
                     val isNightTime = hour >= 22 || hour < 5
 
-                    if ((!isBedtimeActive || hour >= 6) && !isNightTime) {
+                    if ((!SharedMonitoringState.isBedtimeActive || hour >= 6) && !isNightTime) {
                         AppGoalOverlayActivity.start(this@AppUsageMonitorService, overlayGoals.map { it.packageName })
                     }
                 }
@@ -486,7 +451,7 @@ class AppUsageMonitorService : Service() {
         }
     }
 
-    private val notifiedGoals = ConcurrentHashMap.newKeySet<String>()
+
 
     private fun startMonitoring() {
         if (monitoringLoopActive && System.currentTimeMillis() - lastLoopTick < 60000) return
@@ -498,79 +463,63 @@ class AppUsageMonitorService : Service() {
                 Log.e("ZenithAUMS", "Error in day change check: ${t.message}")
             }
         }
+
         serviceScope.launch {
+            AppStateHolder.foregroundApp
+                .filterNotNull()
+                .distinctUntilChanged()
+                .collect { currentApp ->
+                    try {
+                        lastLoopTick = System.currentTimeMillis()
+                        handleForegroundChange(currentApp)
+                    } catch (t: Throwable) {
+                        logError(t)
+                    }
+                }
+        }
+
+        serviceScope.launch {
+            var maintenanceTick = 0L
+            val startTime = System.currentTimeMillis()
             while (true) {
                 try {
                     lastLoopTick = System.currentTimeMillis()
+
                     if (isScreenOn && !ZenithAccessibilityService.isServiceRunning) {
                         val currentApp = getForegroundApp()
                         if (currentApp != null && currentApp != AppStateHolder.foregroundApp.value) {
                             AppStateHolder.foregroundApp.value = currentApp
                         }
-                        delay(3000)
-                    } else {
-                        delay(30000)
                     }
-                } catch (_: Exception) {
-                    delay(30000)
-                }
-            }
-        }
-        serviceScope.launch {
-            launch {
-                AppStateHolder.foregroundApp
-                    .filterNotNull()
-                    .distinctUntilChanged()
-                    .collect { currentApp ->
-                        try {
-                            lastLoopTick = System.currentTimeMillis()
-                            handleForegroundChange(currentApp)
-                        } catch (t: Throwable) {
-                            logError(t)
-                        }
-                    }
-            }
-            while (true) {
-                try {
-                    lastLoopTick = System.currentTimeMillis()
+
                     if (isScreenOn && !InterceptOverlayManager.isShowing) {
                         val currentApp = AppStateHolder.foregroundApp.value
                         if (currentApp != null) {
                             monitoringTick(currentApp)
                         }
                     }
+
+                    val elapsedMinutes = (lastLoopTick - startTime) / 60_000L
+                    if (elapsedMinutes > maintenanceTick) {
+                        maintenanceTick = elapsedMinutes
+                        if (isScreenOn) {
+                            if (SharedMonitoringState.launcherPackages.isEmpty() || lastLoopTick - lastLauncherRefreshTime > 3_600_000) {
+                                refreshLauncherCache()
+                            }
+                            if (maintenanceTick % 2 == 0L) checkGoalReminders()
+                            if (maintenanceTick % 2 == 0L) checkDayChangePeriodic()
+                        }
+                    }
                 } catch (t: Throwable) {
                     logError(t)
                 }
 
-                val delayTime = computeMonitoringDelay()
+                val delayTime = when {
+                    !isScreenOn -> 60_000L
+                    !ZenithAccessibilityService.isServiceRunning -> 3_000L
+                    else -> computeMonitoringDelay()
+                }
                 delay(delayTime)
-            }
-        }
-        serviceScope.launch {
-            while (true) {
-                try {
-                    if (isScreenOn && launcherPackages.isEmpty()) {
-                        refreshLauncherCache()
-                    }
-                } catch (_: Exception) {}
-                delay(60000)
-            }
-        }
-        serviceScope.launch {
-            while (true) {
-                try {
-                    checkGoalReminders()
-                } catch (_: Exception) {}
-                delay(120000)
-            }
-        }
-        serviceScope.launch {
-            while (true) {
-                try {
-                    checkDayChangePeriodic()
-                } catch (_: Exception) {}
-                delay(120000)
             }
         }
     }
@@ -588,16 +537,16 @@ class AppUsageMonitorService : Service() {
     private suspend fun handleForegroundChange(currentApp: String) {
         val currentTime = System.currentTimeMillis()
 
-        if (launcherPackages.isEmpty() || currentTime - lastLauncherRefreshTime > 3600000) {
+        if (SharedMonitoringState.launcherPackages.isEmpty() || currentTime - lastLauncherRefreshTime > 3600000) {
             refreshLauncherCache()
         }
 
-        if (launcherPackages.contains(currentApp) || currentApp == packageName) {
+        if (SharedMonitoringState.launcherPackages.contains(currentApp) || currentApp == packageName) {
             overlayManager.hideOverlay()
             sessionUsageOverlayManager.destroyAllHUDs()
             lastForegroundApp?.let { prevPkg ->
-                if (prevPkg != packageName && !launcherPackages.contains(prevPkg)) {
-                    allShieldsCache[prevPkg]?.let { shield ->
+                if (prevPkg != packageName && !SharedMonitoringState.launcherPackages.contains(prevPkg)) {
+                    SharedMonitoringState.allShieldsCache[prevPkg]?.let { shield ->
                         if (shield.isDelayAppEnabled) {
                             serviceScope.launch {
                                 shieldRepository.updateShield(shield.copy(lastDelayStartTimestamp = 0L))
@@ -628,7 +577,7 @@ class AppUsageMonitorService : Service() {
         try {
             lastForegroundApp?.let { prevPkg ->
                 if (prevPkg != currentApp) {
-                    allShieldsCache[prevPkg]?.let { prevShield ->
+                    SharedMonitoringState.allShieldsCache[prevPkg]?.let { prevShield ->
                         updateShieldInDatabase(prevShield, force = true)
                     }
                 }
@@ -636,13 +585,13 @@ class AppUsageMonitorService : Service() {
         } catch (_: Exception) {}
 
         if (isNewSession) {
-            currentShieldCache = allShieldsCache[currentApp]
+            currentShieldCache = SharedMonitoringState.allShieldsCache[currentApp]
             lastUsageFetchTime = 0L
             lastHUDUpdateTime = 0L
             sessionStartTime = currentTime
             currentSessionPackage = currentApp
 
-            val startOfDay = getStartOfDay()
+            val startOfDay = SharedMonitoringState.getStartOfDay()
             val timeSinceMidnight = (currentTime - startOfDay).coerceAtLeast(0L)
 
             val detailedUsage = withContext(Dispatchers.IO) {
@@ -666,7 +615,7 @@ class AppUsageMonitorService : Service() {
 
     private suspend fun monitoringTick(currentApp: String) {
         val currentTime = System.currentTimeMillis()
-        if (currentApp == packageName || launcherPackages.contains(currentApp)) {
+        if (currentApp == packageName || SharedMonitoringState.launcherPackages.contains(currentApp)) {
             sessionUsageOverlayManager.updateForegroundApp(currentApp)
             currentShieldCache = null
             currentSessionPackage = currentApp
@@ -682,7 +631,7 @@ class AppUsageMonitorService : Service() {
         if (shield != null && shield.type != FocusType.GOAL && !isPaused(shield)) {
             val limitMillis = shield.timeLimitMinutes * 60 * 1000L
             val actualRemaining = (limitMillis - cachedTotalUsage).coerceAtLeast(0L)
-            val prefs = currentPreferences
+            val prefs = SharedMonitoringState.currentPreferences
 
             val isOverlayShowing = InterceptOverlayManager.isShowing
             val isSessionActive = allowedApps[currentApp]?.let { it > currentTime } ?: false
@@ -712,7 +661,7 @@ class AppUsageMonitorService : Service() {
 
         val allowedUntilVal = allowedApps[currentApp]
         if (!isAppPaused && allowedUntilVal != null && allowedUntilVal > currentTime && !ZenithAccessibilityService.isServiceRunning) {
-            val prefs = currentPreferences
+            val prefs = SharedMonitoringState.currentPreferences
             if (prefs?.sessionUsageOverlayEnabled == true) {
                 val remainingMinutes = ((allowedUntilVal - currentTime) / 60000L).toInt().coerceAtLeast(1)
                 val sh = currentShieldCache
@@ -721,7 +670,7 @@ class AppUsageMonitorService : Service() {
                 val limitMillis = (sh?.timeLimitMinutes ?: 0) * 60 * 1000L
                 val currentUsage = if (isGoal) getTotalUsageToday(currentApp) else cachedTotalUsage
 
-                if (!(isGoal && (currentUsage >= limitMillis || notifiedGoals.contains(currentApp)) && limitMillis > 0)) {
+                if (!(isGoal && (currentUsage >= limitMillis || SharedMonitoringState.notifiedGoals.contains(currentApp)) && limitMillis > 0)) {
                     val duration = if (isGoal) sh?.timeLimitMinutes ?: 0 else remainingMinutes
                     val currentUsageSeconds = (currentUsage / 1000).toInt()
                     withContext(Dispatchers.Main) {
@@ -735,7 +684,7 @@ class AppUsageMonitorService : Service() {
                             onSessionEnd = {
                                 allowedApps.remove(currentApp)
                                 serviceScope.launch {
-                                    val s = allShieldsCache[currentApp] ?: shieldRepository.getShieldByPackageName(currentApp)
+                                    val s = SharedMonitoringState.allShieldsCache[currentApp] ?: shieldRepository.getShieldByPackageName(currentApp)
                                     if (s != null) {
                                         val updated = s.copy(lastSessionEndTimestamp = System.currentTimeMillis())
                                         shieldRepository.updateShield(updated)
@@ -756,8 +705,8 @@ class AppUsageMonitorService : Service() {
             }
         }
 
-        val isBedtimeBlocking = isBedtimeActive || (isWindDownActive && currentPreferences?.bedtimeWindDownEnabled == true)
-        val shouldCheckSchedules = (isBedtimeBlocking && currentApp !in bedtimeWhitelistedPackages) || (allowedUntilVal == null || currentTime > allowedUntilVal)
+        val isBedtimeBlocking = SharedMonitoringState.isBedtimeActive || (SharedMonitoringState.isWindDownActive && SharedMonitoringState.currentPreferences?.bedtimeWindDownEnabled == true)
+        val shouldCheckSchedules = (isBedtimeBlocking && currentApp !in SharedMonitoringState.bedtimeWhitelistedPackages) || (allowedUntilVal == null || currentTime > allowedUntilVal)
 
         if (!isAppPaused && shouldCheckSchedules && !InterceptOverlayManager.isShowing && !ZenithAccessibilityService.isServiceRunning) {
             if (checkSchedules(currentApp)) {
@@ -767,7 +716,7 @@ class AppUsageMonitorService : Service() {
 
             if (allowedUntilVal == null || currentTime > allowedUntilVal) {
                 val sh = currentShieldCache
-                val prefs = currentPreferences
+                val prefs = SharedMonitoringState.currentPreferences
                 if (sh != null || (prefs?.mindfulGatewayEnabled == true && !shouldBypassBlocking(currentApp))) {
                     if (sh != null && sh.isAutoQuitEnabled && allowedUntilVal != null && allowedUntilVal > 0) {
                         lastKickTime = System.currentTimeMillis()
@@ -792,6 +741,7 @@ class AppUsageMonitorService : Service() {
     }
 
     private fun computeMonitoringDelay(): Long {
+        val prefs = SharedMonitoringState.currentPreferences
         return try {
             if (!isScreenOn) {
                 120000L
@@ -799,8 +749,8 @@ class AppUsageMonitorService : Service() {
                 120000L
             } else if (InterceptOverlayManager.isShowing) {
                 30000L
-            } else if (currentPreferences?.customDelayEnabled == true) {
-                val prefs = currentPreferences!!
+            } else if (prefs?.customDelayEnabled == true) {
+                val p = prefs
                 when {
                     currentShieldCache != null -> {
                         val shield = currentShieldCache!!
@@ -808,20 +758,20 @@ class AppUsageMonitorService : Service() {
                         val remaining = (limitMillis - cachedTotalUsage).coerceAtLeast(0L)
                         if (shield.type == FocusType.GOAL) {
                             when {
-                                remaining < 60000 -> prefs.delayGoalNear.coerceIn(5000L, 10000L)
-                                remaining < 300000 -> prefs.delayGoalMid.coerceIn(7000L, 15000L)
-                                else -> prefs.delayGoalFar.coerceIn(10000L, 25000L)
+                                remaining < 60000 -> p.delayGoalNear.coerceIn(5000L, 10000L)
+                                remaining < 300000 -> p.delayGoalMid.coerceIn(7000L, 15000L)
+                                else -> p.delayGoalFar.coerceIn(10000L, 25000L)
                             }
                         } else {
                             when {
-                                remaining > 3600000 -> prefs.delayShieldVeryFar.coerceIn(15000L, 30000L)
-                                remaining > 600000 -> prefs.delayShieldFar.coerceIn(10000L, 25000L)
-                                remaining > 60000 -> prefs.delayShieldMid.coerceIn(7000L, 15000L)
-                                else -> prefs.delayShieldNear.coerceIn(5000L, 10000L)
+                                remaining > 3600000 -> p.delayShieldVeryFar.coerceIn(15000L, 30000L)
+                                remaining > 600000 -> p.delayShieldFar.coerceIn(10000L, 25000L)
+                                remaining > 60000 -> p.delayShieldMid.coerceIn(7000L, 15000L)
+                                else -> p.delayShieldNear.coerceIn(5000L, 10000L)
                             }
                         }
                     }
-                    else -> prefs.delayDefault.coerceIn(10000L, 30000L)
+                    else -> p.delayDefault.coerceIn(10000L, 30000L)
                 }
             } else {
                 when {
@@ -861,12 +811,12 @@ class AppUsageMonitorService : Service() {
                 com.etrisad.zenith.util.ScreenUsageHelper.clearCache()
                 shieldRepository.resetAllRemainingTimes()
             }
-            notifiedGoals.clear()
+            SharedMonitoringState.notifiedGoals.clear()
             earlyKickManager.reset()
-            dailyUsageCache.clear()
+            SharedMonitoringState.dailyUsageCache.clear()
             lastAllowedRemainingTime.clear()
-            systemAppCache.clear()
-            launcherPackages = emptySet()
+            SharedMonitoringState.systemAppCache.clear()
+            SharedMonitoringState.launcherPackages = emptySet()
             lastUsageCacheTime = 0L
             lastUsageFetchTime = 0L
             cachedTotalUsage = 0L
@@ -883,7 +833,7 @@ class AppUsageMonitorService : Service() {
             return
         }
 
-        currentPreferences?.let { updateBedtimeStatus(it) }
+        SharedMonitoringState.currentPreferences?.let { updateBedtimeStatus(it) }
         checkSchedulesTransition(LocalTime.now().hour * 60 + LocalTime.now().minute)
         lastCheckedDayTimestamp = currentTime
     }
@@ -900,7 +850,7 @@ class AppUsageMonitorService : Service() {
             if (checkSchedules(currentApp)) return
 
             if (!isAppPaused && (allowedUntil == null || currentTime > allowedUntil)) {
-                val prefs = currentPreferences
+                val prefs = SharedMonitoringState.currentPreferences
                 if (shield != null || (prefs?.mindfulGatewayEnabled == true && !shouldBypassBlocking(currentApp))) {
                     checkIfAppIsShielded(currentApp)
                 }
@@ -947,7 +897,7 @@ class AppUsageMonitorService : Service() {
 
                     val systemUsage = detailedUsage.appUsageMap[packageName] ?: 0L
                     val systemGlobal = getFilteredGlobalUsage(detailedUsage.appUsageMap)
-                    val startOfDay = getStartOfDay()
+                    val startOfDay = SharedMonitoringState.getStartOfDay()
                     val now = System.currentTimeMillis()
                     val timeSinceMidnight = (now - startOfDay).coerceAtLeast(0L)
 
@@ -973,7 +923,7 @@ class AppUsageMonitorService : Service() {
 
     private fun updateShieldInDatabase(shield: ShieldEntity, force: Boolean = false) {
         val currentTime = System.currentTimeMillis()
-        val prefs = currentPreferences ?: return
+        val prefs = SharedMonitoringState.currentPreferences ?: return
         val rechargeDurationMillis = prefs.emergencyRechargeDurationMinutes * 60 * 1000L
 
         var updatedShield = shield
@@ -1044,9 +994,9 @@ class AppUsageMonitorService : Service() {
             }
 
             if (shield.type == FocusType.GOAL && !isPaused(shield)) {
-                if (cachedTotalUsage >= limitMillis && !notifiedGoals.contains(shield.packageName)) {
+                if (cachedTotalUsage >= limitMillis && !SharedMonitoringState.notifiedGoals.contains(shield.packageName)) {
                     sendGoalReachedNotification(shield.appName, shield.packageName)
-                    notifiedGoals.add(shield.packageName)
+                    SharedMonitoringState.notifiedGoals.add(shield.packageName)
                 }
             }
         }
@@ -1139,7 +1089,7 @@ class AppUsageMonitorService : Service() {
         }
 
         var updated = existing
-        val rechargeDurationMillis = (currentPreferences?.emergencyRechargeDurationMinutes ?: 60) * 60 * 1000L
+        val rechargeDurationMillis = (SharedMonitoringState.currentPreferences?.emergencyRechargeDurationMinutes ?: 60) * 60 * 1000L
         if (updated.emergencyUseCount < updated.maxEmergencyUses && rechargeDurationMillis > 0) {
             val timeSinceLastRecharge = currentTime - updated.lastEmergencyRechargeTimestamp
             if (timeSinceLastRecharge >= rechargeDurationMillis) {
@@ -1183,10 +1133,10 @@ class AppUsageMonitorService : Service() {
         val shield = if (currentShieldCache?.packageName == targetPackageName) {
             currentShieldCache
         } else {
-            allShieldsCache[targetPackageName]
+            SharedMonitoringState.allShieldsCache[targetPackageName]
         }
 
-        val prefs = currentPreferences ?: return
+        val prefs = SharedMonitoringState.currentPreferences ?: return
         val isMindfulGateway = shield == null && prefs.mindfulGatewayEnabled && !shouldBypassBlocking(targetPackageName)
 
         val appName = shield?.appName ?: try {
@@ -1286,13 +1236,13 @@ class AppUsageMonitorService : Service() {
                                 }
                             }
 
-                            val currentPrefs = currentPreferences ?: return@launch
+                            val currentPrefs = SharedMonitoringState.currentPreferences ?: return@launch
                             if (currentPrefs.sessionUsageOverlayEnabled) {
                                 val isGoal = shieldWithTimestamp.type == FocusType.GOAL
                                 val limitMillisOnHUD = (shieldWithTimestamp.timeLimitMinutes) * 60 * 1000L
                                 val currentUsage = getTotalUsageToday(targetPackageName)
 
-                                if (!(isGoal && (currentUsage >= limitMillisOnHUD || notifiedGoals.contains(targetPackageName)) && limitMillisOnHUD > 0)) {
+                                if (!(isGoal && (currentUsage >= limitMillisOnHUD || SharedMonitoringState.notifiedGoals.contains(targetPackageName)) && limitMillisOnHUD > 0)) {
                                     val duration = if (isGoal) shieldWithTimestamp.timeLimitMinutes else minutes
                                     val currentUsageSeconds = (currentUsage / 1000).toInt()
 
@@ -1333,7 +1283,7 @@ class AppUsageMonitorService : Service() {
                         lastKickTime = now
                         lastKickedPackage = targetPackageName
                         serviceScope.launch {
-                            val s = currentShieldCache ?: allShieldsCache[targetPackageName] ?: shieldRepository.getShieldByPackageName(targetPackageName)
+                            val s = currentShieldCache ?: SharedMonitoringState.allShieldsCache[targetPackageName] ?: shieldRepository.getShieldByPackageName(targetPackageName)
                             if (s != null && s.isDelayAppEnabled) {
                                 val updated = s.copy(lastDelayStartTimestamp = 0L)
                                 shieldRepository.updateShield(updated)
@@ -1358,9 +1308,9 @@ class AppUsageMonitorService : Service() {
 
         if (lastCheckStr.isNotEmpty() && lastCheckStr != todayStr) {
             shieldRepository.resetAllRemainingTimes()
-            notifiedGoals.clear()
-            dailyUsageCache.clear()
-            systemAppCache.clear()
+            SharedMonitoringState.notifiedGoals.clear()
+            SharedMonitoringState.dailyUsageCache.clear()
+            SharedMonitoringState.systemAppCache.clear()
             com.etrisad.zenith.util.ScreenUsageHelper.clearCache()
             lastAllowedRemainingTime.clear()
         }
@@ -1396,18 +1346,18 @@ class AppUsageMonitorService : Service() {
 
     private fun getFilteredGlobalUsage(appUsageMap: Map<String, Long>): Long {
         val currentTime = System.currentTimeMillis()
-        val todayStart = getStartOfDay()
+        val todayStart = SharedMonitoringState.getStartOfDay()
         val timeSinceMidnight = (currentTime - todayStart).coerceAtLeast(0L)
 
-        if (currentTime - lastLauncherAppsRefreshTime > 7200000 || launcherAppsCache.isEmpty()) {
+        if (currentTime - SharedMonitoringState.lastLauncherAppsRefreshTime > 7200000 || SharedMonitoringState.launcherAppsCache.isEmpty()) {
             refreshLauncherCache()
         }
 
-        val excludePackages = setOfNotNull(packageName, defaultLauncherPackage)
+        val excludePackages = setOfNotNull(packageName, SharedMonitoringState.defaultLauncherPackage)
 
         var totalSum = 0L
         appUsageMap.forEach { (pkg, time) ->
-            if (pkg !in excludePackages && pkg in launcherAppsCache) {
+            if (pkg !in excludePackages && pkg in SharedMonitoringState.launcherAppsCache) {
                 if (time > 0) {
                     totalSum += time
                 }
@@ -1420,19 +1370,19 @@ class AppUsageMonitorService : Service() {
     private fun refreshLauncherCache() {
         try {
             val pm = packageManager
-            launcherAppsCache = pm.queryIntentActivities(
+            SharedMonitoringState.launcherAppsCache = pm.queryIntentActivities(
                 Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0
             ).map { it.activityInfo.packageName }.toSet()
 
             val launcherIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
             val launchers = pm.queryIntentActivities(launcherIntent, PackageManager.MATCH_ALL)
-            launcherPackages = launchers.map { it.activityInfo.packageName }.toSet()
+            SharedMonitoringState.launcherPackages = launchers.map { it.activityInfo.packageName }.toSet()
 
-            defaultLauncherPackage = pm.resolveActivity(launcherIntent, PackageManager.MATCH_DEFAULT_ONLY)
+            SharedMonitoringState.defaultLauncherPackage = pm.resolveActivity(launcherIntent, PackageManager.MATCH_DEFAULT_ONLY)
                 ?.activityInfo?.packageName
 
             val currentTime = System.currentTimeMillis()
-            lastLauncherAppsRefreshTime = currentTime
+            SharedMonitoringState.lastLauncherAppsRefreshTime = currentTime
             lastLauncherRefreshTime = currentTime
         } catch (_: Exception) {}
     }
@@ -1446,49 +1396,37 @@ class AppUsageMonitorService : Service() {
 
     private fun getSystemUsageToday(packageName: String): Long {
         getUsageStatsList()
-        return dailyUsageCache[packageName] ?: 0L
+        return SharedMonitoringState.dailyUsageCache[packageName] ?: 0L
     }
 
     private fun getCachedUsageToday(packageName: String): Long {
-        val cached = dailyUsageCache[packageName]
+        val cached = SharedMonitoringState.dailyUsageCache[packageName]
         if (cached != null) return cached
         return getSystemUsageToday(packageName)
     }
 
     private fun getUsageStatsList() {
         val currentTime = System.currentTimeMillis()
-        if (currentTime - lastUsageCacheTime < 60000 && dailyUsageCache.isNotEmpty()) {
+        if (currentTime - lastUsageCacheTime < 60000 && SharedMonitoringState.dailyUsageCache.isNotEmpty()) {
             return
         }
 
-        val startTime = getStartOfDay()
+        val startTime = SharedMonitoringState.getStartOfDay()
         val timeSinceMidnight = currentTime - startTime
 
         try {
             val detailedUsage = com.etrisad.zenith.util.ScreenUsageHelper.fetchDetailedUsageToday(usageStatsManager)
-            dailyUsageCache.clear()
+            SharedMonitoringState.dailyUsageCache.clear()
             detailedUsage.appUsageMap.forEach { (pkg, time) ->
                 val cappedTime = if (time > timeSinceMidnight) timeSinceMidnight else time
-                if (cappedTime > 0) dailyUsageCache[pkg] = cappedTime
+                if (cappedTime > 0) SharedMonitoringState.dailyUsageCache[pkg] = cappedTime
             }
         } catch (_: Exception) { }
 
         lastUsageCacheTime = currentTime
     }
 
-    private var cachedStartOfDayTime = 0L
-    private var cachedStartOfDayValue = 0L
 
-    private fun getStartOfDay(): Long {
-        val now = System.currentTimeMillis()
-        if (now - cachedStartOfDayTime < 60000 && cachedStartOfDayValue > 0) {
-            return cachedStartOfDayValue
-        }
-        val result = LocalDate.now().atStartOfDay(systemZone).toInstant().toEpochMilli()
-        cachedStartOfDayTime = now
-        cachedStartOfDayValue = result
-        return result
-    }
 
     private fun goToHomeScreen() {
         lastForegroundApp = null
@@ -1508,8 +1446,8 @@ class AppUsageMonitorService : Service() {
 
         val yesterdayDay = now.minusDays(1).dayOfWeek.let { if (it == java.time.DayOfWeek.SUNDAY) 1 else it.value + 1 }
 
-        val startMinutes = cachedBedtimeStartMinutes
-        val endMinutes = cachedBedtimeEndMinutes
+        val startMinutes = SharedMonitoringState.cachedBedtimeStartMinutes
+        val endMinutes = SharedMonitoringState.cachedBedtimeEndMinutes
 
         var active = false
         var windDownActive = false
@@ -1543,17 +1481,17 @@ class AppUsageMonitorService : Service() {
             }
         }
 
-        val wasWindDownActive = isWindDownActive
+        val wasWindDownActive = SharedMonitoringState.isWindDownActive
         if (windDownActive && !wasWindDownActive) {
-            windDownUsedPackages.clear()
+            SharedMonitoringState.windDownUsedPackages.clear()
             if (prefs.bedtimeNotificationEnabled) {
                 sendWindDownNotification()
             }
         }
 
-        isBedtimeActive = active
-        isWindDownActive = windDownActive
-        isBedtimeBlockingActive = active || (windDownActive && prefs.bedtimeWindDownEnabled)
+        SharedMonitoringState.isBedtimeActive = active
+        SharedMonitoringState.isWindDownActive = windDownActive
+        SharedMonitoringState.isBedtimeBlockingActive = active || (windDownActive && prefs.bedtimeWindDownEnabled)
 
         updateDndAndWindDown(
             active && prefs.bedtimeDndEnabled,
@@ -1582,7 +1520,7 @@ class AppUsageMonitorService : Service() {
 
     private fun checkSchedulesTransition(currentTotalMinutes: Int) {
         val currentlyActiveIds = mutableSetOf<Long>()
-        for (ps in parsedSchedulesCache) {
+        for (ps in SharedMonitoringState.parsedSchedulesCache) {
             val isInInterval = if (ps.startMinutes <= ps.endMinutes) {
                 currentTotalMinutes in ps.startMinutes..ps.endMinutes
             } else {
@@ -1606,18 +1544,18 @@ class AppUsageMonitorService : Service() {
         val allowedUntil = allowedApps[packageName] ?: 0L
         if (System.currentTimeMillis() < allowedUntil) return false
 
-        val prefs = currentPreferences
+        val prefs = SharedMonitoringState.currentPreferences
 
-        if (isBedtimeActive) {
-            if (packageName !in bedtimeWhitelistedPackages) {
+        if (SharedMonitoringState.isBedtimeActive) {
+            if (packageName !in SharedMonitoringState.bedtimeWhitelistedPackages) {
                 showBedtimeOverlay(packageName)
                 return true
             }
             return false
         }
 
-        if (isWindDownActive && prefs?.bedtimeWindDownEnabled == true) {
-            if (packageName !in bedtimeWhitelistedPackages) {
+        if (SharedMonitoringState.isWindDownActive && prefs?.bedtimeWindDownEnabled == true) {
+            if (packageName !in SharedMonitoringState.bedtimeWhitelistedPackages) {
                 showWindDownOverlay(packageName)
                 return true
             }
@@ -1627,7 +1565,7 @@ class AppUsageMonitorService : Service() {
         val nowTime = LocalTime.now()
         val currentTotalMinutes = nowTime.hour * 60 + nowTime.minute
 
-        for (ps in parsedSchedulesCache) {
+        for (ps in SharedMonitoringState.parsedSchedulesCache) {
             val isInInterval = if (ps.startMinutes <= ps.endMinutes) {
                 currentTotalMinutes in ps.startMinutes..ps.endMinutes
             } else {
@@ -1676,7 +1614,7 @@ class AppUsageMonitorService : Service() {
     }
 
     private fun showWindDownOverlay(packageName: String) {
-        val sessionUsed = windDownUsedPackages[packageName] ?: false
+        val sessionUsed = SharedMonitoringState.windDownUsedPackages[packageName] ?: false
         serviceScope.launch(Dispatchers.Main) {
             val appName = try {
                 packageManager.getApplicationLabel(packageManager.getApplicationInfo(packageName, 0)).toString()
@@ -1688,16 +1626,16 @@ class AppUsageMonitorService : Service() {
                 sessionUsed = sessionUsed,
                 onAllowUse = { minutes ->
                     val currentTime = System.currentTimeMillis()
-                    val shield = allShieldsCache[packageName]
+                    val shield = SharedMonitoringState.allShieldsCache[packageName]
                     if (shield != null) {
                         val limitMillis = shield.timeLimitMinutes * 60 * 1000L
                         lastAllowedRemainingTime[packageName] = (limitMillis - getTotalUsageToday(packageName)).coerceAtLeast(0L)
                     }
 
                     allowedApps[packageName] = currentTime + (minutes * 60 * 1000L)
-                    windDownUsedPackages[packageName] = true
+                    SharedMonitoringState.windDownUsedPackages[packageName] = true
 
-                    val currentPrefs = currentPreferences ?: return@showWindDownOverlay
+                    val currentPrefs = SharedMonitoringState.currentPreferences ?: return@showWindDownOverlay
                     if (currentPrefs.sessionUsageOverlayEnabled) {
                         serviceScope.launch(Dispatchers.Main) {
                             sessionUsageOverlayManager.showHUD(
@@ -1728,7 +1666,7 @@ class AppUsageMonitorService : Service() {
     }
 
     private fun showScheduleOverlayFromParsed(packageName: String, ps: ParsedSchedule) {
-        val originalSchedule = activeSchedules.find { it.id == ps.id } ?: return
+        val originalSchedule = SharedMonitoringState.activeSchedules.find { it.id == ps.id } ?: return
         showScheduleOverlay(packageName, originalSchedule)
     }
 
@@ -1754,22 +1692,22 @@ class AppUsageMonitorService : Service() {
             return true
         }
 
-        val prefs = currentPreferences
-        val isBedtimeOrWindDown = isBedtimeActive || (isWindDownActive && prefs?.bedtimeWindDownEnabled == true)
+        val prefs = SharedMonitoringState.currentPreferences
+        val isBedtimeOrWindDown = SharedMonitoringState.isBedtimeActive || (SharedMonitoringState.isWindDownActive && prefs?.bedtimeWindDownEnabled == true)
 
         val result = when {
-            packageName in whitelistedPackages && packageName !in restrictedPackages -> {
+            packageName in SharedMonitoringState.whitelistedPackages && packageName !in SharedMonitoringState.restrictedPackages -> {
                 if (!isBedtimeOrWindDown || prefs?.mindfulGatewayEnabled != true) true else null
             }
-            isBedtimeOrWindDown && packageName in bedtimeWhitelistedPackages && packageName !in restrictedPackages -> {
+            isBedtimeOrWindDown && packageName in SharedMonitoringState.bedtimeWhitelistedPackages && packageName !in SharedMonitoringState.restrictedPackages -> {
                 if (prefs?.mindfulGatewayEnabled != true) true else null
             }
             isKeyboardApp(packageName) -> true
             packageName in CRITICAL_SYSTEM_PACKAGES -> true
-            launcherPackages.contains(packageName) ||
+            SharedMonitoringState.launcherPackages.contains(packageName) ||
                 packageName.contains("launcher", ignoreCase = true) ||
                 packageName.contains("home", ignoreCase = true) -> true
-            packageName in restrictedPackages -> false
+            packageName in SharedMonitoringState.restrictedPackages -> false
             else -> null
         }
 
@@ -1778,7 +1716,7 @@ class AppUsageMonitorService : Service() {
             return result
         }
 
-        val isSystem = systemAppCache.getOrPut(packageName) {
+        val isSystem = SharedMonitoringState.systemAppCache.getOrPut(packageName) {
             try {
                 val appInfo = packageManager.getApplicationInfo(packageName, 0)
                 (appInfo.flags and (android.content.pm.ApplicationInfo.FLAG_SYSTEM or android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) != 0
@@ -1788,7 +1726,7 @@ class AppUsageMonitorService : Service() {
         val finalResult = if (isSystem) {
             if (packageName.contains("car.mode", ignoreCase = true)) true
             else if (isBedtimeOrWindDown) false
-            else !(packageName in restrictedPackages || hasGlobalAllowSchedule || (prefs?.mindfulGatewayEnabled == true))
+            else !(packageName in SharedMonitoringState.restrictedPackages || SharedMonitoringState.hasGlobalAllowSchedule || (prefs?.mindfulGatewayEnabled == true))
         } else false
 
         cachedBypassPackage = packageName; cachedBypassResult = finalResult; cachedBypassTime = now
@@ -1808,11 +1746,11 @@ class AppUsageMonitorService : Service() {
     }
 
     private fun updateRestrictedPackages() {
-        val shieldPkgs = allShieldsCache.keys
-        val schedulePkgs = activeSchedules.asSequence().filter { it.mode == com.etrisad.zenith.data.local.entity.ScheduleMode.BLOCK }
+        val shieldPkgs = SharedMonitoringState.allShieldsCache.keys
+        val schedulePkgs = SharedMonitoringState.activeSchedules.asSequence().filter { it.mode == com.etrisad.zenith.data.local.entity.ScheduleMode.BLOCK }
             .flatMap { it.packageNames }.toSet()
-        hasGlobalAllowSchedule = activeSchedules.any { it.mode == com.etrisad.zenith.data.local.entity.ScheduleMode.ALLOW }
-        restrictedPackages = shieldPkgs + schedulePkgs + BLOCKABLE_SYSTEM_APPS
+        SharedMonitoringState.hasGlobalAllowSchedule = SharedMonitoringState.activeSchedules.any { it.mode == com.etrisad.zenith.data.local.entity.ScheduleMode.ALLOW }
+        SharedMonitoringState.restrictedPackages = shieldPkgs + schedulePkgs + BLOCKABLE_SYSTEM_APPS
     }
 
     private fun showScheduleOverlay(packageName: String, schedule: com.etrisad.zenith.data.local.entity.ScheduleEntity) {
@@ -1833,7 +1771,7 @@ class AppUsageMonitorService : Service() {
                         allowedApps[packageName] = currentTime + (minutes * 60 * 1000L)
 
                         serviceScope.launch {
-                            val shield = allShieldsCache[packageName]
+                            val shield = SharedMonitoringState.allShieldsCache[packageName]
                             if (shield != null) {
                                 val limitMillis = shield.timeLimitMinutes * 60 * 1000L
                                 lastAllowedRemainingTime[packageName] = (limitMillis - getTotalUsageToday(packageName)).coerceAtLeast(0L)
@@ -1845,7 +1783,7 @@ class AppUsageMonitorService : Service() {
                             )
                             shieldRepository.updateSchedule(updatedSchedule)
 
-                            val currentPrefs = currentPreferences ?: return@launch
+                            val currentPrefs = SharedMonitoringState.currentPreferences ?: return@launch
                             if (currentPrefs.sessionUsageOverlayEnabled) {
                                 serviceScope.launch(Dispatchers.Main) {
                                     sessionUsageOverlayManager.showHUD(
@@ -1929,8 +1867,8 @@ class AppUsageMonitorService : Service() {
         if (level >= TRIM_MEMORY_MODERATE) {
             currentShieldCache = null
             lastUsageFetchTime = 0L
-            systemAppCache.clear()
-            launcherPackages = emptySet()
+            SharedMonitoringState.systemAppCache.clear()
+            SharedMonitoringState.launcherPackages = emptySet()
             lastUsageCacheTime = 0L
             lastLauncherRefreshTime = 0L
             try {

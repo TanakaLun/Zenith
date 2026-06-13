@@ -17,7 +17,9 @@ class MidnightResetWorker(context: Context, params: WorkerParameters) : Coroutin
         val serviceIntent = Intent(applicationContext, com.etrisad.zenith.service.AppUsageMonitorService::class.java).apply {
             action = ACTION_MIDNIGHT_RESET_SERVICE
         }
-        applicationContext.startService(serviceIntent)
+        try {
+            applicationContext.startForegroundService(serviceIntent)
+        } catch (_: Exception) {}
 
         AlarmTasksSchedulingHelper.scheduleMidnightResetTask(applicationContext)
         

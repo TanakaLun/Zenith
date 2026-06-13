@@ -93,46 +93,6 @@ class InterceptOverlayManager(
         onGoalDismiss: () -> Unit
     ) {
         overlayUsageState?.value = Pair(totalUsageToday, totalGlobalUsageToday)
-        overlayView?.setContent {
-            val userPrefs by sharedPrefs.collectAsState(initial = null)
-            val darkTheme = when (userPrefs?.themeConfig) {
-                com.etrisad.zenith.data.preferences.ThemeConfig.LIGHT -> false
-                com.etrisad.zenith.data.preferences.ThemeConfig.DARK -> true
-                else -> androidx.compose.foundation.isSystemInDarkTheme()
-            }
-
-            ZenithTheme(
-                darkTheme = darkTheme,
-                fontOption = userPrefs?.fontOption ?: com.etrisad.zenith.data.preferences.FontOption.SYSTEM,
-                dynamicColor = userPrefs?.dynamicColor ?: true,
-                expressiveColors = userPrefs?.expressiveColors ?: false,
-                gsFlexSettings = userPrefs?.gsFlexSettings ?: GSFlexSettings()
-            ) {
-                val usageState = overlayUsageState?.value ?: Pair(totalUsageToday, totalGlobalUsageToday)
-                Box(modifier = Modifier.fillMaxSize()) {
-                    InterceptOverlayContent(
-                        packageName = packageName,
-                        appName = appName,
-                        shield = shield,
-                        totalUsageToday = usageState.first,
-                        totalGlobalUsageToday = usageState.second,
-                        delayDurationSeconds = delayDurationSeconds,
-                        onAllowUse = { minutes, isEmergency ->
-                            onAllowUse(minutes, isEmergency)
-                            hideOverlay()
-                        },
-                        onCloseApp = {
-                            onCloseApp()
-                            hideOverlay()
-                        },
-                        onGoalDismiss = {
-                            onGoalDismiss()
-                            hideOverlay()
-                        }
-                    )
-                }
-            }
-        }
     }
 
     fun showOverlay(

@@ -7,6 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import java.util.concurrent.Executors
 import com.etrisad.zenith.data.local.dao.ScheduleDao
 import com.etrisad.zenith.data.local.dao.ShieldDao
 import com.etrisad.zenith.data.local.dao.DailyUsageDao
@@ -27,7 +28,7 @@ import com.etrisad.zenith.data.local.Converters
         HourlyUsageEntity::class,
         InterceptedNotificationEntity::class
     ],
-    version = 22,
+    version = 25,
     exportSchema = true,
     autoMigrations = [
         androidx.room.AutoMigration(from = 12, to = 13),
@@ -46,6 +47,25 @@ abstract class ZenithDatabase : RoomDatabase() {
     companion object {
         @Volatile
         private var INSTANCE: ZenithDatabase? = null
+
+        private val MIGRATION_24_25 = object : Migration(24, 25) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_intercepted_notifications_scheduleId` ON `intercepted_notifications` (`scheduleId`)")
+            }
+        }
+
+        private val MIGRATION_23_24 = object : Migration(23, 24) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_shields_packageName` ON `shields` (`packageName`)")
+            }
+        }
+
+        private val MIGRATION_22_23 = object : Migration(22, 23) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_daily_usage_date` ON `daily_usage` (`date`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_hourly_usage_packageName_date_hour` ON `hourly_usage` (`packageName`, `date`, `hour`)")
+            }
+        }
 
         private val MIGRATION_21_22 = object : Migration(21, 22) {
             override fun migrate(db: SupportSQLiteDatabase) {
@@ -219,9 +239,10 @@ abstract class ZenithDatabase : RoomDatabase() {
                         MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
                         MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18,
                         MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21,
-                        MIGRATION_21_22
+                        MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25
                     )
-                    .enableMultiInstanceInvalidation()
+                    .setQueryExecutor(Executors.newFixedThreadPool(2))
+                    .setTransactionExecutor(Executors.newSingleThreadExecutor())
                     .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
                     .fallbackToDestructiveMigration()
                     .fallbackToDestructiveMigrationOnDowngrade()

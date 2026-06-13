@@ -1,8 +1,8 @@
 {
   "formatVersion": 1,
   "database": {
-    "version": 23,
-    "identityHash": "1bbca7c7945f8be7c15f55674a312d95",
+    "version": 24,
+    "identityHash": "9f8d0ee9eeaa641aaa08756af8274756",
     "entities": [
       {
         "tableName": "shields",
@@ -193,7 +193,18 @@
           "columnNames": [
             "packageName"
           ]
-        }
+        },
+        "indices": [
+          {
+            "name": "index_shields_packageName",
+            "unique": true,
+            "columnNames": [
+              "packageName"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_shields_packageName` ON `${TABLE_NAME}` (`packageName`)"
+          }
+        ]
       },
       {
         "tableName": "schedules",
@@ -451,7 +462,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '1bbca7c7945f8be7c15f55674a312d95')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '9f8d0ee9eeaa641aaa08756af8274756')"
     ]
   }
 }

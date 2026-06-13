@@ -10,7 +10,6 @@ import androidx.documentfile.provider.DocumentFile
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.etrisad.zenith.util.BackupUtils
-import com.etrisad.zenith.service.UsageSyncManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.LocalDateTime
@@ -26,11 +25,6 @@ class DatabaseBackupWorker(
         val directoryUri = Uri.parse(directoryUriString)
         
         try {
-            val app = applicationContext as com.etrisad.zenith.ZenithApplication
-            try {
-                UsageSyncManager(applicationContext, app.shieldRepository, app.userPreferencesRepository).syncUsageData()
-            } catch (_: Exception) {}
-
             val formatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")
             val timestamp = LocalDateTime.now().format(formatter)
             val backupFolder = DocumentFile.fromTreeUri(applicationContext, directoryUri)

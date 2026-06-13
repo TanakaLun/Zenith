@@ -101,8 +101,7 @@ class ZenithNotificationListener : NotificationListenerService() {
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             
             CoroutineScope(Dispatchers.IO).launch {
-                val notifications = database.interceptedNotificationDao().getAllNotifications()
-                    .filter { it.scheduleId == scheduleId }
+                val notifications = database.interceptedNotificationDao().getNotificationsByScheduleId(scheduleId)
                 
                 notifications.forEach { intercepted ->
                     val channelId = "zenith_restored_notifications"

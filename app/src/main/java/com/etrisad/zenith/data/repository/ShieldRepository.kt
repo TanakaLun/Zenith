@@ -58,8 +58,9 @@ class ShieldRepository(
     }
 
     fun getRecentUsage(days: Int): Flow<List<DailyUsageEntity>> {
+        val cappedDays = days.coerceAtMost(30)
         val cal = java.util.Calendar.getInstance()
-        cal.add(java.util.Calendar.DAY_OF_YEAR, -days)
+        cal.add(java.util.Calendar.DAY_OF_YEAR, -cappedDays)
         val dateStr = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(cal.time)
         return dailyUsageDao.getRecentUsage(dateStr)
     }

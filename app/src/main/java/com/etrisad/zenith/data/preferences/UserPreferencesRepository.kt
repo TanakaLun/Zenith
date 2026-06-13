@@ -22,6 +22,7 @@ import com.etrisad.zenith.ui.theme.GSFlexSettings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
@@ -30,6 +31,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
+val Context.runtimeDataStore: DataStore<Preferences> by preferencesDataStore(name = "runtime_state")
 
 enum class ThemeConfig {
     FOLLOW_SYSTEM, LIGHT, DARK
@@ -57,20 +59,12 @@ class UserPreferencesRepository(private val context: Context) {
         val SESSION_USAGE_OVERLAY_SIZE = intPreferencesKey("session_usage_overlay_size")
         val SESSION_USAGE_OVERLAY_OPACITY = intPreferencesKey("session_usage_overlay_opacity")
         val WHITELISTED_PACKAGES = stringPreferencesKey("whitelisted_packages")
-        val LAST_RESET_DATE = stringPreferencesKey("last_reset_date")
-        val LAST_STREAK_CHECK_DATE = stringPreferencesKey("last_streak_check_date")
-        val GLOBAL_CURRENT_STREAK = intPreferencesKey("global_current_streak")
-        val GLOBAL_BEST_STREAK = intPreferencesKey("global_best_streak")
-        val GLOBAL_LAST_STREAK_UPDATE_TIMESTAMP = longPreferencesKey("global_last_streak_update_timestamp")
         val AUTO_BACKUP_ENABLED = booleanPreferencesKey("auto_backup_enabled")
         val BACKUP_DIRECTORY_URI = stringPreferencesKey("backup_directory_uri")
         val BACKUP_INTERVAL_HOURS = intPreferencesKey("backup_interval_hours")
-        val LAST_BACKUP_TIMESTAMP = longPreferencesKey("last_backup_timestamp")
         val FLOATING_TAB_BAR_ENABLED = booleanPreferencesKey("floating_tab_bar_enabled")
         val EXPRESSIVE_COLORS = booleanPreferencesKey("expressive_colors")
         val TOTAL_USAGE_PILL_ENABLED = booleanPreferencesKey("total_usage_pill_enabled")
-        val LAST_KNOWN_DAILY_USAGE = longPreferencesKey("last_known_daily_usage")
-        val LAST_KNOWN_DAILY_USAGE_DATE = stringPreferencesKey("last_known_daily_usage_date")
 
         val BEDTIME_ENABLED = booleanPreferencesKey("bedtime_enabled")
         val BEDTIME_START_TIME = stringPreferencesKey("bedtime_start_time")
@@ -80,23 +74,17 @@ class UserPreferencesRepository(private val context: Context) {
         val BEDTIME_WIND_DOWN_ENABLED = booleanPreferencesKey("bedtime_wind_down_enabled")
         val BEDTIME_NOTIFICATION_ENABLED = booleanPreferencesKey("bedtime_notification_enabled")
         val BEDTIME_WHITELISTED_PACKAGES = stringPreferencesKey("bedtime_whitelisted_packages")
-        val BEDTIME_CURRENT_STREAK = intPreferencesKey("bedtime_mode_streak_current")
-        val BEDTIME_BEST_STREAK = intPreferencesKey("bedtime_mode_streak_best")
-        val BEDTIME_STREAK_RESET_DATE = stringPreferencesKey("bedtime_streak_reset_date")
         val USER_NAME = stringPreferencesKey("user_name")
         val EARLY_KICK_ENABLED = booleanPreferencesKey("early_kick_enabled")
         val INTERCEPT_AUDIO_FOCUS_ENABLED = booleanPreferencesKey("intercept_audio_focus_enabled")
         val SHOW_DATABASE_INDICATOR = booleanPreferencesKey("show_database_indicator")
         val DEVELOPER_MODE_ENABLED = booleanPreferencesKey("developer_mode_enabled")
-        val LAST_SYNC_TIMESTAMP = longPreferencesKey("last_sync_timestamp")
         val PREFER_SYSTEM_USAGE_HISTORY = booleanPreferencesKey("prefer_system_usage_history")
         val ONBOARDING_STATS_COMPLETED = booleanPreferencesKey("onboarding_stats_completed")
         val ONBOARDING_UPDATE_COMPLETED = booleanPreferencesKey("onboarding_update_completed")
-        val WHITELIST_INITIALIZED = booleanPreferencesKey("whitelist_initialized")
         val HUD_HIDE_FEATURE_LEARNED = booleanPreferencesKey("hud_hide_feature_learned")
         val SMART_REPAIR_ON_REFRESH = booleanPreferencesKey("smart_repair_on_refresh")
         val ALLOW_REPAIR_NON_UNAVAILABLE = booleanPreferencesKey("allow_repair_non_unavailable")
-        val SHORTS_SCREEN_TIME_MS = longPreferencesKey("shorts_screen_time_ms")
         val CUSTOM_DELAY_ENABLED = booleanPreferencesKey("custom_delay_enabled")
         val DELAY_POWER_SAVE = longPreferencesKey("delay_power_save")
         val DELAY_OVERLAY_SHOWING = longPreferencesKey("delay_overlay_showing")
@@ -112,8 +100,6 @@ class UserPreferencesRepository(private val context: Context) {
         val REFRESH_ON_OPEN_USAGE_STATS = booleanPreferencesKey("refresh_on_open_usage_stats")
         val CHECK_UPDATE_ON_START = booleanPreferencesKey("check_update_on_start")
         val BATTERY_STATS_RESET_ENABLED = booleanPreferencesKey("battery_stats_reset_enabled")
-        val LAST_CHARGE_TIMESTAMP = longPreferencesKey("last_charge_timestamp")
-        val MANUAL_RESET_TIMESTAMPS = stringPreferencesKey("manual_reset_timestamps")
 
         val GS_FLEX_PRESET = stringPreferencesKey("gs_flex_preset")
         val GS_D_WGHT = floatPreferencesKey("gs_d_wght")
@@ -134,117 +120,135 @@ class UserPreferencesRepository(private val context: Context) {
         val GS_B_GRAD = floatPreferencesKey("gs_b_grad")
         val GS_B_SLNT = floatPreferencesKey("gs_b_slnt")
         val GS_B_ROND = floatPreferencesKey("gs_b_rond")
+    }
+
+    private object RuntimeKeys {
+        val LAST_RESET_DATE = stringPreferencesKey("last_reset_date")
+        val LAST_STREAK_CHECK_DATE = stringPreferencesKey("last_streak_check_date")
+        val GLOBAL_CURRENT_STREAK = intPreferencesKey("global_current_streak")
+        val GLOBAL_BEST_STREAK = intPreferencesKey("global_best_streak")
+        val GLOBAL_LAST_STREAK_UPDATE_TIMESTAMP = longPreferencesKey("global_last_streak_update_timestamp")
+        val LAST_BACKUP_TIMESTAMP = longPreferencesKey("last_backup_timestamp")
+        val LAST_KNOWN_DAILY_USAGE = longPreferencesKey("last_known_daily_usage")
+        val LAST_KNOWN_DAILY_USAGE_DATE = stringPreferencesKey("last_known_daily_usage_date")
+        val BEDTIME_CURRENT_STREAK = intPreferencesKey("bedtime_mode_streak_current")
+        val BEDTIME_BEST_STREAK = intPreferencesKey("bedtime_mode_streak_best")
+        val BEDTIME_STREAK_RESET_DATE = stringPreferencesKey("bedtime_streak_reset_date")
+        val LAST_SYNC_TIMESTAMP = longPreferencesKey("last_sync_timestamp")
+        val WHITELIST_INITIALIZED = booleanPreferencesKey("whitelist_initialized")
+        val SHORTS_SCREEN_TIME_MS = longPreferencesKey("shorts_screen_time_ms")
+        val LAST_CHARGE_TIMESTAMP = longPreferencesKey("last_charge_timestamp")
+        val MANUAL_RESET_TIMESTAMPS = stringPreferencesKey("manual_reset_timestamps")
         val STREAK_RECOVERY_PERFORMED = booleanPreferencesKey("streak_recovery_performed")
     }
 
-    val userPreferencesFlow: Flow<UserPreferences> = context.dataStore.data
-        .catch { exception ->
-            if (exception is IOException) emit(emptyPreferences()) else throw exception
-        }
-        .map { preferences ->
-            UserPreferences(
-                themeConfig = ThemeConfig.valueOf(preferences[PreferencesKeys.THEME_CONFIG] ?: ThemeConfig.FOLLOW_SYSTEM.name),
-                fontOption = FontOption.valueOf(preferences[PreferencesKeys.FONT_OPTION] ?: FontOption.GOOGLE_SANS_FLEX.name),
-                dynamicColor = preferences[PreferencesKeys.DYNAMIC_COLOR] ?: true,
-                accessibilityDisabled = preferences[PreferencesKeys.ACCESSIBILITY_DISABLED] ?: false,
-                screenTimeTargetMinutes = preferences[PreferencesKeys.SCREEN_TIME_TARGET] ?: 0,
-                emergencyRechargeDurationMinutes = preferences[PreferencesKeys.EMERGENCY_RECHARGE_DURATION_MINUTES] ?: 60,
-                delayAppDurationSeconds = preferences[PreferencesKeys.DELAY_APP_DURATION_SECONDS] ?: 30,
-                sessionUsageOverlayEnabled = preferences[PreferencesKeys.SESSION_USAGE_OVERLAY_ENABLED] ?: false,
-                sessionUsageOverlaySize = preferences[PreferencesKeys.SESSION_USAGE_OVERLAY_SIZE] ?: 100,
-                sessionUsageOverlayOpacity = preferences[PreferencesKeys.SESSION_USAGE_OVERLAY_OPACITY] ?: 90,
-                whitelistedPackages = preferences[PreferencesKeys.WHITELISTED_PACKAGES]?.split(",")?.filter { it.isNotEmpty() }?.toSet() ?: emptySet(),
-                lastResetDate = preferences[PreferencesKeys.LAST_RESET_DATE] ?: "",
-                lastStreakCheckDate = preferences[PreferencesKeys.LAST_STREAK_CHECK_DATE] ?: "",
-                globalCurrentStreak = preferences[PreferencesKeys.GLOBAL_CURRENT_STREAK] ?: 0,
-                globalBestStreak = preferences[PreferencesKeys.GLOBAL_BEST_STREAK] ?: 0,
-                globalLastStreakUpdateTimestamp = preferences[PreferencesKeys.GLOBAL_LAST_STREAK_UPDATE_TIMESTAMP] ?: 0L,
-                autoBackupEnabled = preferences[PreferencesKeys.AUTO_BACKUP_ENABLED] ?: false,
-                backupDirectoryUri = preferences[PreferencesKeys.BACKUP_DIRECTORY_URI] ?: "",
-                backupIntervalHours = preferences[PreferencesKeys.BACKUP_INTERVAL_HOURS] ?: 3,
-                lastBackupTimestamp = preferences[PreferencesKeys.LAST_BACKUP_TIMESTAMP] ?: 0L,
-                floatingTabBarEnabled = preferences[PreferencesKeys.FLOATING_TAB_BAR_ENABLED] ?: false,
-                expressiveColors = preferences[PreferencesKeys.EXPRESSIVE_COLORS] ?: false,
-                totalUsagePillEnabled = preferences[PreferencesKeys.TOTAL_USAGE_PILL_ENABLED] ?: false,
-                lastKnownDailyUsage = preferences[PreferencesKeys.LAST_KNOWN_DAILY_USAGE] ?: 0L,
-                lastKnownDailyUsageDate = preferences[PreferencesKeys.LAST_KNOWN_DAILY_USAGE_DATE] ?: "",
-                bedtimeEnabled = preferences[PreferencesKeys.BEDTIME_ENABLED] ?: false,
-                bedtimeStartTime = preferences[PreferencesKeys.BEDTIME_START_TIME] ?: "22:00",
-                bedtimeEndTime = preferences[PreferencesKeys.BEDTIME_END_TIME] ?: "07:00",
-                bedtimeDays = preferences[PreferencesKeys.BEDTIME_DAYS]?.split(",")?.filter { it.isNotEmpty() }?.map { it.toInt() }?.toSet() ?: setOf(1, 2, 3, 4, 5, 6, 7),
-                bedtimeDndEnabled = preferences[PreferencesKeys.BEDTIME_DND_ENABLED] ?: false,
-                bedtimeWindDownEnabled = preferences[PreferencesKeys.BEDTIME_WIND_DOWN_ENABLED] ?: false,
-                bedtimeNotificationEnabled = preferences[PreferencesKeys.BEDTIME_NOTIFICATION_ENABLED] ?: true,
-                bedtimeWhitelistedPackages = preferences[PreferencesKeys.BEDTIME_WHITELISTED_PACKAGES]?.split(",")?.filter { it.isNotEmpty() }?.toSet() ?: emptySet(),
-                bedtimeCurrentStreak = preferences[PreferencesKeys.BEDTIME_CURRENT_STREAK] ?: 0,
-                bedtimeBestStreak = preferences[PreferencesKeys.BEDTIME_BEST_STREAK] ?: 0,
-                bedtimeStreakResetDate = preferences[PreferencesKeys.BEDTIME_STREAK_RESET_DATE] ?: "",
-                userName = preferences[PreferencesKeys.USER_NAME] ?: "User",
-                earlyKickEnabled = preferences[PreferencesKeys.EARLY_KICK_ENABLED] ?: false,
-                interceptAudioFocusEnabled = preferences[PreferencesKeys.INTERCEPT_AUDIO_FOCUS_ENABLED] ?: true,
-                showDatabaseIndicator = preferences[PreferencesKeys.SHOW_DATABASE_INDICATOR] ?: false,
-                developerModeEnabled = preferences[PreferencesKeys.DEVELOPER_MODE_ENABLED] ?: false,
-                lastSyncTimestamp = preferences[PreferencesKeys.LAST_SYNC_TIMESTAMP] ?: 0L,
-                preferSystemUsageHistory = preferences[PreferencesKeys.PREFER_SYSTEM_USAGE_HISTORY] ?: true,
-                onboardingStatsCompleted = preferences[PreferencesKeys.ONBOARDING_STATS_COMPLETED] ?: false,
-                onboardingUpdateCompleted = preferences[PreferencesKeys.ONBOARDING_UPDATE_COMPLETED] ?: false,
-                whitelistInitialized = preferences[PreferencesKeys.WHITELIST_INITIALIZED] ?: false,
-                hudHideFeatureLearned = preferences[PreferencesKeys.HUD_HIDE_FEATURE_LEARNED] ?: false,
-                smartRepairOnRefresh = preferences[PreferencesKeys.SMART_REPAIR_ON_REFRESH] ?: false,
-                allowRepairNonUnavailable = preferences[PreferencesKeys.ALLOW_REPAIR_NON_UNAVAILABLE] ?: false,
-                shortsScreenTimeMs = preferences[PreferencesKeys.SHORTS_SCREEN_TIME_MS] ?: 0L,
-                customDelayEnabled = preferences[PreferencesKeys.CUSTOM_DELAY_ENABLED] ?: false,
-                delayPowerSave = preferences[PreferencesKeys.DELAY_POWER_SAVE] ?: 5000L,
-                delayOverlayShowing = preferences[PreferencesKeys.DELAY_OVERLAY_SHOWING] ?: 8000L,
-                delayGoalNear = preferences[PreferencesKeys.DELAY_GOAL_NEAR] ?: 600L,
-                delayGoalMid = preferences[PreferencesKeys.DELAY_GOAL_MID] ?: 1200L,
-                delayGoalFar = preferences[PreferencesKeys.DELAY_GOAL_FAR] ?: 1800L,
-                delayShieldVeryFar = preferences[PreferencesKeys.DELAY_SHIELD_VERY_FAR] ?: 5000L,
-                delayShieldFar = preferences[PreferencesKeys.DELAY_SHIELD_FAR] ?: 3000L,
-                delayShieldMid = preferences[PreferencesKeys.DELAY_SHIELD_MID] ?: 1500L,
-                delayShieldNear = preferences[PreferencesKeys.DELAY_SHIELD_NEAR] ?: 600L,
-                delayDefault = preferences[PreferencesKeys.DELAY_DEFAULT] ?: 1200L,
-                mindfulGatewayEnabled = preferences[PreferencesKeys.MINDFUL_GATEWAY_ENABLED] ?: false,
-                refreshOnOpenUsageStats = preferences[PreferencesKeys.REFRESH_ON_OPEN_USAGE_STATS] ?: false,
-                checkUpdateOnStart = preferences[PreferencesKeys.CHECK_UPDATE_ON_START] ?: false,
-                batteryStatsResetEnabled = preferences[PreferencesKeys.BATTERY_STATS_RESET_ENABLED] ?: false,
-                lastChargeTimestamp = preferences[PreferencesKeys.LAST_CHARGE_TIMESTAMP] ?: 0L,
-                manualResetTimestamps = preferences[PreferencesKeys.MANUAL_RESET_TIMESTAMPS]?.split(",")
-                    ?.filter { it.contains(":") }
-                    ?.associate { 
-                        val parts = it.split(":")
-                        parts[0] to (parts[1].toLongOrNull() ?: 0L)
-                    } ?: emptyMap(),
-                gsFlexSettings = GSFlexSettings(
-                    preset = GSFlexPreset.valueOf(preferences[PreferencesKeys.GS_FLEX_PRESET] ?: GSFlexPreset.ZENITH.name),
-                    display = FontAxes(
-                        weight = preferences[PreferencesKeys.GS_D_WGHT] ?: 400f,
-                        width = preferences[PreferencesKeys.GS_D_WDTH] ?: 100f,
-                        opsz = preferences[PreferencesKeys.GS_D_OPSZ] ?: 72f,
-                        grade = preferences[PreferencesKeys.GS_D_GRAD] ?: 0f,
-                        slant = preferences[PreferencesKeys.GS_D_SLNT] ?: 0f,
-                        roundness = preferences[PreferencesKeys.GS_D_ROND] ?: 0f
-                    ),
-                    headline = FontAxes(
-                        weight = preferences[PreferencesKeys.GS_H_WGHT] ?: 400f,
-                        width = preferences[PreferencesKeys.GS_H_WDTH] ?: 100f,
-                        opsz = preferences[PreferencesKeys.GS_H_OPSZ] ?: 32f,
-                        grade = preferences[PreferencesKeys.GS_H_GRAD] ?: 0f,
-                        slant = preferences[PreferencesKeys.GS_H_SLNT] ?: 0f,
-                        roundness = preferences[PreferencesKeys.GS_H_ROND] ?: 0f
-                    ),
-                    body = FontAxes(
-                        weight = preferences[PreferencesKeys.GS_B_WGHT] ?: 400f,
-                        width = preferences[PreferencesKeys.GS_B_WDTH] ?: 100f,
-                        opsz = preferences[PreferencesKeys.GS_B_OPSZ] ?: 16f,
-                        grade = preferences[PreferencesKeys.GS_B_GRAD] ?: 0f,
-                        slant = preferences[PreferencesKeys.GS_B_SLNT] ?: 0f,
-                        roundness = preferences[PreferencesKeys.GS_B_ROND] ?: 0f
-                    ),
+    val userPreferencesFlow: Flow<UserPreferences> = combine(
+        context.dataStore.data.catch { exception -> if (exception is IOException) emit(emptyPreferences()) else throw exception },
+        context.runtimeDataStore.data.catch { exception -> if (exception is IOException) emit(emptyPreferences()) else throw exception }
+    ) { settings, runtime ->
+        UserPreferences(
+            themeConfig = ThemeConfig.valueOf(settings[PreferencesKeys.THEME_CONFIG] ?: ThemeConfig.FOLLOW_SYSTEM.name),
+            fontOption = FontOption.valueOf(settings[PreferencesKeys.FONT_OPTION] ?: FontOption.GOOGLE_SANS_FLEX.name),
+            dynamicColor = settings[PreferencesKeys.DYNAMIC_COLOR] ?: true,
+            accessibilityDisabled = settings[PreferencesKeys.ACCESSIBILITY_DISABLED] ?: false,
+            screenTimeTargetMinutes = settings[PreferencesKeys.SCREEN_TIME_TARGET] ?: 0,
+            emergencyRechargeDurationMinutes = settings[PreferencesKeys.EMERGENCY_RECHARGE_DURATION_MINUTES] ?: 60,
+            delayAppDurationSeconds = settings[PreferencesKeys.DELAY_APP_DURATION_SECONDS] ?: 30,
+            sessionUsageOverlayEnabled = settings[PreferencesKeys.SESSION_USAGE_OVERLAY_ENABLED] ?: false,
+            sessionUsageOverlaySize = settings[PreferencesKeys.SESSION_USAGE_OVERLAY_SIZE] ?: 100,
+            sessionUsageOverlayOpacity = settings[PreferencesKeys.SESSION_USAGE_OVERLAY_OPACITY] ?: 90,
+            whitelistedPackages = settings[PreferencesKeys.WHITELISTED_PACKAGES]?.split(",")?.filter { it.isNotEmpty() }?.toSet() ?: emptySet(),
+            lastResetDate = runtime[RuntimeKeys.LAST_RESET_DATE] ?: "",
+            lastStreakCheckDate = runtime[RuntimeKeys.LAST_STREAK_CHECK_DATE] ?: "",
+            globalCurrentStreak = runtime[RuntimeKeys.GLOBAL_CURRENT_STREAK] ?: 0,
+            globalBestStreak = runtime[RuntimeKeys.GLOBAL_BEST_STREAK] ?: 0,
+            globalLastStreakUpdateTimestamp = runtime[RuntimeKeys.GLOBAL_LAST_STREAK_UPDATE_TIMESTAMP] ?: 0L,
+            autoBackupEnabled = settings[PreferencesKeys.AUTO_BACKUP_ENABLED] ?: false,
+            backupDirectoryUri = settings[PreferencesKeys.BACKUP_DIRECTORY_URI] ?: "",
+            backupIntervalHours = settings[PreferencesKeys.BACKUP_INTERVAL_HOURS] ?: 3,
+            lastBackupTimestamp = runtime[RuntimeKeys.LAST_BACKUP_TIMESTAMP] ?: 0L,
+            floatingTabBarEnabled = settings[PreferencesKeys.FLOATING_TAB_BAR_ENABLED] ?: false,
+            expressiveColors = settings[PreferencesKeys.EXPRESSIVE_COLORS] ?: false,
+            totalUsagePillEnabled = settings[PreferencesKeys.TOTAL_USAGE_PILL_ENABLED] ?: false,
+            lastKnownDailyUsage = runtime[RuntimeKeys.LAST_KNOWN_DAILY_USAGE] ?: 0L,
+            lastKnownDailyUsageDate = runtime[RuntimeKeys.LAST_KNOWN_DAILY_USAGE_DATE] ?: "",
+            bedtimeEnabled = settings[PreferencesKeys.BEDTIME_ENABLED] ?: false,
+            bedtimeStartTime = settings[PreferencesKeys.BEDTIME_START_TIME] ?: "22:00",
+            bedtimeEndTime = settings[PreferencesKeys.BEDTIME_END_TIME] ?: "07:00",
+            bedtimeDays = settings[PreferencesKeys.BEDTIME_DAYS]?.split(",")?.filter { it.isNotEmpty() }?.map { it.toInt() }?.toSet() ?: setOf(1, 2, 3, 4, 5, 6, 7),
+            bedtimeDndEnabled = settings[PreferencesKeys.BEDTIME_DND_ENABLED] ?: false,
+            bedtimeWindDownEnabled = settings[PreferencesKeys.BEDTIME_WIND_DOWN_ENABLED] ?: false,
+            bedtimeNotificationEnabled = settings[PreferencesKeys.BEDTIME_NOTIFICATION_ENABLED] ?: true,
+            bedtimeWhitelistedPackages = settings[PreferencesKeys.BEDTIME_WHITELISTED_PACKAGES]?.split(",")?.filter { it.isNotEmpty() }?.toSet() ?: emptySet(),
+            bedtimeCurrentStreak = runtime[RuntimeKeys.BEDTIME_CURRENT_STREAK] ?: 0,
+            bedtimeBestStreak = runtime[RuntimeKeys.BEDTIME_BEST_STREAK] ?: 0,
+            bedtimeStreakResetDate = runtime[RuntimeKeys.BEDTIME_STREAK_RESET_DATE] ?: "",
+            userName = settings[PreferencesKeys.USER_NAME] ?: "User",
+            earlyKickEnabled = settings[PreferencesKeys.EARLY_KICK_ENABLED] ?: false,
+            interceptAudioFocusEnabled = settings[PreferencesKeys.INTERCEPT_AUDIO_FOCUS_ENABLED] ?: true,
+            showDatabaseIndicator = settings[PreferencesKeys.SHOW_DATABASE_INDICATOR] ?: false,
+            developerModeEnabled = settings[PreferencesKeys.DEVELOPER_MODE_ENABLED] ?: false,
+            lastSyncTimestamp = runtime[RuntimeKeys.LAST_SYNC_TIMESTAMP] ?: 0L,
+            preferSystemUsageHistory = settings[PreferencesKeys.PREFER_SYSTEM_USAGE_HISTORY] ?: true,
+            onboardingStatsCompleted = settings[PreferencesKeys.ONBOARDING_STATS_COMPLETED] ?: false,
+            onboardingUpdateCompleted = settings[PreferencesKeys.ONBOARDING_UPDATE_COMPLETED] ?: false,
+            whitelistInitialized = runtime[RuntimeKeys.WHITELIST_INITIALIZED] ?: false,
+            hudHideFeatureLearned = settings[PreferencesKeys.HUD_HIDE_FEATURE_LEARNED] ?: false,
+            smartRepairOnRefresh = settings[PreferencesKeys.SMART_REPAIR_ON_REFRESH] ?: false,
+            allowRepairNonUnavailable = settings[PreferencesKeys.ALLOW_REPAIR_NON_UNAVAILABLE] ?: false,
+            shortsScreenTimeMs = runtime[RuntimeKeys.SHORTS_SCREEN_TIME_MS] ?: 0L,
+            customDelayEnabled = settings[PreferencesKeys.CUSTOM_DELAY_ENABLED] ?: false,
+            delayPowerSave = settings[PreferencesKeys.DELAY_POWER_SAVE] ?: 5000L,
+            delayOverlayShowing = settings[PreferencesKeys.DELAY_OVERLAY_SHOWING] ?: 8000L,
+            delayGoalNear = settings[PreferencesKeys.DELAY_GOAL_NEAR] ?: 600L,
+            delayGoalMid = settings[PreferencesKeys.DELAY_GOAL_MID] ?: 1200L,
+            delayGoalFar = settings[PreferencesKeys.DELAY_GOAL_FAR] ?: 1800L,
+            delayShieldVeryFar = settings[PreferencesKeys.DELAY_SHIELD_VERY_FAR] ?: 5000L,
+            delayShieldFar = settings[PreferencesKeys.DELAY_SHIELD_FAR] ?: 3000L,
+            delayShieldMid = settings[PreferencesKeys.DELAY_SHIELD_MID] ?: 1500L,
+            delayShieldNear = settings[PreferencesKeys.DELAY_SHIELD_NEAR] ?: 600L,
+            delayDefault = settings[PreferencesKeys.DELAY_DEFAULT] ?: 1200L,
+            mindfulGatewayEnabled = settings[PreferencesKeys.MINDFUL_GATEWAY_ENABLED] ?: false,
+            refreshOnOpenUsageStats = settings[PreferencesKeys.REFRESH_ON_OPEN_USAGE_STATS] ?: false,
+            checkUpdateOnStart = settings[PreferencesKeys.CHECK_UPDATE_ON_START] ?: false,
+            batteryStatsResetEnabled = settings[PreferencesKeys.BATTERY_STATS_RESET_ENABLED] ?: false,
+            lastChargeTimestamp = runtime[RuntimeKeys.LAST_CHARGE_TIMESTAMP] ?: 0L,
+            manualResetTimestamps = runtime[RuntimeKeys.MANUAL_RESET_TIMESTAMPS]?.split(",")
+                ?.filter { it.contains(":") }
+                ?.associate { 
+                    val parts = it.split(":")
+                    parts[0] to (parts[1].toLongOrNull() ?: 0L)
+                } ?: emptyMap(),
+            gsFlexSettings = GSFlexSettings(
+                preset = GSFlexPreset.valueOf(settings[PreferencesKeys.GS_FLEX_PRESET] ?: GSFlexPreset.ZENITH.name),
+                display = FontAxes(
+                    weight = settings[PreferencesKeys.GS_D_WGHT] ?: 400f,
+                    width = settings[PreferencesKeys.GS_D_WDTH] ?: 100f,
+                    opsz = settings[PreferencesKeys.GS_D_OPSZ] ?: 72f,
+                    grade = settings[PreferencesKeys.GS_D_GRAD] ?: 0f,
+                    slant = settings[PreferencesKeys.GS_D_SLNT] ?: 0f,
+                    roundness = settings[PreferencesKeys.GS_D_ROND] ?: 0f
                 ),
-                streakRecoveryPerformed = preferences[PreferencesKeys.STREAK_RECOVERY_PERFORMED] ?: false
-            )
-        }
+                headline = FontAxes(
+                    weight = settings[PreferencesKeys.GS_H_WGHT] ?: 400f,
+                    width = settings[PreferencesKeys.GS_H_WDTH] ?: 100f,
+                    opsz = settings[PreferencesKeys.GS_H_OPSZ] ?: 32f,
+                    grade = settings[PreferencesKeys.GS_H_GRAD] ?: 0f,
+                    slant = settings[PreferencesKeys.GS_H_SLNT] ?: 0f,
+                    roundness = settings[PreferencesKeys.GS_H_ROND] ?: 0f
+                ),
+                body = FontAxes(
+                    weight = settings[PreferencesKeys.GS_B_WGHT] ?: 400f,
+                    width = settings[PreferencesKeys.GS_B_WDTH] ?: 100f,
+                    opsz = settings[PreferencesKeys.GS_B_OPSZ] ?: 16f,
+                    grade = settings[PreferencesKeys.GS_B_GRAD] ?: 0f,
+                    slant = settings[PreferencesKeys.GS_B_SLNT] ?: 0f,
+                    roundness = settings[PreferencesKeys.GS_B_ROND] ?: 0f
+                ),
+            ),
+            streakRecoveryPerformed = runtime[RuntimeKeys.STREAK_RECOVERY_PERFORMED] ?: false
+        )
+    }
 
 
     suspend fun setUserName(name: String) {
@@ -268,10 +272,14 @@ class UserPreferencesRepository(private val context: Context) {
     }
 
     suspend fun setScreenTimeTarget(minutes: Int) {
+        val currentTarget = userPreferencesFlow.first().screenTimeTargetMinutes
         context.dataStore.edit { preferences ->
-            val currentTarget = preferences[PreferencesKeys.SCREEN_TIME_TARGET] ?: 0
-            if (minutes > currentTarget && currentTarget > 0) preferences[PreferencesKeys.GLOBAL_CURRENT_STREAK] = 0
             preferences[PreferencesKeys.SCREEN_TIME_TARGET] = minutes
+        }
+        if (minutes > currentTarget && currentTarget > 0) {
+            context.runtimeDataStore.edit { preferences ->
+                preferences[RuntimeKeys.GLOBAL_CURRENT_STREAK] = 0
+            }
         }
     }
 
@@ -335,26 +343,26 @@ class UserPreferencesRepository(private val context: Context) {
                     setWhitelistedPackages(systemApps)
                 }
 
-                context.dataStore.edit { preferences ->
-                    preferences[PreferencesKeys.WHITELIST_INITIALIZED] = true
+                context.runtimeDataStore.edit { preferences ->
+                    preferences[RuntimeKeys.WHITELIST_INITIALIZED] = true
                 }
             }
         }
     }
 
     suspend fun setLastResetDate(date: String) {
-        context.dataStore.edit { preferences -> preferences[PreferencesKeys.LAST_RESET_DATE] = date }
+        context.runtimeDataStore.edit { preferences -> preferences[RuntimeKeys.LAST_RESET_DATE] = date }
     }
 
     suspend fun setLastStreakCheckDate(date: String) {
-        context.dataStore.edit { preferences -> preferences[PreferencesKeys.LAST_STREAK_CHECK_DATE] = date }
+        context.runtimeDataStore.edit { preferences -> preferences[RuntimeKeys.LAST_STREAK_CHECK_DATE] = date }
     }
 
     suspend fun updateGlobalStreak(current: Int, best: Int, timestamp: Long) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.GLOBAL_CURRENT_STREAK] = current
-            preferences[PreferencesKeys.GLOBAL_BEST_STREAK] = best
-            preferences[PreferencesKeys.GLOBAL_LAST_STREAK_UPDATE_TIMESTAMP] = timestamp
+        context.runtimeDataStore.edit { preferences ->
+            preferences[RuntimeKeys.GLOBAL_CURRENT_STREAK] = current
+            preferences[RuntimeKeys.GLOBAL_BEST_STREAK] = best
+            preferences[RuntimeKeys.GLOBAL_LAST_STREAK_UPDATE_TIMESTAMP] = timestamp
         }
     }
 
@@ -733,7 +741,7 @@ class UserPreferencesRepository(private val context: Context) {
     }
 
     suspend fun setLastBackupTimestamp(timestamp: Long) {
-        context.dataStore.edit { preferences -> preferences[PreferencesKeys.LAST_BACKUP_TIMESTAMP] = timestamp }
+        context.runtimeDataStore.edit { preferences -> preferences[RuntimeKeys.LAST_BACKUP_TIMESTAMP] = timestamp }
     }
 
     suspend fun setFloatingTabBarEnabled(enabled: Boolean) {
@@ -749,7 +757,7 @@ class UserPreferencesRepository(private val context: Context) {
     }
 
     suspend fun setLastKnownDailyUsage(usage: Long, date: String) {
-        context.dataStore.edit { preferences -> preferences[PreferencesKeys.LAST_KNOWN_DAILY_USAGE] = usage; preferences[PreferencesKeys.LAST_KNOWN_DAILY_USAGE_DATE] = date }
+        context.runtimeDataStore.edit { preferences -> preferences[RuntimeKeys.LAST_KNOWN_DAILY_USAGE] = usage; preferences[RuntimeKeys.LAST_KNOWN_DAILY_USAGE_DATE] = date }
     }
 
     suspend fun setBedtimeEnabled(enabled: Boolean) {
@@ -785,18 +793,18 @@ class UserPreferencesRepository(private val context: Context) {
     }
 
     suspend fun updateBedtimeStreak(current: Int, best: Int) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.BEDTIME_CURRENT_STREAK] = current
-            preferences[PreferencesKeys.BEDTIME_BEST_STREAK] = best
+        context.runtimeDataStore.edit { preferences ->
+            preferences[RuntimeKeys.BEDTIME_CURRENT_STREAK] = current
+            preferences[RuntimeKeys.BEDTIME_BEST_STREAK] = best
         }
     }
 
     suspend fun resetBedtimeStreak() {
         val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(System.currentTimeMillis())
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.BEDTIME_CURRENT_STREAK] = 0
-            preferences[PreferencesKeys.BEDTIME_BEST_STREAK] = 0
-            preferences[PreferencesKeys.BEDTIME_STREAK_RESET_DATE] = today
+        context.runtimeDataStore.edit { preferences ->
+            preferences[RuntimeKeys.BEDTIME_CURRENT_STREAK] = 0
+            preferences[RuntimeKeys.BEDTIME_BEST_STREAK] = 0
+            preferences[RuntimeKeys.BEDTIME_STREAK_RESET_DATE] = today
         }
     }
 
@@ -817,7 +825,7 @@ class UserPreferencesRepository(private val context: Context) {
     }
 
     suspend fun setLastSyncTimestamp(timestamp: Long) {
-        context.dataStore.edit { preferences -> preferences[PreferencesKeys.LAST_SYNC_TIMESTAMP] = timestamp }
+        context.runtimeDataStore.edit { preferences -> preferences[RuntimeKeys.LAST_SYNC_TIMESTAMP] = timestamp }
     }
 
     suspend fun setPreferSystemUsageHistory(enabled: Boolean) {
@@ -845,7 +853,7 @@ class UserPreferencesRepository(private val context: Context) {
     }
 
     suspend fun setShortsScreenTimeMs(ms: Long) {
-        context.dataStore.edit { preferences -> preferences[PreferencesKeys.SHORTS_SCREEN_TIME_MS] = ms }
+        context.runtimeDataStore.edit { preferences -> preferences[RuntimeKeys.SHORTS_SCREEN_TIME_MS] = ms }
     }
 
     suspend fun setCustomDelayEnabled(enabled: Boolean) {
@@ -909,12 +917,12 @@ class UserPreferencesRepository(private val context: Context) {
     }
 
     suspend fun updateLastChargeTimestamp(timestamp: Long) {
-        context.dataStore.edit { preferences -> preferences[PreferencesKeys.LAST_CHARGE_TIMESTAMP] = timestamp }
+        context.runtimeDataStore.edit { preferences -> preferences[RuntimeKeys.LAST_CHARGE_TIMESTAMP] = timestamp }
     }
 
     suspend fun resetAppStats(packageName: String) {
-        context.dataStore.edit { preferences ->
-            val currentMap = preferences[PreferencesKeys.MANUAL_RESET_TIMESTAMPS]?.split(",")
+        context.runtimeDataStore.edit { preferences ->
+            val currentMap = preferences[RuntimeKeys.MANUAL_RESET_TIMESTAMPS]?.split(",")
                 ?.filter { it.contains(":") }
                 ?.associate { 
                     val parts = it.split(":")
@@ -922,7 +930,7 @@ class UserPreferencesRepository(private val context: Context) {
                 }                ?.toMutableMap() ?: hashMapOf()
             
             currentMap[packageName] = System.currentTimeMillis().toString()
-            preferences[PreferencesKeys.MANUAL_RESET_TIMESTAMPS] = currentMap.entries.joinToString(",") { "${it.key}:${it.value}" }
+            preferences[RuntimeKeys.MANUAL_RESET_TIMESTAMPS] = currentMap.entries.joinToString(",") { "${it.key}:${it.value}" }
         }
     }
 
@@ -1058,7 +1066,7 @@ class UserPreferencesRepository(private val context: Context) {
     }
 
     suspend fun setStreakRecoveryPerformed(performed: Boolean) {
-        context.dataStore.edit { preferences -> preferences[PreferencesKeys.STREAK_RECOVERY_PERFORMED] = performed }
+        context.runtimeDataStore.edit { preferences -> preferences[RuntimeKeys.STREAK_RECOVERY_PERFORMED] = performed }
     }
 
     private fun fetchSystemTotalUsageForDate(

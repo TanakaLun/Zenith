@@ -28,6 +28,7 @@ class UsageSyncWorker(
         fun enqueue(context: Context) {
             val constraints = Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
+                .setRequiresBatteryNotLow(true)
                 .build()
 
             val request = PeriodicWorkRequestBuilder<UsageSyncWorker>(60, TimeUnit.MINUTES)

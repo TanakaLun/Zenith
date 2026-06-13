@@ -26,7 +26,7 @@ class AppIconFetcher(
         return DrawableResult(
             drawable = icon,
             isSampled = false,
-            dataSource = DataSource.DISK
+            dataSource = DataSource.MEMORY_CACHE
         )
     }
 

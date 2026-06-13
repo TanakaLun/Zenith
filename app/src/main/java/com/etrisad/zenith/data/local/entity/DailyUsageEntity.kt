@@ -8,7 +8,10 @@ import androidx.room.PrimaryKey
 @Keep
 @Entity(
     tableName = "daily_usage",
-    indices = [Index(value = ["date", "packageName"], unique = true)]
+    indices = [
+        Index(value = ["date", "packageName"], unique = true),
+        Index(value = ["date"])
+    ]
 )
 data class DailyUsageEntity(
     @PrimaryKey(autoGenerate = true)

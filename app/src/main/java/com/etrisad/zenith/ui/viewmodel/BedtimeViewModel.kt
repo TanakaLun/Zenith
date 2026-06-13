@@ -73,15 +73,19 @@ class BedtimeViewModel(
     }
 
     private suspend fun getLauncherInfo(): Pair<Set<String>, String?> = withContext(Dispatchers.IO) {
-        val pm = context.packageManager
-        val apps = pm.queryIntentActivities(
-            Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0
-        ).map { it.activityInfo.packageName }.toSet()
-        
-        val launcherIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
-        val launcherPackage = pm.resolveActivity(launcherIntent, PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName
-        
-        apps to launcherPackage
+        try {
+            val pm = context.packageManager
+            val apps = pm.queryIntentActivities(
+                Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0
+            ).map { it.activityInfo.packageName }.toSet()
+            
+            val launcherIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+            val launcherPackage = pm.resolveActivity(launcherIntent, PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName
+            
+            apps to launcherPackage
+        } catch (_: Exception) {
+            emptySet<String>() to null
+        }
     }
 
     fun loadHourlyUsage() {

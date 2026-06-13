@@ -227,12 +227,6 @@ class DailyUsageWorker(context: Context, params: WorkerParameters) : CoroutineWo
         usagesToInsert.add(DailyUsageEntity(date = dateString, packageName = "OTHER_TOTAL", usageTimeMillis = (totalUsage - (sUsage + gUsage)).coerceAtLeast(0L)))
 
         dailyUsageDao.insertAll(usagesToInsert)
-        
-        try {
-            val app = applicationContext as com.etrisad.zenith.ZenithApplication
-            val syncManager = UsageSyncManager(applicationContext, app.shieldRepository, app.userPreferencesRepository)
-            syncManager.syncUsageData()
-        } catch (_: Exception) {}
 
         if (!isBackup) {
             sendDataSavedNotification()

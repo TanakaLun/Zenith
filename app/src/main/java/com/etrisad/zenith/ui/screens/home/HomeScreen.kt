@@ -99,9 +99,7 @@ fun HomeScreen(
     onBedtimeClick: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val preferences by userPreferencesRepository.userPreferencesFlow.collectAsState(
-        initial = com.etrisad.zenith.data.preferences.UserPreferences()
-    )
+    val preferences by viewModel.homeScreenPreferences.collectAsState()
 
     val coroutineScope = rememberCoroutineScope()
 
@@ -154,13 +152,6 @@ fun HomeScreenContent(
     val pullToRefreshState = rememberPullToRefreshState()
     var isManualRefreshing by remember { mutableStateOf(false) }
 
-    val nowMillis by produceState(initialValue = System.currentTimeMillis()) {
-        while (true) {
-            delay(60000)
-            value = System.currentTimeMillis()
-        }
-    }
-
     LaunchedEffect(uiState.isLoading) {
         if (!uiState.isLoading) isManualRefreshing = false
     }
@@ -212,7 +203,7 @@ fun HomeScreenContent(
                 bottom = 150.dp
             )
         ) {
-            item {
+            item(key = "usage_dashboard") {
                 UsageDashboard(
                     totalScreenTime = uiState.totalScreenTime,
                     globalCurrentStreak = uiState.globalCurrentStreak,
@@ -224,7 +215,7 @@ fun HomeScreenContent(
                 Spacer(modifier = Modifier.height(4.dp))
             }
 
-            item {
+            item(key = "usage_trends") {
                 UsageTrendsRow(
                     yesterdayScreenTime = uiState.yesterdayScreenTime,
                     percentageChange = uiState.percentageChange,
@@ -233,7 +224,7 @@ fun HomeScreenContent(
                 Spacer(modifier = Modifier.height(4.dp))
             }
 
-            item {
+            item(key = "data_warning") {
                 val selectedUsage = remember(uiState.dailyUsageHistory, uiState.selectedDateMillis) {
                     uiState.dailyUsageHistory.find { it.date == uiState.selectedDateMillis }
                 }
@@ -327,7 +318,7 @@ fun HomeScreenContent(
                 }
             }
 
-            item {
+            item(key = "usage_history") {
                 UsageHistoryCard(
                     history = uiState.dailyUsageHistory,
                     targetMillis = targetMillis,
@@ -342,7 +333,7 @@ fun HomeScreenContent(
                 Spacer(modifier = Modifier.height(4.dp))
             }
 
-            item {
+            item(key = "top_apps") {
                 TopAppsSection(
                     topApps = uiState.topApps,
                     formatDuration = formatDuration,
@@ -354,7 +345,7 @@ fun HomeScreenContent(
                 Spacer(modifier = Modifier.height(16.dp))
             }
 
-            item {
+            item(key = "quick_actions") {
                 QuickActionsSection(
                     bedtimeStatus = bedtimeStatus,
                     onBedtimeClick = onBedtimeClick,
@@ -363,7 +354,7 @@ fun HomeScreenContent(
                 Spacer(modifier = Modifier.height(16.dp))
             }
 
-            item {
+            item(key = "goals_header") {
                 ShieldSortHeader(
                     title = "Active Goals",
                     currentSortType = uiState.goalSortType,
@@ -373,7 +364,7 @@ fun HomeScreenContent(
             }
 
             if (uiState.activeGoals.isEmpty()) {
-                item {
+                item(key = "empty_goals") {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(24.dp),
@@ -385,10 +376,10 @@ fun HomeScreenContent(
                     }
                 }
             } else {
-                shieldList(shields = uiState.activeGoals, formatDuration = formatDuration, nowMillis = nowMillis, onAppClick = onAppClick)
+                shieldList(shields = uiState.activeGoals, formatDuration = formatDuration, onAppClick = onAppClick)
             }
 
-            item {
+            item(key = "shields_header") {
                 Spacer(modifier = Modifier.height(24.dp))
                 ShieldSortHeader(
                     title = "Active Shields",
@@ -399,7 +390,7 @@ fun HomeScreenContent(
             }
 
             if (uiState.activeShields.isEmpty()) {
-                item {
+                item(key = "empty_shields") {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(24.dp),
@@ -411,7 +402,7 @@ fun HomeScreenContent(
                     }
                 }
             } else {
-                shieldList(shields = uiState.activeShields, formatDuration = formatDuration, nowMillis = nowMillis, onAppClick = onAppClick)
+                shieldList(shields = uiState.activeShields, formatDuration = formatDuration, onAppClick = onAppClick)
             }
         }
     }
@@ -1230,7 +1221,6 @@ fun QuickActionCard(
 fun LazyListScope.shieldList(
     shields: List<ShieldEntity>,
     formatDuration: (Long) -> String,
-    nowMillis: Long,
     onAppClick: (String) -> Unit
 ) {
     itemsIndexed(
@@ -1244,7 +1234,7 @@ fun LazyListScope.shieldList(
             else -> RoundedCornerShape(8.dp)
         }
         Column(modifier = Modifier.animateItem()) {
-            ShieldItem(shield = shield, shape = shape, formatDuration = formatDuration, nowMillis = nowMillis, onAppClick = onAppClick)
+            ShieldItem(shield = shield, shape = shape, formatDuration = formatDuration, onAppClick = onAppClick)
             if (index < shields.size - 1) {
                 Spacer(modifier = Modifier.height(4.dp))
             }
@@ -1258,9 +1248,14 @@ fun ShieldItem(
     shield: ShieldEntity,
     shape: RoundedCornerShape,
     formatDuration: (Long) -> String,
-    nowMillis: Long,
     onAppClick: (String) -> Unit
 ) {
+    val nowMillis by produceState(initialValue = System.currentTimeMillis()) {
+        while (true) {
+            delay(60000)
+            value = System.currentTimeMillis()
+        }
+    }
     val totalLimitMillis = remember(shield.timeLimitMinutes) { shield.timeLimitMinutes * 60 * 1000L }
     val remainingMillis = shield.remainingTimeMillis.coerceIn(0L, totalLimitMillis)
     val progress = if (totalLimitMillis > 0) remainingMillis.toFloat() / totalLimitMillis else 0f

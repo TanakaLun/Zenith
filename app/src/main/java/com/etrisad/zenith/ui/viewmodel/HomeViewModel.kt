@@ -319,7 +319,8 @@ class HomeViewModel(
             cal.add(Calendar.DAY_OF_YEAR, -1)
         }
         groups
-    }.flowOn(Dispatchers.Default)
+    }.debounce(200)
+    .flowOn(Dispatchers.Default)
 
     val repairableData: Flow<List<UsageHistoryGroup>> = combine(
         fullUsageHistory,
@@ -335,7 +336,21 @@ class HomeViewModel(
     private val _isRepairing = MutableStateFlow(false)
     val isRepairing = _isRepairing.asStateFlow()
 
-    val userPreferences: Flow<UserPreferences> = userPreferencesRepository.userPreferencesFlow
+    val userPreferences: StateFlow<UserPreferences> = userPreferencesRepository.userPreferencesFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UserPreferences())
+
+    val homeScreenPreferences: StateFlow<UserPreferences> = userPreferences
+        .map { it }
+        .distinctUntilChanged { old, new ->
+            old.screenTimeTargetMinutes == new.screenTimeTargetMinutes &&
+            old.showDatabaseIndicator == new.showDatabaseIndicator &&
+            old.expressiveColors == new.expressiveColors &&
+            old.bedtimeEnabled == new.bedtimeEnabled &&
+            old.bedtimeStartTime == new.bedtimeStartTime &&
+            old.bedtimeEndTime == new.bedtimeEndTime &&
+            old.bedtimeDays == new.bedtimeDays
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UserPreferences())
 
     private val _systemOnlyUsageHistory = MutableStateFlow<List<DailyUsage>>(emptyList())
     val systemOnlyUsageHistory: StateFlow<List<DailyUsage>> = _systemOnlyUsageHistory.asStateFlow()
@@ -352,69 +367,80 @@ class HomeViewModel(
             for (i in 0 until 21) {
                 val start = getMidnight(i)
                 val end = if (i == 0) now else getMidnight(i - 1)
-
-                val events = usm.queryEvents(start - 1800000L, end)
-                val event = UsageEvents.Event()
+                val isToday = i == 0
 
                 val usageMap = mutableMapOf<String, Long>()
-                var activePkg: String? = null
-                var activeStartTime = 0L
-                var isScreenOn = true
 
-                while (events.hasNextEvent()) {
-                    events.getNextEvent(event)
-                    val pkg = event.packageName
-                    val time = event.timeStamp
+                if (isToday) {
+                    val events = usm.queryEvents(start - 1800000L, end)
+                    val event = UsageEvents.Event()
+                    var activePkg: String? = null
+                    var activeStartTime = 0L
+                    var isScreenOn = true
 
-                    when (event.eventType) {
-                        UsageEvents.Event.SCREEN_INTERACTIVE -> isScreenOn = true
-                        UsageEvents.Event.SCREEN_NON_INTERACTIVE -> {
-                            isScreenOn = false
-                            activePkg?.let { p ->
-                                val segmentStart = maxOf(activeStartTime, start)
-                                val segmentEnd = minOf(time, end)
-                                if (segmentStart < segmentEnd) {
-                                    usageMap[p] = (usageMap[p] ?: 0L) + (segmentEnd - segmentStart)
+                    while (events.hasNextEvent()) {
+                        events.getNextEvent(event)
+                        val pkg = event.packageName
+                        val time = event.timeStamp
+
+                        when (event.eventType) {
+                            UsageEvents.Event.SCREEN_INTERACTIVE -> isScreenOn = true
+                            UsageEvents.Event.SCREEN_NON_INTERACTIVE -> {
+                                isScreenOn = false
+                                activePkg?.let { p ->
+                                    val segmentStart = maxOf(activeStartTime, start)
+                                    val segmentEnd = minOf(time, end)
+                                    if (segmentStart < segmentEnd) {
+                                        usageMap[p] = (usageMap[p] ?: 0L) + (segmentEnd - segmentStart)
+                                    }
+                                }
+                                activePkg = null
+                                activeStartTime = 0L
+                            }
+                            UsageEvents.Event.ACTIVITY_RESUMED,
+                            UsageEvents.Event.MOVE_TO_FOREGROUND -> {
+                                if (isScreenOn) {
+                                    if (activePkg != null) {
+                                        val pkg = activePkg
+                                        val segmentStart = maxOf(activeStartTime, start)
+                                        val segmentEnd = minOf(time, end)
+                                        if (segmentStart < segmentEnd) {
+                                            usageMap[pkg] = (usageMap[pkg] ?: 0L) + (segmentEnd - segmentStart)
+                                        }
+                                    }
+                                    activePkg = pkg
+                                    activeStartTime = time
                                 }
                             }
-                            activePkg = null
-                            activeStartTime = 0L
-                        }
-                        UsageEvents.Event.ACTIVITY_RESUMED,
-                        UsageEvents.Event.MOVE_TO_FOREGROUND -> {
-                            if (isScreenOn) {
-                                if (activePkg != null) {
-                                    val pkg = activePkg
+                            UsageEvents.Event.ACTIVITY_PAUSED,
+                            UsageEvents.Event.MOVE_TO_BACKGROUND -> {
+                                if (activePkg == pkg) {
                                     val segmentStart = maxOf(activeStartTime, start)
                                     val segmentEnd = minOf(time, end)
                                     if (segmentStart < segmentEnd) {
                                         usageMap[pkg] = (usageMap[pkg] ?: 0L) + (segmentEnd - segmentStart)
                                     }
+                                    activePkg = null
+                                    activeStartTime = 0L
                                 }
-                                activePkg = pkg
-                                activeStartTime = time
-                            }
-                        }
-                        UsageEvents.Event.ACTIVITY_PAUSED,
-                        UsageEvents.Event.MOVE_TO_BACKGROUND -> {
-                            if (activePkg == pkg) {
-                                val segmentStart = maxOf(activeStartTime, start)
-                                val segmentEnd = minOf(time, end)
-                                if (segmentStart < segmentEnd) {
-                                    usageMap[pkg] = (usageMap[pkg] ?: 0L) + (segmentEnd - segmentStart)
-                                }
-                                activePkg = null
-                                activeStartTime = 0L
                             }
                         }
                     }
-                }
 
-                if (activePkg != null && isScreenOn) {
-                    val segmentStart = maxOf(activeStartTime, start)
-                    val segmentEnd = minOf(now, end)
-                    if (segmentStart < segmentEnd) {
-                        usageMap[activePkg] = (usageMap[activePkg] ?: 0L) + (segmentEnd - segmentStart)
+                    if (activePkg != null && isScreenOn) {
+                        val segmentStart = maxOf(activeStartTime, start)
+                        val segmentEnd = minOf(now, end)
+                        if (segmentStart < segmentEnd) {
+                            usageMap[activePkg] = (usageMap[activePkg] ?: 0L) + (segmentEnd - segmentStart)
+                        }
+                    }
+                } else {
+                    val stats = try { usm.queryAndAggregateUsageStats(start, end) } catch (e: Exception) { null }
+                    stats?.forEach { (pkg, stat) ->
+                        if (pkg !in excludePackages && pkg in launcherApps) {
+                            val time = stat.totalTimeVisible.coerceAtLeast(stat.totalTimeInForeground)
+                            if (time > 0) usageMap[pkg] = time
+                        }
                     }
                 }
 
@@ -703,24 +729,44 @@ class HomeViewModel(
     }
 
     private fun setupDataObservers() {
-        viewModelScope.launch {
-            var lastPreferSystem: Boolean? = null
-            var lastOnboardingCompleted: Boolean? = null
+        var lastPreferSystem: Boolean? = null
+        var lastOnboardingCompleted: Boolean? = null
 
+        viewModelScope.launch {
+            shieldRepository.allShields.collect { shields ->
+                allShields = shields
+                _uiState.update { it.copy(
+                    activeShields = sortShields(shields.filter { it.type == FocusType.SHIELD }, it.shieldSortType),
+                    activeGoals = sortShields(shields.filter { it.type == FocusType.GOAL }, it.goalSortType)
+                ) }
+                val currentPkg = _appDetailUiState.value.packageName
+                if (currentPkg.isNotEmpty()) {
+                    val shield = shields.find { it.packageName == currentPkg }
+                    _appDetailUiState.update { it.copy(
+                        shieldEntity = shield,
+                        type = shield?.type,
+                        isPaused = shield?.isPaused ?: false,
+                        pauseEndTimestamp = shield?.pauseEndTimestamp ?: 0L,
+                        currentStreak = shield?.currentStreak ?: 0,
+                        bestStreak = shield?.bestStreak ?: 0
+                    ) }
+                }
+            }
+        }
+
+        viewModelScope.launch {
             combine(
-                shieldRepository.allShields,
-                shieldRepository.getRecentUsage(60),
+                shieldRepository.getRecentUsage(21),
                 shieldRepository.getLastNDaysGlobalUsage(60),
                 userPreferencesRepository.userPreferencesFlow,
                 _globalFallbackMap
-            ) { shields, usage, global, prefs, fallbackMap ->
+            ) { usage, global, prefs, fallbackMap ->
                 val forceUpdate = (lastPreferSystem != null && lastPreferSystem != prefs.preferSystemUsageHistory) ||
                                 (lastOnboardingCompleted != null && lastOnboardingCompleted != prefs.onboardingStatsCompleted)
-                
+
                 lastPreferSystem = prefs.preferSystemUsageHistory
                 lastOnboardingCompleted = prefs.onboardingStatsCompleted
 
-                allShields = shields
                 allHistory = usage
                 globalHistory = global
 
@@ -735,25 +781,11 @@ class HomeViewModel(
                     bedtimeDays = prefs.bedtimeDays
                 ) }
 
-                updateUiStateFromDatabase(shields, usage, global, prefs, fallbackMap)
-
-                val currentPkg = _appDetailUiState.value.packageName
-                if (currentPkg.isNotEmpty()) {
-                    val shield = shields.find { it.packageName == currentPkg }
-                    _appDetailUiState.update { it.copy(
-                        shieldEntity = shield,
-                        type = shield?.type,
-                        isPaused = shield?.isPaused ?: false,
-                        pauseEndTimestamp = shield?.pauseEndTimestamp ?: 0L,
-                        currentStreak = shield?.currentStreak ?: 0,
-                        bestStreak = shield?.bestStreak ?: 0
-                    ) }
-                }
+                updateUiStateFromDatabase(allShields, usage, global, prefs, fallbackMap)
                 forceUpdate
-            }.debounce(300).collect { forceUpdate ->
+            }.debounce(2000).collect { forceUpdate ->
                 refreshMutex.withLock {
                     if (forceUpdate) _uiState.update { it.copy(isLoading = true) }
-                    
                     updateGlobalFallbackInternal(forceFull = forceUpdate)
                     performUsageStatsRefresh(showLoading = false)
                 }
@@ -1631,7 +1663,9 @@ class HomeViewModel(
                     performUsageStatsRefresh(showLoading = false)
                     refreshCurrentAppDetailUsage()
                 }
-                delay(120000)
+                val remainingToTarget = (currentTargetMinutes * 60 * 1000L - _uiState.value.totalScreenTime).coerceAtLeast(0L)
+                val interval = if (remainingToTarget < 60_000L) 1000L else 10_000L
+                delay(interval)
             }
         }
     }

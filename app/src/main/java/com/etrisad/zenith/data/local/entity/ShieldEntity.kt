@@ -2,6 +2,7 @@ package com.etrisad.zenith.data.local.entity
 
 import androidx.annotation.Keep
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
 @Keep
@@ -10,7 +11,10 @@ enum class FocusType {
 }
 
 @Keep
-@Entity(tableName = "shields")
+@Entity(
+    tableName = "shields",
+    indices = [Index(value = ["packageName"], unique = true)]
+)
 data class ShieldEntity(
     @PrimaryKey
     val packageName: String,

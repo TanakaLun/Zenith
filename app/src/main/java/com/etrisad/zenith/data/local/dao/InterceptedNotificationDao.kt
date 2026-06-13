@@ -15,8 +15,8 @@ interface InterceptedNotificationDao {
     @Query("SELECT * FROM intercepted_notifications WHERE scheduleId = :scheduleId")
     fun getNotificationsForSchedule(scheduleId: Long): Flow<List<InterceptedNotificationEntity>>
 
-    @Query("SELECT * FROM intercepted_notifications")
-    suspend fun getAllNotifications(): List<InterceptedNotificationEntity>
+    @Query("SELECT * FROM intercepted_notifications WHERE scheduleId = :scheduleId")
+    suspend fun getNotificationsByScheduleId(scheduleId: Long): List<InterceptedNotificationEntity>
 
     @Query("DELETE FROM intercepted_notifications WHERE scheduleId = :scheduleId")
     suspend fun deleteByScheduleId(scheduleId: Long)

@@ -27,6 +27,7 @@ class StreakRefreshWorker(
                 .setConstraints(
                     Constraints.Builder()
                         .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
+                        .setRequiresBatteryNotLow(true)
                         .build()
                 )
                 .build()
