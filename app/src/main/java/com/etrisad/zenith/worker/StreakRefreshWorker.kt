@@ -23,7 +23,7 @@ class StreakRefreshWorker(
 
     companion object {
         fun enqueue(context: Context) {
-            val request = PeriodicWorkRequestBuilder<StreakRefreshWorker>(1, TimeUnit.HOURS)
+            val request = PeriodicWorkRequestBuilder<StreakRefreshWorker>(6, TimeUnit.HOURS)
                 .setConstraints(
                     Constraints.Builder()
                         .setRequiredNetworkType(NetworkType.NOT_REQUIRED)

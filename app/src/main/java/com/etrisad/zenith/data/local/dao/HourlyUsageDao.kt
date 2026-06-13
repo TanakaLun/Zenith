@@ -21,6 +21,9 @@ interface HourlyUsageDao {
     @Query("SELECT * FROM hourly_usage WHERE date = :date")
     suspend fun getHourlyUsageForDateSync(date: String): List<HourlyUsageEntity>
 
+    @Query("SELECT * FROM hourly_usage WHERE date IN (:dates)")
+    suspend fun getHourlyUsageForDatesSync(dates: List<String>): List<HourlyUsageEntity>
+
     @Query("SELECT DISTINCT date FROM hourly_usage")
     fun getDatesWithHourlyUsage(): Flow<List<String>>
 

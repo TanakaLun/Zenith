@@ -72,6 +72,10 @@ class ShieldRepository(
         return hourlyUsageDao.getHourlyUsageForDateSync(date)
     }
 
+    suspend fun getHourlyUsageForDatesSync(dates: List<String>): List<HourlyUsageEntity> {
+        return hourlyUsageDao.getHourlyUsageForDatesSync(dates)
+    }
+
     suspend fun getDailyUsagesForDateSync(date: String): List<DailyUsageEntity> {
         return dailyUsageDao.getUsagesForDate(date)
     }

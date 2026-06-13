@@ -96,16 +96,23 @@ fun FocusScreen(
     val fabOffset = (fabProgress * 12).dp
     val iconSize = (44 - (fabProgress * 8)).dp
 
+    val onEditShield = remember(viewModel) { { it: ShieldEntity -> viewModel.editShield(it) } }
+    val onEditSchedule = remember(viewModel) { { it: ScheduleEntity -> viewModel.editSchedule(it) } }
+    val onShieldSortTypeChange = remember(viewModel) { { it: ShieldSortType -> viewModel.onShieldSortTypeChange(it) } }
+    val onGoalSortTypeChange = remember(viewModel) { { it: ShieldSortType -> viewModel.onGoalSortTypeChange(it) } }
+    val onToggleShieldSelection = remember(viewModel) { { it: String -> viewModel.toggleShieldSelection(it) } }
+    val onToggleScheduleSelection = remember(viewModel) { { it: Long -> viewModel.toggleScheduleSelection(it) } }
+
     Box(modifier = Modifier.fillMaxSize()) {
         FocusScreenContent(
             uiState = uiState,
             innerPadding = innerPadding,
-            onEditShield = { viewModel.editShield(it) },
+            onEditShield = onEditShield,
             onDeleteShield = { pendingDeleteShield = it },
-            onEditSchedule = { viewModel.editSchedule(it) },
+            onEditSchedule = onEditSchedule,
             onDeleteSchedule = { pendingDeleteSchedule = it },
-            onShieldSortTypeChange = { viewModel.onShieldSortTypeChange(it) },
-            onGoalSortTypeChange = { viewModel.onGoalSortTypeChange(it) },
+            onShieldSortTypeChange = onShieldSortTypeChange,
+            onGoalSortTypeChange = onGoalSortTypeChange,
             onAppClick = { pkg ->
                 if (uiState.isSelectionMode) {
                     viewModel.toggleShieldSelection(pkg)
@@ -128,8 +135,8 @@ fun FocusScreen(
             isSelectionMode = uiState.isSelectionMode,
             selectedShields = uiState.selectedShields,
             selectedSchedules = uiState.selectedSchedules,
-            onToggleShieldSelection = { viewModel.toggleShieldSelection(it) },
-            onToggleScheduleSelection = { viewModel.toggleScheduleSelection(it) }
+            onToggleShieldSelection = onToggleShieldSelection,
+            onToggleScheduleSelection = onToggleScheduleSelection
         )
 
         FloatingActionButtonMenu(

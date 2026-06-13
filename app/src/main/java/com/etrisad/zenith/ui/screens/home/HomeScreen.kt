@@ -105,15 +105,23 @@ fun HomeScreen(
 
     val coroutineScope = rememberCoroutineScope()
 
+    val onSetTarget = remember {
+        { minutes: Int ->
+            coroutineScope.launch {
+                userPreferencesRepository.setScreenTimeTarget(minutes)
+            }
+            Unit
+        }
+    }
+    val onDaySelected = remember(viewModel) {
+        { date: Long? -> viewModel.selectDate(date) }
+    }
+
     HomeScreenContent(
         uiState = uiState,
         preferences = preferences,
         innerPadding = innerPadding,
-        onSetTarget = { minutes ->
-            coroutineScope.launch {
-                userPreferencesRepository.setScreenTimeTarget(minutes)
-            }
-        },
+        onSetTarget = onSetTarget,
         formatDuration = viewModel::formatDuration,
         onShieldSortTypeChange = viewModel::onShieldSortTypeChange,
         onGoalSortTypeChange = viewModel::onGoalSortTypeChange,
@@ -121,7 +129,7 @@ fun HomeScreen(
         onAppClick = onAppClick,
         onBedtimeClick = onBedtimeClick,
         onStatsClick = onSeeFullList,
-        onDaySelected = { viewModel.selectDate(it) },
+        onDaySelected = onDaySelected,
         onRefresh = { viewModel.onRefresh() }
     )
 }

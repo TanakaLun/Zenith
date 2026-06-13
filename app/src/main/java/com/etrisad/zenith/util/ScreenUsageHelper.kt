@@ -20,6 +20,7 @@ object ScreenUsageHelper {
     @Volatile
     private var lastQueryTime = 0L
     private const val CACHE_DURATION = 30000L
+    private val refreshLock = Any()
 
     private const val MIDNIGHT_LOOKBACK_MS = 600000L
     private const val SESSION_MIN_DURATION = 4000L
@@ -36,7 +37,6 @@ object ScreenUsageHelper {
     private var lastTotalGlobalUsage = 0L
     private var lastParsedDate: LocalDate? = null
 
-    @Synchronized
     fun fetchDetailedUsageToday(
         usageStatsManager: UsageStatsManager,
         includeHourly: Boolean = false
@@ -53,48 +53,57 @@ object ScreenUsageHelper {
             return cached
         }
 
-        if (lastParsedDate != today || lastParsedTimestamp < todayStart - MIDNIGHT_LOOKBACK_MS) {
-            clearIncrementalState()
-            lastParsedDate = today
-        }
+        synchronized(refreshLock) {
+            val reCached = lastResult
+            if (reCached != null && currentTime - lastQueryTime < CACHE_DURATION &&
+                (!includeHourly || reCached.hourlyUsageMap.isNotEmpty()) &&
+                lastParsedDate == today) {
+                return reCached
+            }
 
-        val startQuery = if (lastParsedTimestamp == 0L) todayStart - MIDNIGHT_LOOKBACK_MS else lastParsedTimestamp
-        val endQuery = currentTime
+            if (lastParsedDate != today || lastParsedTimestamp < todayStart - MIDNIGHT_LOOKBACK_MS) {
+                clearIncrementalState()
+                lastParsedDate = today
+            }
 
-        if (endQuery > startQuery) {
-            val events = try {
-                usageStatsManager.queryEvents(startQuery, endQuery)
+            val startQuery = if (lastParsedTimestamp == 0L) todayStart - MIDNIGHT_LOOKBACK_MS else lastParsedTimestamp
+            val endQuery = currentTime
+
+            if (endQuery > startQuery) {
+                val events = try {
+                    usageStatsManager.queryEvents(startQuery, endQuery)
+                } catch (e: Exception) {
+                    null
+                }
+
+                val event = UsageEvents.Event()
+                while (events?.hasNextEvent() == true) {
+                    events.getNextEvent(event)
+                    val pkg = event.packageName
+                    val time = event.timeStamp.coerceAtMost(endQuery)
+                    if (time < lastParsedTimestamp) continue
+
+                    processEvent(event, pkg, time, todayStart, endQuery, zoneId, includeHourly)
+                    lastParsedTimestamp = time
+                }
+                lastParsedTimestamp = maxOf(lastParsedTimestamp, endQuery)
+            }
+
+            val aggregatedStats = try {
+                usageStatsManager.queryAndAggregateUsageStats(todayStart, endQuery)
             } catch (e: Exception) {
                 null
             }
-
-            val event = UsageEvents.Event()
-            while (events?.hasNextEvent() == true) {
-                events.getNextEvent(event)
-                val pkg = event.packageName
-                val time = event.timeStamp.coerceAtMost(endQuery)
-                if (time < lastParsedTimestamp) continue
-
-                processEvent(event, pkg, time, todayStart, endQuery, zoneId, includeHourly)
-                lastParsedTimestamp = time
+            val lastUsedMap = mutableMapOf<String, Long>()
+            aggregatedStats?.forEach { (pkg, stats) ->
+                lastUsedMap[pkg] = stats.lastTimeUsed
             }
-            lastParsedTimestamp = maxOf(lastParsedTimestamp, endQuery)
-        }
 
-        val aggregatedStats = try {
-            usageStatsManager.queryAndAggregateUsageStats(todayStart, endQuery)
-        } catch (e: Exception) {
-            null
+            val result = buildResult(currentTime, todayStart, zoneId, includeHourly, lastUsedMap, aggregatedStats)
+            lastResult = result
+            lastQueryTime = currentTime
+            return result
         }
-        val lastUsedMap = mutableMapOf<String, Long>()
-        aggregatedStats?.forEach { (pkg, stats) ->
-            lastUsedMap[pkg] = stats.lastTimeUsed
-        }
-
-        val result = buildResult(currentTime, todayStart, zoneId, includeHourly, lastUsedMap, aggregatedStats)
-        lastResult = result
-        lastQueryTime = currentTime
-        return result
     }
 
     private fun processEvent(

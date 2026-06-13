@@ -43,7 +43,7 @@ import java.util.concurrent.ConcurrentHashMap
 class AppUsageMonitorService : Service() {
 
     private val serviceJob = SupervisorJob()
-    private val serviceScope = CoroutineScope(Dispatchers.IO + serviceJob)
+    private val serviceScope = CoroutineScope(Dispatchers.Default + serviceJob)
     private lateinit var shieldRepository: ShieldRepository
     private lateinit var preferencesRepository: UserPreferencesRepository
     private lateinit var overlayManager: InterceptOverlayManager
@@ -95,7 +95,6 @@ class AppUsageMonitorService : Service() {
     private var bedtimeWhitelistedPackages = emptySet<String>()
     private var lastCheckedDayTimestamp = 0L
     private var isScreenOn = true
-    private var isPowerSaveMode = false
 
     private var restrictedPackages = emptySet<String>()
     private var hasGlobalAllowSchedule = false
@@ -130,7 +129,6 @@ class AppUsageMonitorService : Service() {
     private var cachedBypassResult = false
     private var cachedBypassTime = 0L
 
-    private var monitoringWakeLock: android.os.PowerManager.WakeLock? = null
     private var monitoringLoopActive = false
     private var lastLoopTick = 0L
 
@@ -140,7 +138,6 @@ class AppUsageMonitorService : Service() {
                 Intent.ACTION_SCREEN_ON -> {
                     isScreenOn = true
                     AppStateHolder.isScreenOn.value = true
-                    monitoringWakeLock?.let { if (it.isHeld) it.release() }
                     currentSessionPackage = null
                     lastForegroundApp = null
                 }
@@ -149,12 +146,10 @@ class AppUsageMonitorService : Service() {
                     AppStateHolder.isScreenOn.value = false
                     currentShieldCache = null
                     currentSessionPackage = null
-
-                    monitoringWakeLock?.let { if (it.isHeld) it.release() }
                 }
-                android.os.PowerManager.ACTION_POWER_SAVE_MODE_CHANGED -> {
-                    isPowerSaveMode = powerManager.isPowerSaveMode
-                }
+                    android.os.PowerManager.ACTION_POWER_SAVE_MODE_CHANGED -> {
+                        AppStateHolder.isPowerSaveMode.value = powerManager.isPowerSaveMode
+                    }
                 Intent.ACTION_POWER_DISCONNECTED -> {
                     serviceScope.launch {
                         preferencesRepository.updateLastChargeTimestamp(System.currentTimeMillis())
@@ -363,7 +358,7 @@ class AppUsageMonitorService : Service() {
             registerReceiver(screenStateReceiver, filter)
         }
         isScreenOn = powerManager.isInteractive
-        isPowerSaveMode = powerManager.isPowerSaveMode
+        AppStateHolder.isPowerSaveMode.value = powerManager.isPowerSaveMode
 
         lastCheckedDayDate = LocalDate.now()
 
@@ -442,17 +437,19 @@ class AppUsageMonitorService : Service() {
                 isCustomBitmap = false
                 drawable.bitmap
             } else {
+                val maxSize = 256
                 val width = drawable.intrinsicWidth.coerceAtLeast(1)
                 val height = drawable.intrinsicHeight.coerceAtLeast(1)
-                if (width > 2000 || height > 2000) { isCustomBitmap = false; null }
-                else {
-                    isCustomBitmap = true
-                    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                    val canvas = Canvas(bitmap)
-                    drawable.setBounds(0, 0, canvas.width, canvas.height)
-                    drawable.draw(canvas)
-                    bitmap
-                }
+                val (targetW, targetH) = if (width > maxSize || height > maxSize) {
+                    val scale = maxSize.toFloat() / maxOf(width, height)
+                    (width * scale).toInt() to (height * scale).toInt()
+                } else width to height
+                isCustomBitmap = true
+                val bitmap = Bitmap.createBitmap(targetW, targetH, Bitmap.Config.ARGB_8888)
+                val canvas = Canvas(bitmap)
+                drawable.setBounds(0, 0, canvas.width, canvas.height)
+                drawable.draw(canvas)
+                bitmap
             }
         } catch (e: Throwable) {
             isCustomBitmap = false
@@ -501,8 +498,6 @@ class AppUsageMonitorService : Service() {
                 Log.e("ZenithAUMS", "Error in day change check: ${t.message}")
             }
         }
-
-        // Loop 1: Foreground detection (ringan, 3s, only when AS not active)
         serviceScope.launch {
             while (true) {
                 try {
@@ -512,15 +507,16 @@ class AppUsageMonitorService : Service() {
                         if (currentApp != null && currentApp != AppStateHolder.foregroundApp.value) {
                             AppStateHolder.foregroundApp.value = currentApp
                         }
+                        delay(3000)
+                    } else {
+                        delay(30000)
                     }
-                } catch (_: Exception) {}
-                delay(3000)
+                } catch (_: Exception) {
+                    delay(30000)
+                }
             }
         }
-
-        // Loop 2: Main monitoring (event-driven on app change + periodic fallback)
         serviceScope.launch {
-            // Process foreground changes reactively
             launch {
                 AppStateHolder.foregroundApp
                     .filterNotNull()
@@ -534,8 +530,6 @@ class AppUsageMonitorService : Service() {
                         }
                     }
             }
-
-            // Periodic monitoring tick
             while (true) {
                 try {
                     lastLoopTick = System.currentTimeMillis()
@@ -553,8 +547,6 @@ class AppUsageMonitorService : Service() {
                 delay(delayTime)
             }
         }
-
-        // Loop 3: Background data sync (60s)
         serviceScope.launch {
             while (true) {
                 try {
@@ -565,8 +557,6 @@ class AppUsageMonitorService : Service() {
                 delay(60000)
             }
         }
-
-        // Loop 4: Goal reminders (120s)
         serviceScope.launch {
             while (true) {
                 try {
@@ -575,8 +565,6 @@ class AppUsageMonitorService : Service() {
                 delay(120000)
             }
         }
-
-        // Loop 5: Day change & jadwal transisi (120s)
         serviceScope.launch {
             while (true) {
                 try {
@@ -807,7 +795,7 @@ class AppUsageMonitorService : Service() {
         return try {
             if (!isScreenOn) {
                 120000L
-            } else if (isPowerSaveMode) {
+            } else if (AppStateHolder.isPowerSaveMode.value) {
                 120000L
             } else if (InterceptOverlayManager.isShowing) {
                 30000L
@@ -1891,7 +1879,7 @@ class AppUsageMonitorService : Service() {
 
     private fun getForegroundApp(): String? {
         val time = System.currentTimeMillis()
-        if (time - cachedForegroundAppTime < 4000 && cachedForegroundApp != null) {
+        if (time - cachedForegroundAppTime < 15000 && cachedForegroundApp != null) {
             return cachedForegroundApp
         }
 
@@ -1976,6 +1964,7 @@ class AppUsageMonitorService : Service() {
         monitoringLoopActive = false
         try {
             overlayManager.hideOverlay()
+            overlayManager.destroy()
             sessionUsageOverlayManager.destroyAllHUDs()
         } catch (_: Exception) {}
         try {

@@ -21,6 +21,8 @@ class UsageSyncManager(
 ) {
     companion object {
         private val syncMutex = Mutex()
+        @Volatile
+        private var cachedLastSyncTimestamp = 0L
         private var cachedLauncherPackage: String? = null
         private var cachedLauncherApps: Set<String>? = null
         private var lastLauncherRefresh = 0L
@@ -32,8 +34,11 @@ class UsageSyncManager(
     private data class UsageChunk(val packageName: String, var duration: Long)
 
     suspend fun syncUsageData() = syncMutex.withLock {
-        val lastSyncTime = preferencesRepository.userPreferencesFlow.first().lastSyncTimestamp
         val currentTime = System.currentTimeMillis()
+        if (cachedLastSyncTimestamp == 0L) {
+            cachedLastSyncTimestamp = preferencesRepository.userPreferencesFlow.first().lastSyncTimestamp
+        }
+        val lastSyncTime = cachedLastSyncTimestamp
 
         if (currentTime - lastSyncTime < 30000) return@withLock
 
@@ -143,7 +148,10 @@ class UsageSyncManager(
             }
         }
 
-        saveBucketsToDatabase(hourlyBuckets)
+        repository.isShieldsLoaded.first { it }
+        val allShields = repository.allShields.first()
+
+        saveBucketsToDatabase(hourlyBuckets, allShields)
         preferencesRepository.setLastSyncTimestamp(currentTime)
     }
 
@@ -177,7 +185,8 @@ class UsageSyncManager(
     }
 
     private suspend fun saveBucketsToDatabase(
-        buckets: MutableMap<String, MutableMap<Int, MutableList<UsageChunk>>>
+        buckets: MutableMap<String, MutableMap<Int, MutableList<UsageChunk>>>,
+        allShields: List<com.etrisad.zenith.data.local.entity.ShieldEntity>
     ) {
         val now = System.currentTimeMillis()
         val calendarNow = Calendar.getInstance().apply { timeInMillis = now }
@@ -190,6 +199,13 @@ class UsageSyncManager(
 
         val sortedDates = buckets.keys.sorted().toMutableList()
         if (sortedDates.isEmpty() && carryOver.isEmpty()) return
+
+        val initialDates = sortedDates.toList()
+        val existingByDate = if (initialDates.isNotEmpty()) {
+            repository.getHourlyUsageForDatesSync(initialDates).groupBy { it.date }
+        } else {
+            emptyMap()
+        }
 
         var dateIdx = 0
         while (dateIdx < sortedDates.size || (carryOver.isNotEmpty() && dateIdx < 3)) {
@@ -211,7 +227,7 @@ class UsageSyncManager(
             }
             dateIdx++
 
-            val existingRecords = repository.getHourlyUsageForDateSync(date)
+            val existingRecords = existingByDate[date] ?: emptyList()
             val existingMap = existingRecords.associateBy { it.hour to it.packageName }
             val dayBuckets = buckets[date] ?: hashMapOf()
 
@@ -312,16 +328,15 @@ class UsageSyncManager(
             repository.insertHourlyUsage(finalEntities)
         }
 
-        syncDailyFromHourly(buckets.keys)
+        syncDailyFromHourly(buckets.keys, allShields)
+        cachedLastSyncTimestamp = System.currentTimeMillis()
         preferencesRepository.setLastSyncTimestamp(System.currentTimeMillis())
     }
 
-    private suspend fun syncDailyFromHourly(dates: Set<String>) {
+    private suspend fun syncDailyFromHourly(dates: Set<String>, allShields: List<com.etrisad.zenith.data.local.entity.ShieldEntity>) {
         val now = System.currentTimeMillis()
         val dailyEntities = mutableListOf<com.etrisad.zenith.data.local.entity.DailyUsageEntity>()
 
-        repository.isShieldsLoaded.first { it }
-        val allShields = repository.allShields.first()
         val shieldPkgs = allShields.asSequence().filter { it.type == com.etrisad.zenith.data.local.entity.FocusType.SHIELD }.map { it.packageName }.toSet()
         val goalPkgs = allShields.asSequence().filter { it.type == com.etrisad.zenith.data.local.entity.FocusType.GOAL }.map { it.packageName }.toSet()
 

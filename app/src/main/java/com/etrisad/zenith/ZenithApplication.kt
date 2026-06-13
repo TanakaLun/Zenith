@@ -24,6 +24,10 @@ class ZenithApplication : Application(), ImageLoaderFactory {
     private var lastUiMode: Int = 0
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
+    companion object {
+        private var workersEnqueued = false
+    }
+
     val userPreferencesRepository: UserPreferencesRepository by lazy {
         UserPreferencesRepository(this)
     }
@@ -53,8 +57,11 @@ class ZenithApplication : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         lastUiMode = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
-        com.etrisad.zenith.service.UsageSyncWorker.enqueue(this)
-        com.etrisad.zenith.worker.StreakRefreshWorker.enqueue(this)
+        if (!workersEnqueued) {
+            workersEnqueued = true
+            com.etrisad.zenith.service.UsageSyncWorker.enqueue(this)
+            com.etrisad.zenith.worker.StreakRefreshWorker.enqueue(this)
+        }
 
         applicationScope.launch {
             try {

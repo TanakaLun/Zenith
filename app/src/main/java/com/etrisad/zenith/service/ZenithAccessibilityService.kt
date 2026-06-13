@@ -35,7 +35,7 @@ import kotlinx.coroutines.launch
 class ZenithAccessibilityService : AccessibilityService() {
 
     private val serviceJob = SupervisorJob()
-    private val serviceScope = CoroutineScope(Dispatchers.IO + serviceJob)
+    private val serviceScope = CoroutineScope(Dispatchers.Default + serviceJob)
     private val packageChangeFlow = MutableSharedFlow<String>(extraBufferCapacity = 1)
     private lateinit var shieldRepository: ShieldRepository
     private lateinit var preferencesRepository: UserPreferencesRepository
@@ -111,7 +111,7 @@ class ZenithAccessibilityService : AccessibilityService() {
 
     companion object {
         var isServiceRunning = false
-            private set
+            set(value) { field = value; AppStateHolder.isAccessibilityServiceRunning.value = value }
         @Volatile
         var lastEventTime = 0L
         private var instance: ZenithAccessibilityService? = null
@@ -264,21 +264,24 @@ class ZenithAccessibilityService : AccessibilityService() {
                 val currentPkg = lastForegroundApp
 
                 if (currentPkg != null && !InterceptOverlayManager.isShowing && !shouldBypassBlocking(currentPkg)) {
-                    val allowedUntil = allowedApps[currentPkg]
-                    if (allowedUntil != null && allowedUntil != 0L && currentTime > allowedUntil) {
+                    val shouldRemove: Boolean
+                    synchronized(allowedApps) {
+                        val allowedUntil = allowedApps[currentPkg]
+                        shouldRemove = allowedUntil != null && allowedUntil != 0L && currentTime > allowedUntil
+                        if (shouldRemove) allowedApps.remove(currentPkg)
+                    }
+                    if (shouldRemove) {
                         val s = currentShieldCache ?: allShieldsCache[currentPkg] ?: shieldRepository.getShieldByPackageName(currentPkg)
                         if (s?.isAutoQuitEnabled == true) {
                             lastKickTime = System.currentTimeMillis()
                             lastKickedPackage = currentPkg
                             goToHomeScreen()
-                            allowedApps.remove(currentPkg)
                             if (s.isDelayAppEnabled) {
                                 val updated = s.copy(lastDelayStartTimestamp = 0L)
                                 shieldRepository.updateShield(updated)
                                 currentShieldCache = updated
                             }
                         } else {
-                            allowedApps.remove(currentPkg)
                             checkIfAppIsShielded(currentPkg)
                         }
                     }
@@ -1054,6 +1057,7 @@ class ZenithAccessibilityService : AccessibilityService() {
         isServiceRunning = false
         try {
             overlayManager.hideOverlay()
+            overlayManager.destroy()
             sessionUsageOverlayManager.destroyAllHUDs()
         } catch (_: Exception) {}
         serviceJob.cancel()

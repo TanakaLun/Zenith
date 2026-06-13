@@ -32,6 +32,9 @@ import com.etrisad.zenith.ui.theme.ZenithTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -45,6 +48,13 @@ class InterceptOverlayManager(
     private val mainHandler = Handler(Looper.getMainLooper())
     private val managerScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var overlayUsageState: androidx.compose.runtime.MutableState<Pair<Long, Long>>? = null
+    private val sharedPrefs = MutableStateFlow<com.etrisad.zenith.data.preferences.UserPreferences?>(null)
+
+    init {
+        managerScope.launch {
+            preferencesRepository.userPreferencesFlow.collectLatest { sharedPrefs.value = it }
+        }
+    }
 
     companion object {
         private const val TAG = "InterceptOverlayManager"
@@ -84,7 +94,7 @@ class InterceptOverlayManager(
     ) {
         overlayUsageState?.value = Pair(totalUsageToday, totalGlobalUsageToday)
         overlayView?.setContent {
-            val userPrefs by preferencesRepository.userPreferencesFlow.collectAsState(initial = null)
+            val userPrefs by sharedPrefs.collectAsState(initial = null)
             val darkTheme = when (userPrefs?.themeConfig) {
                 com.etrisad.zenith.data.preferences.ThemeConfig.LIGHT -> false
                 com.etrisad.zenith.data.preferences.ThemeConfig.DARK -> true
@@ -176,7 +186,7 @@ class InterceptOverlayManager(
             setViewTreeSavedStateRegistryOwner(lOwner)
             
             setContent {
-                val userPrefs by preferencesRepository.userPreferencesFlow.collectAsState(initial = null)
+                val userPrefs by sharedPrefs.collectAsState(initial = null)
                 val darkTheme = when (userPrefs?.themeConfig) {
                     com.etrisad.zenith.data.preferences.ThemeConfig.LIGHT -> false
                     com.etrisad.zenith.data.preferences.ThemeConfig.DARK -> true
@@ -262,7 +272,7 @@ class InterceptOverlayManager(
             setViewTreeSavedStateRegistryOwner(lOwner)
 
             setContent {
-                val userPrefs by preferencesRepository.userPreferencesFlow.collectAsState(initial = null)
+                val userPrefs by sharedPrefs.collectAsState(initial = null)
                 val darkTheme = when (userPrefs?.themeConfig) {
                     com.etrisad.zenith.data.preferences.ThemeConfig.LIGHT -> false
                     com.etrisad.zenith.data.preferences.ThemeConfig.DARK -> true
@@ -330,7 +340,7 @@ class InterceptOverlayManager(
 
         val composeView = ComposeView(context).apply {
             setContent {
-                val userPrefs by preferencesRepository.userPreferencesFlow.collectAsState(initial = null)
+                val userPrefs by sharedPrefs.collectAsState(initial = null)
                 val darkTheme = when (userPrefs?.themeConfig) {
                     com.etrisad.zenith.data.preferences.ThemeConfig.LIGHT -> false
                     com.etrisad.zenith.data.preferences.ThemeConfig.DARK -> true
@@ -397,7 +407,7 @@ class InterceptOverlayManager(
 
         val composeView = ComposeView(context).apply {
             setContent {
-                val userPrefs by preferencesRepository.userPreferencesFlow.collectAsState(initial = null)
+                val userPrefs by sharedPrefs.collectAsState(initial = null)
                 val darkTheme = when (userPrefs?.themeConfig) {
                     com.etrisad.zenith.data.preferences.ThemeConfig.LIGHT -> false
                     com.etrisad.zenith.data.preferences.ThemeConfig.DARK -> true
@@ -573,7 +583,7 @@ class InterceptOverlayManager(
 
         focusRequestJob?.cancel()
         focusRequestJob = managerScope.launch {
-            val enabled = preferencesRepository.userPreferencesFlow.first().interceptAudioFocusEnabled
+            val enabled = sharedPrefs.value?.interceptAudioFocusEnabled ?: false
             if (!enabled) return@launch
 
             if (!isShowing || currentPackage != pkg) return@launch
@@ -673,6 +683,10 @@ class InterceptOverlayManager(
         }
     }
 
+    fun destroy() {
+        hideOverlay()
+        managerScope.cancel()
+    }
 
     private class MyLifecycleOwner : LifecycleOwner, SavedStateRegistryOwner {
         private val lifecycleRegistry = LifecycleRegistry(this)
