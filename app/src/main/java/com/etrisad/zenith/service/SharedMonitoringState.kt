@@ -2,6 +2,8 @@ package com.etrisad.zenith.service
 
 import com.etrisad.zenith.data.local.entity.ScheduleMode
 import com.etrisad.zenith.data.local.entity.ShieldEntity
+import com.etrisad.zenith.data.preferences.PerformanceConfig
+import com.etrisad.zenith.data.preferences.PerformanceLevel
 import com.etrisad.zenith.data.preferences.UserPreferences
 import java.time.LocalDate
 import java.time.ZoneId
@@ -38,6 +40,8 @@ object SharedMonitoringState {
     val dailyUsageCache = ConcurrentHashMap<String, Long>()
     val notifiedGoals = ConcurrentHashMap.newKeySet<String>()
     @Volatile var activeSchedules = listOf<com.etrisad.zenith.data.local.entity.ScheduleEntity>()
+    @Volatile var performanceLevel: PerformanceLevel = PerformanceLevel.BALANCED
+    @Volatile var performanceConfig: PerformanceConfig = PerformanceConfig()
 
     private var cachedStartOfDayTime = 0L
     private var cachedStartOfDayValue = 0L

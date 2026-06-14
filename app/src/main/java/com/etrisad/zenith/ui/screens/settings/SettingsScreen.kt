@@ -17,9 +17,11 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import com.etrisad.zenith.data.manager.GitHubUpdateManager
+import com.etrisad.zenith.data.preferences.PerformanceConfig
 import com.etrisad.zenith.data.preferences.ThemeConfig
 import com.etrisad.zenith.data.preferences.UserPreferences
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
+import com.etrisad.zenith.data.preferences.detectPreset
 import com.etrisad.zenith.data.remote.model.GitHubRelease
 import com.etrisad.zenith.ui.navigation.Screen
 import kotlinx.coroutines.launch
@@ -153,6 +155,15 @@ fun SettingsScreen(
                     shape = RoundedCornerShape(8.dp)
                 )
                 
+                Spacer(modifier = Modifier.height(4.dp))
+                SettingsActionItem(
+                    title = "Performance",
+                    summary = "Responsiveness & battery balance | ${preferences.buildPerformanceConfig().detectPreset().labelRes}",
+                    onClick = { navController.navigate(Screen.SettingsCategory.createRoute("Performance")) },
+                    icon = Icons.Outlined.Timer,
+                    shape = RoundedCornerShape(8.dp)
+                )
+
                 Spacer(modifier = Modifier.height(4.dp))
                 SettingsActionItem(
                     title = "Data Management",

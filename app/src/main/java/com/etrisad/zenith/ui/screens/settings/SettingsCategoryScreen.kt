@@ -5,8 +5,11 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -15,6 +18,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.etrisad.zenith.ZenithApplication
 import com.etrisad.zenith.data.manager.GitHubUpdateManager
+import com.etrisad.zenith.data.preferences.PerformanceLevel
 import com.etrisad.zenith.data.preferences.UserPreferences
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
 import com.etrisad.zenith.data.remote.model.GitHubRelease
@@ -118,6 +122,9 @@ fun SettingsCategoryScreen(
         }
     )
 
+    val performanceApplyAction = remember { mutableStateOf<() -> Unit>({}) }
+    var perfSelectedLevel by remember { mutableStateOf(preferences.performanceLevel) }
+
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             modifier = Modifier
@@ -181,6 +188,32 @@ fun SettingsCategoryScreen(
                         onRefreshOnOpenUsageStatsChange = { enabled -> coroutineScope.launch { preferencesRepository.setRefreshOnOpenUsageStats(enabled) } },
                         onRestore = { restoreLauncher.launch(arrayOf("application/octet-stream", "*/*")) }
                     )
+                    "performance" -> {
+                        PerformanceSettings(
+                            preferences = preferences,
+                            selectedLevel = perfSelectedLevel,
+                            onSelectLevel = { level -> perfSelectedLevel = level },
+                        )
+                        Spacer(modifier = Modifier.height(24.dp))
+                        PerformanceTuningPanel(
+                            preferences = preferences,
+                            selectedLevel = perfSelectedLevel,
+                            onSelectedLevelChange = { perfSelectedLevel = it },
+                            onApplyCustomSettings = { a11yActive, a11yInactive, screenOff, powerSave, usageCache, dbWrite, dbWriteNear, launcherCache ->
+                                coroutineScope.launch {
+                                    preferencesRepository.applyPerformanceSettings(
+                                        a11yActive, a11yInactive, screenOff, powerSave, usageCache, dbWrite, dbWriteNear, launcherCache
+                                    )
+                                }
+                            },
+                            onSetPerformanceLevel = { level ->
+                                coroutineScope.launch {
+                                    preferencesRepository.setPerformanceLevel(level)
+                                }
+                            },
+                            onRegisterApplyAction = { action -> performanceApplyAction.value = action },
+                        )
+                    }
                     "developer" -> DeveloperSettings(
                         preferences = preferences,
                         focusUiState = focusUiState,
@@ -266,6 +299,22 @@ fun SettingsCategoryScreen(
                     )
                 }
             }
+        }
+
+        if (category.lowercase() == "performance") {
+            ExtendedFloatingActionButton(
+                onClick = { performanceApplyAction.value.invoke() },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(
+                        bottom = innerPadding.calculateBottomPadding() + 24.dp,
+                        end = 24.dp
+                    ),
+                icon = { Icon(Icons.Outlined.Check, contentDescription = null) },
+                text = { Text("Apply Settings") },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+            )
         }
 
         if (showGoalTestSheet) {

@@ -19,7 +19,13 @@ object ScreenUsageHelper {
     private var lastResult: UsageResult? = null
     @Volatile
     private var lastQueryTime = 0L
-    private const val CACHE_DURATION = 30000L
+    @Volatile
+    var cacheDuration = 600000L
+        private set
+
+    fun updateCacheDuration(durationMs: Long) {
+        cacheDuration = durationMs
+    }
     private val refreshLock = Any()
 
     private const val MIDNIGHT_LOOKBACK_MS = 600000L
@@ -47,7 +53,7 @@ object ScreenUsageHelper {
         val todayStart = today.atStartOfDay(zoneId).toInstant().toEpochMilli()
 
         val cached = lastResult
-        if (cached != null && currentTime - lastQueryTime < CACHE_DURATION &&
+        if (cached != null && currentTime - lastQueryTime < cacheDuration &&
             (!includeHourly || cached.hourlyUsageMap.isNotEmpty()) &&
             lastParsedDate == today) {
             return cached
@@ -55,7 +61,7 @@ object ScreenUsageHelper {
 
         synchronized(refreshLock) {
             val reCached = lastResult
-            if (reCached != null && currentTime - lastQueryTime < CACHE_DURATION &&
+            if (reCached != null && currentTime - lastQueryTime < cacheDuration &&
                 (!includeHourly || reCached.hourlyUsageMap.isNotEmpty()) &&
                 lastParsedDate == today) {
                 return reCached

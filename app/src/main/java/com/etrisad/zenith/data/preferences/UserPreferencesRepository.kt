@@ -45,6 +45,94 @@ enum class GSFlexPreset {
     ZENITH, NEO, COMPACT, AIRY, CUSTOM
 }
 
+enum class PerformanceLevel(val labelRes: String, val descriptionRes: String) {
+    MAX_RESPONSIVENESS("Max Responsiveness", "Overlay appears instantly (0.5-30s). Higher battery usage."),
+    RESPONSIVE("Responsive", "Overlay appears within 1-60s. Moderate battery usage."),
+    BALANCED("Balanced", "Overlay appears within 3-120s. Optimized battery usage. [DEFAULT]"),
+    BATTERY_SAVER("Battery Saver", "Overlay appears within 5-300s. Low battery usage."),
+    MAX_BATTERY("Max Battery", "Overlay appears within 10-600s. Minimal battery usage."),
+    CUSTOM("Custom", "Manually tuned performance values.")
+}
+
+fun PerformanceLevel.isPreset() = this != PerformanceLevel.CUSTOM
+
+data class PerformanceConfig(
+    val a11yActiveDelay: Long = 120_000L,
+    val a11yInactiveDelay: Long = 3_000L,
+    val screenOffDelay: Long = 300_000L,
+    val powerSaveDelay: Long = 300_000L,
+    val usageStatsCacheMs: Long = 600_000L,
+    val shieldDbWriteMs: Long = 300_000L,
+    val shieldDbWriteNearMs: Long = 120_000L,
+    val launcherCacheMs: Long = 3_600_000L,
+    val goalReminderTick: Long = 2L,
+    val dayChangeTick: Long = 2L,
+)
+
+fun PerformanceLevel.toConfig(): PerformanceConfig = when (this) {
+    PerformanceLevel.MAX_RESPONSIVENESS -> PerformanceConfig(
+        a11yActiveDelay = 30_000L,
+        a11yInactiveDelay = 1_000L,
+        screenOffDelay = 60_000L,
+        powerSaveDelay = 60_000L,
+        usageStatsCacheMs = 10_000L,
+        shieldDbWriteMs = 60_000L,
+        shieldDbWriteNearMs = 30_000L,
+        launcherCacheMs = 1_800_000L,
+        goalReminderTick = 1L,
+        dayChangeTick = 1L,
+    )
+    PerformanceLevel.RESPONSIVE -> PerformanceConfig(
+        a11yActiveDelay = 60_000L,
+        a11yInactiveDelay = 2_000L,
+        screenOffDelay = 120_000L,
+        powerSaveDelay = 120_000L,
+        usageStatsCacheMs = 30_000L,
+        shieldDbWriteMs = 120_000L,
+        shieldDbWriteNearMs = 60_000L,
+        launcherCacheMs = 3_600_000L,
+        goalReminderTick = 1L,
+        dayChangeTick = 1L,
+    )
+    PerformanceLevel.BALANCED -> PerformanceConfig(
+        a11yActiveDelay = 120_000L,
+        a11yInactiveDelay = 3_000L,
+        screenOffDelay = 300_000L,
+        powerSaveDelay = 300_000L,
+        usageStatsCacheMs = 600_000L,
+        shieldDbWriteMs = 300_000L,
+        shieldDbWriteNearMs = 120_000L,
+        launcherCacheMs = 3_600_000L,
+        goalReminderTick = 2L,
+        dayChangeTick = 2L,
+    )
+    PerformanceLevel.BATTERY_SAVER -> PerformanceConfig(
+        a11yActiveDelay = 300_000L,
+        a11yInactiveDelay = 5_000L,
+        screenOffDelay = 600_000L,
+        powerSaveDelay = 600_000L,
+        usageStatsCacheMs = 1_800_000L,
+        shieldDbWriteMs = 600_000L,
+        shieldDbWriteNearMs = 300_000L,
+        launcherCacheMs = 7_200_000L,
+        goalReminderTick = 5L,
+        dayChangeTick = 5L,
+    )
+    PerformanceLevel.MAX_BATTERY -> PerformanceConfig(
+        a11yActiveDelay = 600_000L,
+        a11yInactiveDelay = 10_000L,
+        screenOffDelay = 1_800_000L,
+        powerSaveDelay = 1_800_000L,
+        usageStatsCacheMs = 3_600_000L,
+        shieldDbWriteMs = 1_800_000L,
+        shieldDbWriteNearMs = 600_000L,
+        launcherCacheMs = 14_400_000L,
+        goalReminderTick = 10L,
+        dayChangeTick = 10L,
+    )
+    PerformanceLevel.CUSTOM -> PerformanceConfig()
+}
+
 class UserPreferencesRepository(private val context: Context) {
 
     private object PreferencesKeys {
@@ -100,6 +188,18 @@ class UserPreferencesRepository(private val context: Context) {
         val REFRESH_ON_OPEN_USAGE_STATS = booleanPreferencesKey("refresh_on_open_usage_stats")
         val CHECK_UPDATE_ON_START = booleanPreferencesKey("check_update_on_start")
         val BATTERY_STATS_RESET_ENABLED = booleanPreferencesKey("battery_stats_reset_enabled")
+
+        val PERFORMANCE_LEVEL = stringPreferencesKey("performance_level")
+        val PERF_A11Y_ACTIVE_DELAY = longPreferencesKey("perf_a11y_active_delay")
+        val PERF_A11Y_INACTIVE_DELAY = longPreferencesKey("perf_a11y_inactive_delay")
+        val PERF_SCREEN_OFF_DELAY = longPreferencesKey("perf_screen_off_delay")
+        val PERF_POWER_SAVE_DELAY = longPreferencesKey("perf_power_save_delay")
+        val PERF_USAGE_STATS_CACHE = longPreferencesKey("perf_usage_stats_cache")
+        val PERF_SHIELD_DB_WRITE = longPreferencesKey("perf_shield_db_write")
+        val PERF_SHIELD_DB_WRITE_NEAR = longPreferencesKey("perf_shield_db_write_near")
+        val PERF_LAUNCHER_CACHE = longPreferencesKey("perf_launcher_cache")
+        val PERF_GOAL_REMINDER_TICK = longPreferencesKey("perf_goal_reminder_tick")
+        val PERF_DAY_CHANGE_TICK = longPreferencesKey("perf_day_change_tick")
 
         val GS_FLEX_PRESET = stringPreferencesKey("gs_flex_preset")
         val GS_D_WGHT = floatPreferencesKey("gs_d_wght")
@@ -212,6 +312,17 @@ class UserPreferencesRepository(private val context: Context) {
             refreshOnOpenUsageStats = settings[PreferencesKeys.REFRESH_ON_OPEN_USAGE_STATS] ?: false,
             checkUpdateOnStart = settings[PreferencesKeys.CHECK_UPDATE_ON_START] ?: false,
             batteryStatsResetEnabled = settings[PreferencesKeys.BATTERY_STATS_RESET_ENABLED] ?: false,
+            performanceLevel = PerformanceLevel.valueOf(settings[PreferencesKeys.PERFORMANCE_LEVEL] ?: PerformanceLevel.BALANCED.name),
+            perfA11yActiveDelay = settings[PreferencesKeys.PERF_A11Y_ACTIVE_DELAY] ?: PerformanceConfig().a11yActiveDelay,
+            perfA11yInactiveDelay = settings[PreferencesKeys.PERF_A11Y_INACTIVE_DELAY] ?: PerformanceConfig().a11yInactiveDelay,
+            perfScreenOffDelay = settings[PreferencesKeys.PERF_SCREEN_OFF_DELAY] ?: PerformanceConfig().screenOffDelay,
+            perfPowerSaveDelay = settings[PreferencesKeys.PERF_POWER_SAVE_DELAY] ?: PerformanceConfig().powerSaveDelay,
+            perfUsageStatsCacheMs = settings[PreferencesKeys.PERF_USAGE_STATS_CACHE] ?: PerformanceConfig().usageStatsCacheMs,
+            perfShieldDbWriteMs = settings[PreferencesKeys.PERF_SHIELD_DB_WRITE] ?: PerformanceConfig().shieldDbWriteMs,
+            perfShieldDbWriteNearMs = settings[PreferencesKeys.PERF_SHIELD_DB_WRITE_NEAR] ?: PerformanceConfig().shieldDbWriteNearMs,
+            perfLauncherCacheMs = settings[PreferencesKeys.PERF_LAUNCHER_CACHE] ?: PerformanceConfig().launcherCacheMs,
+            perfGoalReminderTick = settings[PreferencesKeys.PERF_GOAL_REMINDER_TICK] ?: PerformanceConfig().goalReminderTick,
+            perfDayChangeTick = settings[PreferencesKeys.PERF_DAY_CHANGE_TICK] ?: PerformanceConfig().dayChangeTick,
             lastChargeTimestamp = runtime[RuntimeKeys.LAST_CHARGE_TIMESTAMP] ?: 0L,
             manualResetTimestamps = runtime[RuntimeKeys.MANUAL_RESET_TIMESTAMPS]?.split(",")
                 ?.filter { it.contains(":") }
@@ -916,6 +1027,34 @@ class UserPreferencesRepository(private val context: Context) {
         context.dataStore.edit { preferences -> preferences[PreferencesKeys.BATTERY_STATS_RESET_ENABLED] = enabled }
     }
 
+    suspend fun setPerformanceLevel(level: PerformanceLevel) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.PERFORMANCE_LEVEL] = level.name
+        }
+    }
+
+    suspend fun applyPerformanceSettings(
+        perfA11yActiveDelay: Long,
+        perfA11yInactiveDelay: Long,
+        perfScreenOffDelay: Long,
+        perfPowerSaveDelay: Long,
+        perfUsageStatsCacheMs: Long,
+        perfShieldDbWriteMs: Long,
+        perfShieldDbWriteNearMs: Long,
+        perfLauncherCacheMs: Long,
+    ) {
+        context.dataStore.edit { prefs ->
+            prefs[PreferencesKeys.PERF_A11Y_ACTIVE_DELAY] = perfA11yActiveDelay
+            prefs[PreferencesKeys.PERF_A11Y_INACTIVE_DELAY] = perfA11yInactiveDelay
+            prefs[PreferencesKeys.PERF_SCREEN_OFF_DELAY] = perfScreenOffDelay
+            prefs[PreferencesKeys.PERF_POWER_SAVE_DELAY] = perfPowerSaveDelay
+            prefs[PreferencesKeys.PERF_USAGE_STATS_CACHE] = perfUsageStatsCacheMs
+            prefs[PreferencesKeys.PERF_SHIELD_DB_WRITE] = perfShieldDbWriteMs
+            prefs[PreferencesKeys.PERF_SHIELD_DB_WRITE_NEAR] = perfShieldDbWriteNearMs
+            prefs[PreferencesKeys.PERF_LAUNCHER_CACHE] = perfLauncherCacheMs
+        }
+    }
+
     suspend fun updateLastChargeTimestamp(timestamp: Long) {
         context.runtimeDataStore.edit { preferences -> preferences[RuntimeKeys.LAST_CHARGE_TIMESTAMP] = timestamp }
     }
@@ -1179,8 +1318,42 @@ data class UserPreferences(
     val refreshOnOpenUsageStats: Boolean = false,
     val checkUpdateOnStart: Boolean = false,
     val batteryStatsResetEnabled: Boolean = false,
+    val performanceLevel: PerformanceLevel = PerformanceLevel.BALANCED,
+    val perfA11yActiveDelay: Long = PerformanceConfig().a11yActiveDelay,
+    val perfA11yInactiveDelay: Long = PerformanceConfig().a11yInactiveDelay,
+    val perfScreenOffDelay: Long = PerformanceConfig().screenOffDelay,
+    val perfPowerSaveDelay: Long = PerformanceConfig().powerSaveDelay,
+    val perfUsageStatsCacheMs: Long = PerformanceConfig().usageStatsCacheMs,
+    val perfShieldDbWriteMs: Long = PerformanceConfig().shieldDbWriteMs,
+    val perfShieldDbWriteNearMs: Long = PerformanceConfig().shieldDbWriteNearMs,
+    val perfLauncherCacheMs: Long = PerformanceConfig().launcherCacheMs,
+    val perfGoalReminderTick: Long = PerformanceConfig().goalReminderTick,
+    val perfDayChangeTick: Long = PerformanceConfig().dayChangeTick,
     val lastChargeTimestamp: Long = 0L,
     val manualResetTimestamps: Map<String, Long> = emptyMap(),
     val gsFlexSettings: GSFlexSettings = GSFlexSettings(),
     val streakRecoveryPerformed: Boolean = false
-)
+) {
+    fun buildPerformanceConfig(): PerformanceConfig {
+        if (performanceLevel.isPreset()) return performanceLevel.toConfig()
+        return PerformanceConfig(
+            a11yActiveDelay = perfA11yActiveDelay,
+            a11yInactiveDelay = perfA11yInactiveDelay,
+            screenOffDelay = perfScreenOffDelay,
+            powerSaveDelay = perfPowerSaveDelay,
+            usageStatsCacheMs = perfUsageStatsCacheMs,
+            shieldDbWriteMs = perfShieldDbWriteMs,
+            shieldDbWriteNearMs = perfShieldDbWriteNearMs,
+            launcherCacheMs = perfLauncherCacheMs,
+            goalReminderTick = perfGoalReminderTick,
+            dayChangeTick = perfDayChangeTick,
+        )
+    }
+}
+
+fun PerformanceConfig.detectPreset(): PerformanceLevel {
+    PerformanceLevel.entries.forEach { level ->
+        if (level.isPreset() && this == level.toConfig()) return level
+    }
+    return PerformanceLevel.CUSTOM
+}

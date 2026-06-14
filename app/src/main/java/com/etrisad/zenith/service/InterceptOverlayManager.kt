@@ -12,6 +12,7 @@ import android.os.Looper
 import android.util.Log
 import android.view.Gravity
 import android.view.WindowManager
+import android.view.inputmethod.InputMethodManager
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.collectAsState
@@ -79,6 +80,8 @@ class InterceptOverlayManager(
             "com.google.android.permissioncontroller",
             "com.google.android.packageinstaller"
         )
+        private var keyboardPackages = emptySet<String>()
+        private var lastKeyboardRefreshTime = 0L
     }
 
     private fun updateOverlayContent(
@@ -425,6 +428,7 @@ class InterceptOverlayManager(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
             WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
             WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
             WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
@@ -480,14 +484,27 @@ class InterceptOverlayManager(
         }
     }
 
+    private fun isKeyboardApp(packageName: String): Boolean {
+        val currentTime = System.currentTimeMillis()
+        if (keyboardPackages.isEmpty() || currentTime - lastKeyboardRefreshTime > 600000) {
+            try {
+                val imm = context.getSystemService(InputMethodManager::class.java)
+                keyboardPackages = imm.enabledInputMethodList.map { it.packageName }.toSet()
+                lastKeyboardRefreshTime = currentTime
+            } catch (_: Exception) {}
+        }
+        return packageName in keyboardPackages
+    }
+
     fun checkAndHide(newPackage: String) {
         if (!isShowing) return
         
         val target = currentPackage ?: return
 
-        if (newPackage != target && newPackage != context.packageName && !SYSTEM_UI_PACKAGES.contains(newPackage)) {
-            hideOverlay()
-        }
+        if (newPackage == target || newPackage == context.packageName) return
+        if (SYSTEM_UI_PACKAGES.contains(newPackage) || isKeyboardApp(newPackage)) return
+
+        hideOverlay()
     }
 
     fun hideOverlay() {
