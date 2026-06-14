@@ -103,6 +103,9 @@ class AppUsageMonitorService : Service() {
     private var monitoringLoopActive = false
     private var lastLoopTick = 0L
 
+    private var monitoringJob: kotlinx.coroutines.Job? = null
+    private var foregroundAppJob: kotlinx.coroutines.Job? = null
+
     private val screenStateReceiver = object : android.content.BroadcastReceiver() {
         override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
             when (intent?.action) {
@@ -480,6 +483,7 @@ class AppUsageMonitorService : Service() {
     private fun startMonitoring() {
         if (monitoringLoopActive && System.currentTimeMillis() - lastLoopTick < 60000) return
         monitoringLoopActive = true
+        
         serviceScope.launch {
             try {
                 checkDayChangeOnStartup()
@@ -488,11 +492,13 @@ class AppUsageMonitorService : Service() {
             }
         }
 
-        serviceScope.launch {
+        foregroundAppJob?.cancel()
+        foregroundAppJob = serviceScope.launch {
             AppStateHolder.foregroundApp
                 .filterNotNull()
                 .distinctUntilChanged()
                 .collect { currentApp ->
+                    if (!isScreenOn) return@collect
                     try {
                         lastLoopTick = System.currentTimeMillis()
                         handleForegroundChange(currentApp)
@@ -502,31 +508,32 @@ class AppUsageMonitorService : Service() {
                 }
         }
 
-        serviceScope.launch {
+        monitoringJob?.cancel()
+        monitoringJob = serviceScope.launch {
             var maintenanceTick = 0L
             val startTime = System.currentTimeMillis()
             while (true) {
                 try {
                     lastLoopTick = System.currentTimeMillis()
 
-                    if (isScreenOn && !ZenithAccessibilityService.isServiceRunning) {
-                        val currentApp = getForegroundApp()
-                        if (currentApp != null && currentApp != AppStateHolder.foregroundApp.value) {
-                            AppStateHolder.foregroundApp.value = currentApp
+                    if (isScreenOn) {
+                        if (!ZenithAccessibilityService.isServiceRunning) {
+                            val currentApp = getForegroundApp()
+                            if (currentApp != null && currentApp != AppStateHolder.foregroundApp.value) {
+                                AppStateHolder.foregroundApp.value = currentApp
+                            }
                         }
-                    }
 
-                    if (isScreenOn && !InterceptOverlayManager.isShowing) {
-                        val currentApp = getForegroundApp()
-                        if (currentApp != null) {
-                            monitoringTick(currentApp)
+                        if (!InterceptOverlayManager.isShowing) {
+                            val currentApp = getForegroundApp()
+                            if (currentApp != null) {
+                                monitoringTick(currentApp)
+                            }
                         }
-                    }
 
-                    val elapsedMinutes = (lastLoopTick - startTime) / 60_000L
-                    if (elapsedMinutes > maintenanceTick) {
-                        maintenanceTick = elapsedMinutes
-                        if (isScreenOn) {
+                        val elapsedMinutes = (lastLoopTick - startTime) / 60_000L
+                        if (elapsedMinutes > maintenanceTick) {
+                            maintenanceTick = elapsedMinutes
                             val cfg = SharedMonitoringState.performanceConfig
                             if (SharedMonitoringState.launcherPackages.isEmpty() || lastLoopTick - lastLauncherRefreshTime > cfg.launcherCacheMs) {
                                 refreshLauncherCache()
@@ -540,11 +547,7 @@ class AppUsageMonitorService : Service() {
                 }
 
                 val cfg = SharedMonitoringState.performanceConfig
-                val delayTime = if (ZenithAccessibilityService.isServiceRunning) {
-                    cfg.a11yActiveDelay
-                } else {
-                    computeMonitoringDelay()
-                }
+                val delayTime = computeMonitoringDelay()
                 delay(delayTime)
             }
         }
@@ -771,6 +774,9 @@ class AppUsageMonitorService : Service() {
         val currentApp = lastForegroundApp
         val allowedUntil = currentApp?.let { allowedApps[it] } ?: 0L
         val currentTime = System.currentTimeMillis()
+        
+        if (!isScreenOn) return cfg.screenOffDelay
+        
         if (allowedUntil > currentTime) {
             val remaining = allowedUntil - currentTime
             return when {
@@ -781,8 +787,8 @@ class AppUsageMonitorService : Service() {
         }
 
         return try {
-            if (!isScreenOn) {
-                cfg.screenOffDelay
+            if (ZenithAccessibilityService.isServiceRunning) {
+                cfg.a11yActiveDelay
             } else if (AppStateHolder.isPowerSaveMode.value) {
                 cfg.monPowerSave
             } else if (InterceptOverlayManager.isShowing) {

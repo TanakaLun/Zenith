@@ -196,21 +196,9 @@ class DailyUsageWorker(context: Context, params: WorkerParameters) : CoroutineWo
 
         var totalUsage = calculatedSum.coerceAtMost(timeSinceMidnight)
 
-        if (isDateToday && prefs.lastKnownDailyUsageDate == dateString) {
-            if (prefs.lastKnownDailyUsage > totalUsage && (prefs.lastKnownDailyUsage - totalUsage) < 1800000L) {
-                totalUsage = prefs.lastKnownDailyUsage.coerceAtMost(timeSinceMidnight)
-            }
-        }
-
-        if (existingTotalVal > 0) {
-            totalUsage = maxOf(totalUsage, existingTotalVal).coerceAtMost(timeSinceMidnight)
-        }
-
         val usagesToInsert = mutableListOf<DailyUsageEntity>()
         finalAppUsages.forEach { (pkg, time) ->
-            val existing = existingDaily[pkg]
-            val finalTime = if (existing != null) maxOf(existing.usageTimeMillis, time) else time
-            usagesToInsert.add(DailyUsageEntity(date = dateString, packageName = pkg, usageTimeMillis = finalTime.coerceAtMost(timeSinceMidnight)))
+            usagesToInsert.add(DailyUsageEntity(date = dateString, packageName = pkg, usageTimeMillis = time.coerceAtMost(timeSinceMidnight)))
         }
 
         usagesToInsert.add(DailyUsageEntity(date = dateString, packageName = "TOTAL", usageTimeMillis = totalUsage))
@@ -222,8 +210,8 @@ class DailyUsageWorker(context: Context, params: WorkerParameters) : CoroutineWo
             if (pkg in shieldPkgs) sUsage += time else if (pkg in goalPkgs) gUsage += time
         }
         
-        usagesToInsert.add(DailyUsageEntity(date = dateString, packageName = "SHIELD_TOTAL", usageTimeMillis = maxOf(sUsage, existingDaily["SHIELD_TOTAL"]?.usageTimeMillis ?: 0L)))
-        usagesToInsert.add(DailyUsageEntity(date = dateString, packageName = "GOAL_TOTAL", usageTimeMillis = maxOf(gUsage, existingDaily["GOAL_TOTAL"]?.usageTimeMillis ?: 0L)))
+        usagesToInsert.add(DailyUsageEntity(date = dateString, packageName = "SHIELD_TOTAL", usageTimeMillis = sUsage))
+        usagesToInsert.add(DailyUsageEntity(date = dateString, packageName = "GOAL_TOTAL", usageTimeMillis = gUsage))
         usagesToInsert.add(DailyUsageEntity(date = dateString, packageName = "OTHER_TOTAL", usageTimeMillis = (totalUsage - (sUsage + gUsage)).coerceAtLeast(0L)))
 
         dailyUsageDao.insertAll(usagesToInsert)

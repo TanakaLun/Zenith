@@ -60,6 +60,8 @@ class ZenithAccessibilityService : AccessibilityService() {
     private var lastKickTime = 0L
     private var lastKickedPackage: String? = null
 
+    private var monitoringJob: kotlinx.coroutines.Job? = null
+
     private var cachedTotalGlobalUsage: Long = 0L
     private var lastGlobalUsageCacheTime: Long = 0L
 
@@ -229,7 +231,8 @@ class ZenithAccessibilityService : AccessibilityService() {
             }
         }, 1000)
 
-        serviceScope.launch {
+        monitoringJob?.cancel()
+        monitoringJob = serviceScope.launch {
             while (true) {
                 val cfg = SharedMonitoringState.performanceConfig
                 if (!AppStateHolder.isScreenOn.value) {
@@ -242,15 +245,25 @@ class ZenithAccessibilityService : AccessibilityService() {
 
                 var checkInterval = cfg.a11yActiveDelay
                 if (currentPkg != null) {
+                    val isMonitored = SharedMonitoringState.allShieldsCache.containsKey(currentPkg) || 
+                                     SharedMonitoringState.restrictedPackages.contains(currentPkg)
+                    
+                    if (!isMonitored) {
+                        checkInterval = cfg.a11yInactiveDelay
+                    }
+                    
                     val allowedUntil = allowedApps[currentPkg] ?: 0L
                     if (allowedUntil > 0) {
                         val remaining = allowedUntil - currentTime
-                        checkInterval = when {
+                        val dynamicInterval = when {
                             remaining < 10000 -> 1000L
                             remaining < 60000 -> 5000L
-                            else -> 15000L.coerceAtMost(cfg.a11yActiveDelay)
+                            else -> 15000L
                         }
+                        checkInterval = dynamicInterval.coerceAtMost(checkInterval)
                     }
+                } else {
+                    checkInterval = cfg.a11yInactiveDelay
                 }
 
                 if (currentPkg != null && !InterceptOverlayManager.isShowing && !shouldBypassBlocking(currentPkg)) {
@@ -285,7 +298,7 @@ class ZenithAccessibilityService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         lastEventTime = System.currentTimeMillis()
-        if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+        if (!AppStateHolder.isScreenOn.value || event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
 
         val packageName = event.packageName?.toString() ?: return
         if (packageName == this.packageName) return

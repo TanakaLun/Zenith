@@ -257,7 +257,7 @@ class HomeViewModel(
                 groups.add(UsageHistoryGroup(
                     date = dateStr,
                     records = liveRecords,
-                    totalTimeMillis = if (preferSystem) maxOf(dbTotal, liveTotal) else dbTotal,
+                    totalTimeMillis = if (preferSystem) liveTotal else dbTotal,
                     hasDatabaseRecord = dbRecords.isNotEmpty(),
                     hasSystemData = actualSystemRecords.isNotEmpty(),
                     isLive = true,
@@ -266,9 +266,9 @@ class HomeViewModel(
                     hasPiechartData = true,
                     systemTotalMillis = liveTotal,
                     databaseAppSumMillis = dbAppSum,
-                    shieldTotalMillis = maxOf(dbShieldTotal, liveShield),
-                    goalTotalMillis = maxOf(dbGoalTotal, liveGoal),
-                    otherTotalMillis = maxOf(dbOtherTotal, liveOther)
+                    shieldTotalMillis = if (preferSystem) liveShield else dbShieldTotal,
+                    goalTotalMillis = if (preferSystem) liveGoal else dbGoalTotal,
+                    otherTotalMillis = if (preferSystem) liveOther else dbOtherTotal
                 ))
             } else if (dbRecords.isEmpty() && actualSystemRecords.isEmpty()) {
                 groups.add(UsageHistoryGroup(
@@ -302,7 +302,7 @@ class HomeViewModel(
                 groups.add(UsageHistoryGroup(
                     date = dateStr,
                     records = combinedRecords,
-                    totalTimeMillis = if (preferSystem) maxOf(dbTotal, systemTotal) else dbTotal,
+                    totalTimeMillis = if (preferSystem) systemTotal else dbTotal,
                     hasDatabaseRecord = true,
                     hasSystemData = actualSystemRecords.isNotEmpty(),
                     hasSnapshot = hasSnap,
@@ -526,8 +526,7 @@ class HomeViewModel(
                 recordsToUse.find { it.packageName == "TOTAL" }?.usageTimeMillis ?: appSum
             } else appSum
 
-            val existingTotal = dbRecords.find { it.packageName == "TOTAL" }?.usageTimeMillis ?: 0L
-            var finalTotal = if (mode == RepairMode.SYSTEM) maxOf(systemTotal, appSum, existingTotal) else appSum
+            var finalTotal = if (mode == RepairMode.SYSTEM) maxOf(appSum, systemTotal) else appSum
 
             if (date == todayStr) {
                 val cal = Calendar.getInstance()
@@ -647,7 +646,7 @@ class HomeViewModel(
         val totalFromFallback = if (prefs.preferSystemUsageHistory) {
             fallbackMap[selectedDateStr]?.find { it.packageName == "TOTAL" }?.usageTimeMillis ?: 0L
         } else 0L
-        val currentTotal = maxOf(totalFromDb, totalFromFallback, mergedAppMap.values.sum())
+        val currentTotal = mergedAppMap.values.sum()
 
         val shieldTotal = selectedDayUsage.find { it.packageName == "SHIELD_TOTAL" }?.usageTimeMillis ?: 0L
         val goalTotal = selectedDayUsage.find { it.packageName == "GOAL_TOTAL" }?.usageTimeMillis ?: 0L
@@ -712,7 +711,7 @@ class HomeViewModel(
             val shouldStillLoad = state.isLoading && fallbackMap.isEmpty() && isSelectedDayToday
             
             state.copy(
-                totalScreenTime = if (isSelectedDayToday) maxOf(state.totalScreenTime, currentTotal) else currentTotal,
+                totalScreenTime = currentTotal,
                 allAppsUsage = allApps,
                 topApps = allApps.take(5),
                 shieldUsage = maxOf(state.shieldUsage, shieldTotal),
@@ -947,7 +946,7 @@ class HomeViewModel(
                 else UsageRecord.Live(pkg, time)
             }.toMutableList()
             
-            val todayTotal = todayDetailed.totalGlobalUsage.coerceAtMost(now - todayStart)
+            val todayTotal = todayLiveRecords.sumOf { it.usageTimeMillis }
             if (todayTotal > 0) {
                 todayLiveRecords.add(UsageRecord.Live("TOTAL", todayTotal))
             }
@@ -1217,7 +1216,7 @@ class HomeViewModel(
             }
         }
 
-        val totalToday = todayDetailed.totalGlobalUsage.coerceAtMost(timeSinceMidnight)
+        val totalToday = filteredTodayUsage.values.sum().coerceAtMost(timeSinceMidnight)
 
         val missingPkgs = appTotals.keys.filter { !appInfoCache.containsKey(it) }
         if (missingPkgs.isNotEmpty()) {
@@ -1249,7 +1248,9 @@ class HomeViewModel(
                     val label = pm.getApplicationLabel(appInfo).toString()
                     appInfoCache[pkg] = label
                     AppUsageInfo(pkg, label, time, sessionCount = sessions, lastTimeUsed = lastUsed)
-                } catch (_: Exception) { null }
+                } catch (_: Exception) { 
+                    AppUsageInfo(pkg, pkg, time, sessionCount = sessions, lastTimeUsed = lastUsed)
+                }
             }
         }
 
@@ -1270,15 +1271,15 @@ class HomeViewModel(
         }
 
         val selectedDayTotal = if (isSelectedToday) {
-            val dbTotalToday = selectedDayHistory.find { it.packageName == "TOTAL" }?.usageTimeMillis ?: 0L
-            maxOf(totalToday, dbTotalToday).coerceAtMost(timeSinceMidnight)
+            allAppsUsage.sumOf { it.totalTimeVisible }.coerceAtMost(timeSinceMidnight)
         } else {
+            val appSum = allAppsUsage.sumOf { it.totalTimeVisible }
             val dbTotal = selectedDayHistory.find { it.packageName == "TOTAL" }?.usageTimeMillis
             val fallbackTotal = if (preferSystemUsageHistory) {
                 _globalFallbackMap.value[selectedDateStr]?.find { it.packageName == "TOTAL" }?.usageTimeMillis
             } else null
 
-            dbTotal ?: fallbackTotal ?: appTotals.values.sum().coerceAtMost(86400000L)
+            dbTotal ?: fallbackTotal ?: appSum.coerceAtMost(86400000L)
         }
 
         val (finalShieldUsage, finalGoalUsage, finalOtherUsage) = if (isSelectedToday || (storedShieldUsage == null && storedGoalUsage == null)) {
@@ -1432,7 +1433,7 @@ class HomeViewModel(
         val todayDateStr = dateFormat.format(Date(todayStart))
         val actualTodayDbTotal = allHistory.find { it.date == todayDateStr && it.packageName == "TOTAL" }?.usageTimeMillis ?: 0L
 
-        val actualTodayTotal = maxOf(totalToday, actualTodayDbTotal).coerceAtMost(timeSinceMidnight)
+        val actualTodayTotal = totalToday.coerceAtMost(timeSinceMidnight)
 
         val history = (0 until 21).map { i ->
             val dStart = getMidnight(i)
@@ -1507,7 +1508,7 @@ class HomeViewModel(
         val (liveStreak, finalBestStreak) = userPreferencesRepository.refreshGlobalStreak(shieldRepository)
 
         _uiState.update { state -> state.copy(
-            totalScreenTime      = if (isSelectedToday) maxOf(state.totalScreenTime, selectedDayTotal) else selectedDayTotal,
+            totalScreenTime      = selectedDayTotal,
             yesterdayScreenTime  = totalYesterday,
             percentageChange     = percentageChange,
             dailyUsageHistory    = history.reversed(),
@@ -1515,9 +1516,9 @@ class HomeViewModel(
             snapshotStamps       = snapshotStamps.reversed(),
             topApps              = if (topApps.isEmpty() && isSelectedToday) state.topApps else topApps,
             allAppsUsage         = if (allAppsUsage.isEmpty() && isSelectedToday) state.allAppsUsage else allAppsUsage,
-            shieldUsage          = if (isSelectedToday) maxOf(state.shieldUsage, finalShieldUsage) else finalShieldUsage,
-            goalUsage            = if (isSelectedToday) maxOf(state.goalUsage, finalGoalUsage) else finalGoalUsage,
-            otherUsage           = if (isSelectedToday) maxOf(state.otherUsage, finalOtherUsage) else finalOtherUsage,
+            shieldUsage          = finalShieldUsage,
+            goalUsage            = finalGoalUsage,
+            otherUsage           = finalOtherUsage,
             activeShields = sortShields(liveShields.filter { it.type == FocusType.SHIELD }, state.shieldSortType),
             activeGoals   = sortShields(liveShields.filter { it.type == FocusType.GOAL }, state.goalSortType),
             globalCurrentStreak = liveStreak,
@@ -1750,7 +1751,9 @@ class HomeViewModel(
             weekDays.forEach { day ->
                 val dateStr = dateFormat.format(Date(day.date))
                 allHistory.filter { it.date == dateStr }.forEach { if (it.packageName !in setOf("TOTAL", "SHIELD_TOTAL", "GOAL_TOTAL", "OTHER_TOTAL")) appUsageMap[it.packageName] = (appUsageMap[it.packageName] ?: 0L) + it.usageTimeMillis }
-                if (preferSystem) _globalFallbackMap.value[dateStr]?.forEach { if (it.packageName != "TOTAL") { val ex = appUsageMap[it.packageName] ?: 0L; appUsageMap[it.packageName] = maxOf(ex, it.usageTimeMillis) } }
+                if (preferSystem) _globalFallbackMap.value[dateStr]?.forEach { if (it.packageName != "TOTAL") { 
+                    appUsageMap[it.packageName] = it.usageTimeMillis 
+                } }
             }
             val topApps = appUsageMap.entries.sortedByDescending { it.value }.take(3).map { (pkg, time) ->
                 val cached = appInfoCache[pkg]

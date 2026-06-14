@@ -363,8 +363,7 @@ class UsageSyncManager(
             } else 86400000L
 
             totalTime = totalTime.coerceAtMost(timeSinceMidnight)
-            val existingTotal = existingDailyMap["TOTAL"]?.usageTimeMillis ?: 0L
-            val finalTotal = maxOf(totalTime, existingTotal)
+            val finalTotal = totalTime
 
             var shieldTime = 0L
             var goalTime = 0L
@@ -374,9 +373,9 @@ class UsageSyncManager(
             allPackages.forEach { pkg ->
                 val newTime = appTotals[pkg] ?: 0L
                 val existingPkgTime = existingDailyMap[pkg]?.usageTimeMillis ?: 0L
-                val finalPkgTime = maxOf(newTime, existingPkgTime).coerceAtMost(finalTotal)
+                val finalPkgTime = newTime.coerceAtMost(finalTotal)
 
-                if (finalPkgTime > 0) {
+                if (finalPkgTime >= 0) {
                     dailyEntities.add(
                         com.etrisad.zenith.data.local.entity.DailyUsageEntity(
                             id = existingDailyMap[pkg]?.id ?: 0,
