@@ -554,22 +554,27 @@ class UserPreferencesRepository(private val context: Context) {
         val now = System.currentTimeMillis()
         val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
-        val (launcherApps, launcherPackage) = try {
-            val pm = context.packageManager
-            val apps = pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0).map { it.activityInfo.packageName }.toSet()
-            val lPkg = pm.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName
-            apps to lPkg
-        } catch (_: Exception) { emptySet<String>() to null }
+        val (launcherApps, launcherPackage) = withContext(Dispatchers.IO) {
+            try {
+                val pm = context.packageManager
+                val apps = pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0).map { it.activityInfo.packageName }.toSet()
+                val lPkg = pm.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName
+                apps to lPkg
+            } catch (_: Exception) { emptySet<String>() to null }
+        }
 
         val excludePackages = setOfNotNull(context.packageName, launcherPackage)
 
         val calendar = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }
         val todayStart = calendar.timeInMillis
 
-        val stats = com.etrisad.zenith.util.ScreenUsageHelper.fetchDetailedUsageToday(usageStatsManager).appUsageMap
-        var totalToday = 0L
-        stats.forEach { (pkg, time) ->
-            if (pkg !in excludePackages && pkg in launcherApps) totalToday += time
+        val totalToday = withContext(Dispatchers.IO) {
+            val stats = com.etrisad.zenith.util.ScreenUsageHelper.fetchDetailedUsageToday(usageStatsManager).appUsageMap
+            var total = 0L
+            stats.forEach { (pkg, time) ->
+                if (pkg !in excludePackages && pkg in launcherApps) total += time
+            }
+            total
         }
 
         val globalHistory = dbUsage.filter { it.packageName == "TOTAL" }
@@ -588,7 +593,9 @@ class UserPreferencesRepository(private val context: Context) {
                 if (oldestHistoryDate != null && dStr >= oldestHistoryDate) {
                     usage = 0L
                     } else if (i <= 14) {
-                        usage = fetchSystemTotalUsageForDate(usageStatsManager, c.timeInMillis, launcherApps, excludePackages)
+                        usage = withContext(Dispatchers.IO) {
+                            fetchSystemTotalUsageForDate(usageStatsManager, c.timeInMillis, launcherApps, excludePackages)
+                        }
                     }
                 }
 
@@ -653,7 +660,9 @@ class UserPreferencesRepository(private val context: Context) {
         val todayStr = dateFormat.format(Date(now))
 
         val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-        val todayUsageMap = com.etrisad.zenith.util.ScreenUsageHelper.fetchDetailedUsageToday(usageStatsManager).appUsageMap
+        val todayUsageMap = withContext(Dispatchers.IO) {
+            com.etrisad.zenith.util.ScreenUsageHelper.fetchDetailedUsageToday(usageStatsManager).appUsageMap
+        }
 
         shields.forEach { shield ->
             val pkg = shield.packageName
@@ -685,7 +694,9 @@ class UserPreferencesRepository(private val context: Context) {
                     if (oldestHistoryDate != null && dStr >= oldestHistoryDate) {
                         if (shield.type == FocusType.SHIELD) usage = 0L else break
                     } else if (i <= 14) {
-                        usage = fetchSystemAppUsageForDate(usageStatsManager, pkg, c.timeInMillis)
+                        usage = withContext(Dispatchers.IO) {
+                            fetchSystemAppUsageForDate(usageStatsManager, pkg, c.timeInMillis)
+                        }
                     }
                 }
 
@@ -769,14 +780,16 @@ class UserPreferencesRepository(private val context: Context) {
         val endH = try { prefs.bedtimeEndTime.split(":")[0].toInt() } catch(_: Exception) { 7 }
         val endM = try { prefs.bedtimeEndTime.split(":")[1].toInt() } catch(_: Exception) { 0 }
 
-        val launcherIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
-        val launcherPackage = try {
-            context.packageManager.resolveActivity(launcherIntent, PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName
-        } catch (_: Exception) { null }
-
-        val launcherApps = context.packageManager.queryIntentActivities(
-            Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0
-        ).map { it.activityInfo.packageName }.toSet()
+        val (launcherPackage, launcherApps) = withContext(Dispatchers.IO) {
+            val launcherIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+            val lPkg = try {
+                context.packageManager.resolveActivity(launcherIntent, PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName
+            } catch (_: Exception) { null }
+            val lApps = context.packageManager.queryIntentActivities(
+                Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0
+            ).map { it.activityInfo.packageName }.toSet()
+            lPkg to lApps
+        }
 
         val excludePackages = setOfNotNull(context.packageName, launcherPackage) + prefs.whitelistedPackages + prefs.bedtimeWhitelistedPackages
 
@@ -828,10 +841,12 @@ class UserPreferencesRepository(private val context: Context) {
             val totalDuration = endTime - startTime
             val targetMillis = (totalDuration * 0.1).toLong()
 
-            val events = try {
-                usageStatsManager.queryEvents(startTime - 30 * 60 * 1000L, actualEnd)
-            } catch (e: Exception) {
-                null
+            val events = withContext(Dispatchers.IO) {
+                try {
+                    usageStatsManager.queryEvents(startTime - 30 * 60 * 1000L, actualEnd)
+                } catch (e: Exception) {
+                    null
+                }
             }
             val event = android.app.usage.UsageEvents.Event()
             val usageMap = mutableMapOf<String, Long>()
@@ -1183,12 +1198,14 @@ class UserPreferencesRepository(private val context: Context) {
         val calendar = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }
         val todayStart = calendar.timeInMillis
         if (targetMillis > 0) {
-            val (launcherApps, launcherPackage) = try {
-                val pm = context.packageManager
-                val apps = pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0).map { it.activityInfo.packageName }.toSet()
-                val lPkg = pm.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName
-                apps to lPkg
-            } catch (_: Exception) { emptySet<String>() to null }
+            val (launcherApps, launcherPackage) = withContext(Dispatchers.IO) {
+                try {
+                    val pm = context.packageManager
+                    val apps = pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0).map { it.activityInfo.packageName }.toSet()
+                    val lPkg = pm.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName
+                    apps to lPkg
+                } catch (_: Exception) { emptySet<String>() to null }
+            }
             val excludePackages = setOfNotNull(context.packageName, launcherPackage)
 
             val globalHistory = dbUsage.filter { it.packageName == "TOTAL" }
@@ -1203,7 +1220,9 @@ class UserPreferencesRepository(private val context: Context) {
                     if (oldestHistoryDate != null && dStr >= oldestHistoryDate) {
                         usage = 0L
                     } else if (i <= 14) {
-                        usage = fetchSystemTotalUsageForDate(usageStatsManager, c.timeInMillis, launcherApps, excludePackages)
+                        usage = withContext(Dispatchers.IO) {
+                            fetchSystemTotalUsageForDate(usageStatsManager, c.timeInMillis, launcherApps, excludePackages)
+                        }
                     }
                 }
 
@@ -1212,9 +1231,12 @@ class UserPreferencesRepository(private val context: Context) {
                 } else break
             }
 
-            val stats = com.etrisad.zenith.util.ScreenUsageHelper.fetchDetailedUsageToday(usageStatsManager).appUsageMap
-            var totalToday = 0L
-            stats.forEach { (pkg, time) -> if (pkg !in excludePackages && pkg in launcherApps) totalToday += time }
+            val (totalToday, stats) = withContext(Dispatchers.IO) {
+                val stats = com.etrisad.zenith.util.ScreenUsageHelper.fetchDetailedUsageToday(usageStatsManager).appUsageMap
+                var total = 0L
+                stats.forEach { (pkg, time) -> if (pkg !in excludePackages && pkg in launcherApps) total += time }
+                total to stats
+            }
 
             val isSuccessToday = totalToday <= targetMillis
             if (isSuccessToday && (pastStreak + 1) < prefs.globalBestStreak) {
@@ -1222,7 +1244,9 @@ class UserPreferencesRepository(private val context: Context) {
                 for (j in 1..3) {
                     val cal = Calendar.getInstance().apply { timeInMillis = todayStart; add(Calendar.DAY_OF_YEAR, -j) }
                     val u = globalHistory.find { it.date == dateFormat.format(cal.time) }?.usageTimeMillis
-                        ?: fetchSystemTotalUsageForDate(usageStatsManager, cal.timeInMillis, launcherApps, excludePackages)
+                        ?: withContext(Dispatchers.IO) {
+                            fetchSystemTotalUsageForDate(usageStatsManager, cal.timeInMillis, launcherApps, excludePackages)
+                        }
                     if (u <= targetMillis) provenDays++ else break
                 }
                 if (provenDays >= 3) {
@@ -1232,7 +1256,9 @@ class UserPreferencesRepository(private val context: Context) {
         }
         val shields = shieldRepository.allShields.first()
         val allUsage = dbUsage.groupBy { it.packageName }
-        val todayUsageMap = com.etrisad.zenith.util.ScreenUsageHelper.fetchDetailedUsageToday(usageStatsManager).appUsageMap
+        val todayUsageMap = withContext(Dispatchers.IO) {
+            com.etrisad.zenith.util.ScreenUsageHelper.fetchDetailedUsageToday(usageStatsManager).appUsageMap
+        }
 
         shields.forEach { shield ->
             val pkg = shield.packageName
@@ -1251,7 +1277,9 @@ class UserPreferencesRepository(private val context: Context) {
                     if (oldestHistoryDate != null && dStr >= oldestHistoryDate) {
                         if (shield.type == FocusType.SHIELD) usage = 0L else break
                     } else if (i <= 14) {
-                        usage = fetchSystemAppUsageForDate(usageStatsManager, pkg, c.timeInMillis)
+                        usage = withContext(Dispatchers.IO) {
+                            fetchSystemAppUsageForDate(usageStatsManager, pkg, c.timeInMillis)
+                        }
                     }
                 }
 
@@ -1270,7 +1298,9 @@ class UserPreferencesRepository(private val context: Context) {
                 for (j in 1..3) {
                     val cal = Calendar.getInstance().apply { timeInMillis = todayStart; add(Calendar.DAY_OF_YEAR, -j) }
                     val u = history.find { it.date == dateFormat.format(cal.time) }?.usageTimeMillis
-                        ?: fetchSystemAppUsageForDate(usageStatsManager, pkg, cal.timeInMillis)
+                        ?: withContext(Dispatchers.IO) {
+                            fetchSystemAppUsageForDate(usageStatsManager, pkg, cal.timeInMillis)
+                        }
                     val success = if (shield.type == FocusType.GOAL) u >= limitMillis else u <= limitMillis
                     if (success) provenDays++ else break
                 }

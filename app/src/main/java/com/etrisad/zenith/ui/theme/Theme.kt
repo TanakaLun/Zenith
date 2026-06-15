@@ -5,6 +5,7 @@ import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -125,10 +126,12 @@ fun ZenithTheme(
         }
     }
 
-    val typography = when (fontOption) {
-        FontOption.SYSTEM -> SystemTypography
-        FontOption.GOOGLE_SANS_FLEX -> VariableFontFactory.createTypography(gsFlexSettings)
-        FontOption.NUNITO -> NunitoTypography
+    val typography = remember(fontOption, gsFlexSettings) {
+        when (fontOption) {
+            FontOption.SYSTEM -> SystemTypography
+            FontOption.GOOGLE_SANS_FLEX -> VariableFontFactory.createTypography(gsFlexSettings)
+            FontOption.NUNITO -> NunitoTypography
+        }
     }
 
     val view = LocalView.current
