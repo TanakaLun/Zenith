@@ -739,9 +739,11 @@ class ZenithAccessibilityService : AccessibilityService() {
             usageStatsCache = null
             lastUsageCacheTime = 0L
             SharedMonitoringState.systemAppCache.clear()
-            try {
-                ZenithDatabase.getDatabase(this).openHelper.writableDatabase.execSQL("PRAGMA shrink_memory")
-            } catch (_: Exception) {}
+            serviceScope.launch {
+                try {
+                    ZenithDatabase.getDatabase(this@ZenithAccessibilityService).openHelper.writableDatabase.execSQL("PRAGMA shrink_memory")
+                } catch (_: Exception) {}
+            }
         }
     }
 

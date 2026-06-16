@@ -1590,9 +1590,11 @@ class AppUsageMonitorService : Service() {
             SharedMonitoringState.launcherPackages = emptySet()
             lastUsageCacheTime = 0L
             lastLauncherRefreshTime = 0L
-            try {
-                ZenithDatabase.getDatabase(this).openHelper.writableDatabase.execSQL("PRAGMA shrink_memory")
-            } catch (_: Exception) {}
+            serviceScope.launch {
+                try {
+                    ZenithDatabase.getDatabase(this@AppUsageMonitorService).openHelper.writableDatabase.execSQL("PRAGMA shrink_memory")
+                } catch (_: Exception) {}
+            }
         }
     }
 

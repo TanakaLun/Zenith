@@ -109,15 +109,15 @@ class AppGoalOverlayActivity : ComponentActivity() {
         lifecycleScope.launch(Dispatchers.IO) {
             val shield = shieldRepo.getShieldByPackageName(packageName)
             if (shield == null || (shield.isGoalCallerEnabled && shield.isGoalCallerSoundEnabled)) {
+                val soundUri = if (shield?.goalCallerSoundUri != null) {
+                    shield.goalCallerSoundUri.toUri()
+                } else {
+                    android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_RINGTONE)
+                }
+
                 withContext(Dispatchers.Main) {
                     try {
                         mediaPlayer?.release()
-                        val soundUri = if (shield?.goalCallerSoundUri != null) {
-                            shield.goalCallerSoundUri.toUri()
-                        } else {
-                            android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_RINGTONE)
-                        }
-
                         mediaPlayer = MediaPlayer().apply {
                             setDataSource(this@AppGoalOverlayActivity, soundUri)
                             setAudioAttributes(
@@ -127,8 +127,8 @@ class AppGoalOverlayActivity : ComponentActivity() {
                                     .build()
                             )
                             isLooping = true
-                            prepare()
-                            start()
+                            setOnPreparedListener { it.start() }
+                            prepareAsync()
                         }
                     } catch (e: Exception) {
                         e.printStackTrace()

@@ -150,18 +150,29 @@ class BedtimeViewModel(
             val nextDateStr = dateFormat.format(nextDateCal.time)
 
             val pm = context.packageManager
+
+            // Query each unique date once instead of per-hour
+            val date1Data = withContext(Dispatchers.IO) {
+                shieldRepository.getHourlyUsageForDateSync(startDateStr)
+            }
+            val date2Data = if (startDateStr != nextDateStr) {
+                withContext(Dispatchers.IO) {
+                    shieldRepository.getHourlyUsageForDateSync(nextDateStr)
+                }
+            } else date1Data
+
+            val hourlyDataByDate = mapOf(startDateStr to date1Data, nextDateStr to date2Data)
+
             val usageInfoList = bedtimeHours.map { hour ->
                 val targetDate = if (hour >= startH) startDateStr else nextDateStr
-                val hourlyData = withContext(Dispatchers.IO) {
-                    shieldRepository.getHourlyUsageForDateSync(targetDate)
-                }
-                
+                val hourlyData = hourlyDataByDate[targetDate] ?: emptyList()
+
                 val hourTotal = hourlyData.find { it.hour == hour && it.packageName == "TOTAL" }?.usageTimeMillis ?: 0L
                 val appsForHour = withContext(Dispatchers.IO) {
                     hourlyData.filter { it.hour == hour && it.packageName != "TOTAL" && it.packageName !in excludePackages && it.packageName in launcherApps }
                         .mapNotNull { entity ->
                             if (entity.usageTimeMillis <= 0) return@mapNotNull null
-                            
+
                             val pkg = entity.packageName
                             val cached = appInfoCache[pkg]
                             if (cached != null) {
@@ -239,34 +250,40 @@ class BedtimeViewModel(
             calendar.set(Calendar.SECOND, 0)
             calendar.set(Calendar.MILLISECOND, 0)
 
-            val historyList = mutableListOf<DailyUsage>()
+            // First pass: collect all unique dates before querying
+            val uniqueDates = mutableSetOf<String>()
+            val dayEntries = mutableListOf<Triple<Long, String, String>>()
 
             for (i in 0 until 21) {
                 val sessionStartCal = (calendar.clone() as Calendar).apply {
                     add(Calendar.DAY_OF_YEAR, -i)
                 }
-
                 val startDateStr = dateFormat.format(sessionStartCal.time)
                 val nextDateCal = (sessionStartCal.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, 1) }
                 val nextDateStr = dateFormat.format(nextDateCal.time)
+                uniqueDates.add(startDateStr)
+                uniqueDates.add(nextDateStr)
+                dayEntries.add(Triple(sessionStartCal.timeInMillis, startDateStr, nextDateStr))
+            }
 
+            // Batch query all unique dates in one call
+            val allHourlyData = withContext(Dispatchers.IO) {
+                shieldRepository.getHourlyUsageForDatesSync(uniqueDates.toList())
+                    .groupBy { it.date }
+            }
+
+            val historyList = dayEntries.map { (timeInMillis, startDateStr, nextDateStr) ->
                 var sessionTotal = 0L
                 for (hour in bedtimeHours) {
                     val targetDate = if (hour >= startH) startDateStr else nextDateStr
-                    val hourlyData = withContext(Dispatchers.IO) {
-                        shieldRepository.getHourlyUsageForDateSync(targetDate)
-                    }
-                    val hourTotal = hourlyData.find { it.hour == hour && it.packageName == "TOTAL" }?.usageTimeMillis ?: 0L
-                    sessionTotal += hourTotal
+                    val hourlyData = allHourlyData[targetDate] ?: emptyList()
+                    sessionTotal += hourlyData.find { it.hour == hour && it.packageName == "TOTAL" }?.usageTimeMillis ?: 0L
                 }
-
-                historyList.add(
-                    DailyUsage(
-                        date = sessionStartCal.timeInMillis,
-                        totalTime = sessionTotal,
-                        hasDatabaseRecord = true,
-                        isLive = i == 0
-                    )
+                DailyUsage(
+                    date = timeInMillis,
+                    totalTime = sessionTotal,
+                    hasDatabaseRecord = true,
+                    isLive = timeInMillis == dayEntries[0].first
                 )
             }
 

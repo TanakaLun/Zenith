@@ -194,7 +194,7 @@ class HomeViewModel(
         _globalFallbackMap,
         userPreferencesRepository.userPreferencesFlow
     ) { dbList, hourlyDates, fallbackMap, prefs ->
-        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val dateFormat = getDateFormat()
         val todayStr = dateFormat.format(Date())
         val preferSystem = prefs.preferSystemUsageHistory
 
@@ -475,7 +475,7 @@ class HomeViewModel(
 
     private suspend fun repairDataInternal(date: String, mode: RepairMode = RepairMode.SYSTEM) {
         val prefs = userPreferencesRepository.userPreferencesFlow.first()
-        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val dateFormat = getDateFormat()
         val todayStr = dateFormat.format(Date())
 
         val dbRecords = shieldRepository.getDailyUsagesForDateSync(date)
@@ -580,7 +580,7 @@ class HomeViewModel(
 
                 val cal = Calendar.getInstance()
                 cal.add(Calendar.DAY_OF_YEAR, -21)
-                val thresholdDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(cal.time)
+                val thresholdDate = getDateFormat().format(cal.time)
                 try {
                     shieldRepository.deleteOldHourlyUsage(thresholdDate)
                 } catch (e: Exception) {
@@ -613,7 +613,7 @@ class HomeViewModel(
         prefs: UserPreferences,
         fallbackMap: Map<String, List<UsageRecord.Live>>
     ) {
-        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val dateFormat = getDateFormat()
         val todayStr = dateFormat.format(Date())
         val selectedDate = _uiState.value.selectedDateMillis
         val selectedDateStr = dateFormat.format(Date(selectedDate))
@@ -793,7 +793,7 @@ class HomeViewModel(
     }
 
     val todayHourlyUsage: Flow<List<HourlyUsageEntity>> = allDatabaseUsage.flatMapLatest {
-        val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        val today = getDateFormat().format(Date())
         shieldRepository.getHourlyUsageForDate(today)
     }
 
@@ -821,7 +821,7 @@ class HomeViewModel(
         refreshMutex.withLock {
             if (!isInitial) _uiState.update { it.copy(isLoading = true) }
             try {
-                val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+                val todayStr = getDateFormat().format(Date())
                 ScreenUsageHelper.clearCache()
 
                 updateGlobalFallbackInternal(forceFull = isInitial)
@@ -847,7 +847,7 @@ class HomeViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             try {
-                val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+                val today = getDateFormat().format(Date())
 
                 userPreferencesRepository.setLastSyncTimestamp(getMidnight(0))
 
@@ -868,7 +868,7 @@ class HomeViewModel(
 
     fun deleteHourlyPackageUsageToday(packageName: String) {
         viewModelScope.launch {
-            val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+            val today = getDateFormat().format(Date())
             shieldRepository.deleteHourlyUsageForPackage(today, packageName)
             refreshUsageStats(showLoading = false)
         }
@@ -876,7 +876,7 @@ class HomeViewModel(
 
     fun deleteHourlyUsageAtHour(hour: Int, packageName: String) {
         viewModelScope.launch {
-            val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+            val today = getDateFormat().format(Date())
             shieldRepository.deleteHourlyUsageAtHour(today, hour, packageName)
             refreshUsageStats(showLoading = false)
         }
@@ -937,7 +937,7 @@ class HomeViewModel(
             set(Calendar.SECOND, 0)
             set(Calendar.MILLISECOND, 0)
         }.timeInMillis
-        val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(todayStart))
+        val todayStr = getDateFormat().format(Date(todayStart))
 
         val results = if (now - todayStart < 86400000) {
             val todayDetailed = ScreenUsageHelper.fetchDetailedUsageToday(usm)
@@ -984,7 +984,7 @@ class HomeViewModel(
     ): List<Pair<String, List<UsageRecord.Live>>> = coroutineScope {
         range.map { i ->
             async {
-                val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                val dateFormat = getDateFormat()
                 val start = getMidnight(i)
                 val end = if (i == 0) now else getMidnight(i - 1)
                 val dateStr = dateFormat.format(Date(start))
@@ -1058,7 +1058,7 @@ class HomeViewModel(
 
     private suspend fun updatePackageFallback(packageName: String) = withContext(Dispatchers.IO) {
         val usm = this@HomeViewModel.context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val dateFormat = getDateFormat()
         val result = mutableMapOf<String, Long>()
         val now = System.currentTimeMillis()
         for (i in 0..30) {
@@ -1139,7 +1139,7 @@ class HomeViewModel(
         calDate.add(Calendar.DAY_OF_YEAR, 1)
         val dayEnd = if (dayStart + 86400000L > now) now else calDate.timeInMillis
 
-        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val dateFormat = getDateFormat()
 
         val todayDetailed = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             ScreenUsageHelper.fetchDetailedUsageToday(usm, includeHourly = isSelectedToday)
@@ -1536,7 +1536,7 @@ class HomeViewModel(
         else _appDetailUiState.update { it.copy(isLoading = true) }
         appDetailJob = viewModelScope.launch {
             val usm = this@HomeViewModel.context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-            val pm = this@HomeViewModel.context.packageManager; val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+            val pm = this@HomeViewModel.context.packageManager; val dateFormat = getDateFormat()
             var appName = packageName
             try {
                 val appInfo = pm.getApplicationInfo(packageName, 0)
@@ -1756,7 +1756,7 @@ class HomeViewModel(
             val history = _uiState.value.dailyUsageHistory; if (history.isEmpty()) return@launch
             val pages = history.chunked(7); if (pageIndex !in pages.indices) return@launch
             val weekDays = pages[pageIndex]; val avg = if (weekDays.isNotEmpty()) weekDays.map { it.totalTime }.average().toLong() else 0L
-            val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()); val appUsageMap = mutableMapOf<String, Long>()
+            val dateFormat = getDateFormat(); val appUsageMap = mutableMapOf<String, Long>()
             val preferSystem = userPreferencesRepository.userPreferencesFlow.first().preferSystemUsageHistory
             weekDays.forEach { day ->
                 val dateStr = dateFormat.format(Date(day.date))
@@ -1770,6 +1770,16 @@ class HomeViewModel(
                 AppUsageInfo(pkg, cached ?: pkg, time)
             }
             _uiState.update { it.copy(weeklyAvgTime = avg, weeklyTopApps = topApps) }
+        }
+    }
+
+    private fun getDateFormat(): SimpleDateFormat {
+        return dateFormatTL.get()!!
+    }
+
+    companion object {
+        private val dateFormatTL = object : ThreadLocal<SimpleDateFormat>() {
+            override fun initialValue() = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
         }
     }
 }

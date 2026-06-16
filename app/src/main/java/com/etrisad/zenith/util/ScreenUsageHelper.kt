@@ -2,6 +2,7 @@ package com.etrisad.zenith.util
 
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
+import android.util.SparseArray
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -34,7 +35,7 @@ object ScreenUsageHelper {
     private const val SESSION_TIMEOUT_MS = 60000L
 
     private val accumulatedUsageMap = mutableMapOf<String, Long>()
-    private val accumulatedHourlyMap = mutableMapOf<Int, MutableMap<String, Long>>()
+    private val accumulatedHourlyMap = SparseArray<HashMap<String, Long>>()
     private val accumulatedSessionCounts = mutableMapOf<String, Int>()
     private var lastParsedTimestamp = 0L
     private var currentActivePkg: String? = null
@@ -180,7 +181,29 @@ object ScreenUsageHelper {
                     accumulatedSessionCounts[pkg] = (accumulatedSessionCounts[pkg] ?: 0) + 1
                 }
                 if (includeHourly) {
-                    addHourlyUsage(accumulatedHourlyMap, pkg, segmentStart, segmentEnd, zoneId)
+                    var currentMillis = segmentStart
+                    var currentZdt = Instant.ofEpochMilli(currentMillis).atZone(zoneId)
+                    var nextHourZdt = currentZdt.plusHours(1).withMinute(0).withSecond(0).withNano(0)
+                    var nextHourMillis = nextHourZdt.toInstant().toEpochMilli()
+                    while (currentMillis < segmentEnd) {
+                        val hour = currentZdt.hour
+                        val segEnd = if (nextHourMillis < segmentEnd) nextHourMillis else segmentEnd
+                        val duration = segEnd - currentMillis
+                        if (duration > 0) {
+                            var pkgMap = accumulatedHourlyMap.get(hour)
+                            if (pkgMap == null) {
+                                pkgMap = HashMap()
+                                accumulatedHourlyMap.put(hour, pkgMap)
+                            }
+                            pkgMap[pkg] = (pkgMap[pkg] ?: 0L) + duration
+                        }
+                        currentMillis = segEnd
+                        if (currentMillis < segmentEnd) {
+                            currentZdt = nextHourZdt
+                            nextHourZdt = currentZdt.plusHours(1)
+                            nextHourMillis = nextHourZdt.toInstant().toEpochMilli()
+                        }
+                    }
                 }
             }
         }
@@ -225,7 +248,10 @@ object ScreenUsageHelper {
 
         val resultHourlyMap = if (includeHourly) {
             val hMap = mutableMapOf<Int, MutableMap<String, Long>>()
-            accumulatedHourlyMap.forEach { (h, m) -> hMap[h] = m.toMutableMap() }
+            for (i in 0 until accumulatedHourlyMap.size()) {
+                val h = accumulatedHourlyMap.keyAt(i)
+                hMap[h] = accumulatedHourlyMap.valueAt(i).toMutableMap()
+            }
             if (currentIsScreenOn && currentActivePkg != null) {
                 val p = currentActivePkg!!
                 val segmentStart = maxOf(currentActiveStartTime, todayStart)
