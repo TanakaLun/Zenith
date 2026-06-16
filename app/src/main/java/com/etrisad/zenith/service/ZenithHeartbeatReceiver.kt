@@ -11,6 +11,7 @@ class ZenithHeartbeatReceiver : BroadcastReceiver() {
         val validActions = setOf(
             "com.etrisad.zenith.action.HEARTBEAT",
             "com.etrisad.zenith.action.REFRESH_SERVICES",
+            "com.etrisad.zenith.action.SCREEN_OFF_GOAL_CHECK",
             Intent.ACTION_BOOT_COMPLETED,
             Intent.ACTION_MY_PACKAGE_REPLACED
         )
@@ -18,10 +19,11 @@ class ZenithHeartbeatReceiver : BroadcastReceiver() {
         if (action in validActions) {
             try {
                 val monitorIntent = Intent(context, AppUsageMonitorService::class.java).apply {
-                    this.action = if (action == "com.etrisad.zenith.action.REFRESH_SERVICES") 
-                        "com.etrisad.zenith.action.REFRESH_DATA" 
-                    else 
-                        "com.etrisad.zenith.action.HEARTBEAT"
+                    this.action = when (action) {
+                        "com.etrisad.zenith.action.REFRESH_SERVICES" -> "com.etrisad.zenith.action.REFRESH_DATA"
+                        "com.etrisad.zenith.action.SCREEN_OFF_GOAL_CHECK" -> "com.etrisad.zenith.action.SCREEN_OFF_GOAL_CHECK"
+                        else -> "com.etrisad.zenith.action.HEARTBEAT"
+                    }
                 }
                 
                 try {

@@ -339,6 +339,17 @@ class SessionUsageOverlayManager(
         }
     }
 
+    fun removeAllHUDViews() {
+        synchronized(activeSessions) {
+            activeSessions.forEach { session ->
+                session.hudInstance?.let {
+                    destroyHUDInstance(it, session.packageName)
+                    session.hudInstance = null
+                }
+            }
+        }
+    }
+
     fun hideHUD(packageName: String? = null) {
         if (Looper.myLooper() != Looper.getMainLooper()) {
             mainHandler.post { hideHUD(packageName) }
@@ -399,6 +410,10 @@ class SessionUsageOverlayManager(
                         }
                     }
                 } else {
+                    session.hudInstance?.let {
+                        destroyHUDInstance(it, session.packageName)
+                        session.hudInstance = null
+                    }
                     if (session.isVisibleState.value) {
                         session.isVisibleState.value = false
                         if (session.backgroundTimestamp == 0L) {

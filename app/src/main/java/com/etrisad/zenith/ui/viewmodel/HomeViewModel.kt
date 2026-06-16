@@ -1298,7 +1298,7 @@ class HomeViewModel(
             Triple(storedShieldUsage ?: 0L, storedGoalUsage ?: 0L, storedOtherUsage ?: 0L)
         }
 
-        val dbHourly = shieldRepository.getHourlyUsageForDate(selectedDateStr).first()
+        val dbHourly = withTimeout(5000) { shieldRepository.getHourlyUsageForDateSync(selectedDateStr) }
         val currentHour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
         val newlyLocked = mutableListOf<HourlyUsageEntity>()
         val carryOverChunksByPkg = mutableMapOf<String, Long>()

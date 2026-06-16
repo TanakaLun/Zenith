@@ -73,6 +73,17 @@ object SharedMonitoringState {
         "com.google.android.apps.youtube.music", "com.android.vending"
     )
 
+    val FINANCIAL_APPS = setOf(
+        "pl.mbank", "pl.pkobp.iko", "pl.ing.bmo", "pl.pekao.bm",
+        "pl.bzwbk.bm", "pl.millennium.czyngasie", "pl.aliorbank.aib",
+        "pl.bnpparibas.bgzbnp", "pl.creditagricole.lmpl", "pl.bosbank.bbm",
+        "pl.plusbank.mobile", "pl.nestbank.mobile", "pl.toyota.mobile",
+        "com.google.android.apps.walletnfcrel"
+    )
+
+    fun isFinancialApp(packageName: String): Boolean =
+        packageName in FINANCIAL_APPS
+
     fun updateRestrictedPackages() {
         val shieldPkgs = allShieldsCache.keys
         val schedulePkgs = activeSchedules.asSequence().filter { it.mode == ScheduleMode.BLOCK }

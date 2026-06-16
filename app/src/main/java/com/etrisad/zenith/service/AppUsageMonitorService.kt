@@ -1,5 +1,6 @@
 package com.etrisad.zenith.service
 
+import android.app.AlarmManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -116,6 +117,7 @@ class AppUsageMonitorService : Service() {
                     currentSessionPackage = null
                     cachedForegroundApp = null
                     cachedForegroundAppTime = 0L
+                    cancelScreenOffGoalAlarm()
                     Log.w("ZenithAUMS", "SCREEN ON: starting foreground")
                     try {
                         startForeground(NOTIFICATION_ID, createNotification())
@@ -146,6 +148,7 @@ class AppUsageMonitorService : Service() {
                     monitoringJob = null
                     foregroundAppJob = null
                     monitoringLoopActive = false
+                    scheduleScreenOffGoalAlarm()
                     stopForeground(STOP_FOREGROUND_REMOVE)
                     Log.w("ZenithAUMS", "SCREEN OFF: monitoring cancelled, foreground removed")
                 }
@@ -169,12 +172,15 @@ class AppUsageMonitorService : Service() {
             "com.etrisad.zenith.action.MIDNIGHT_RESET_SERVICE" -> onMidnightReset()
             "com.etrisad.zenith.action.HEARTBEAT" -> {
                 scheduleHeartbeatAlarm()
-                if (!monitoringLoopActive && isScreenOn) {
-                    startMonitoring()
-                }
+                refreshData()
             }
             "com.etrisad.zenith.action.REFRESH_DATA" -> {
                 refreshData()
+            }
+            "com.etrisad.zenith.action.SCREEN_OFF_GOAL_CHECK" -> {
+                if (!isScreenOn) {
+                    serviceScope.launch { checkGoalReminders() }
+                }
             }
         }
         return START_STICKY
@@ -251,6 +257,36 @@ class AppUsageMonitorService : Service() {
         )
         val triggerAt = System.currentTimeMillis() + 2 * 60 * 60 * 1000L
         alarmManager.setWindow(android.app.AlarmManager.RTC, triggerAt, 15 * 60 * 1000L, pendingIntent)
+    }
+
+    private fun scheduleScreenOffGoalAlarm() {
+        val hasCallerGoals = SharedMonitoringState.goalShieldsCache.any { it.isGoalCallerEnabled }
+        if (!hasCallerGoals) return
+        val alarmManager = getSystemService(android.content.Context.ALARM_SERVICE) as android.app.AlarmManager
+        val intent = Intent(this, ZenithHeartbeatReceiver::class.java).apply {
+            action = "com.etrisad.zenith.action.SCREEN_OFF_GOAL_CHECK"
+        }
+        val pendingIntent = PendingIntent.getBroadcast(
+            this, 1001, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val interval = 15 * 60 * 1000L
+        alarmManager.setInexactRepeating(
+            AlarmManager.RTC_WAKEUP,
+            System.currentTimeMillis() + interval,
+            interval,
+            pendingIntent
+        )
+    }
+
+    private fun cancelScreenOffGoalAlarm() {
+        val alarmManager = getSystemService(android.content.Context.ALARM_SERVICE) as android.app.AlarmManager
+        val intent = Intent(this, ZenithHeartbeatReceiver::class.java).apply {
+            action = "com.etrisad.zenith.action.SCREEN_OFF_GOAL_CHECK"
+        }
+        val pendingIntent = PendingIntent.getBroadcast(
+            this, 1001, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        alarmManager.cancel(pendingIntent)
     }
 
     private fun onMidnightReset() {
@@ -339,7 +375,7 @@ class AppUsageMonitorService : Service() {
 
     private suspend fun checkGoalReminders() {
         val goals = SharedMonitoringState.goalShieldsCache
-        if (!isScreenOn || goals.isEmpty()) return
+        if (goals.isEmpty()) return
         val currentTime = System.currentTimeMillis()
         if (currentTime - lastGoalReminderCheckTime < 60000) return
         lastGoalReminderCheckTime = currentTime
@@ -543,6 +579,9 @@ class AppUsageMonitorService : Service() {
         monitoringJob = serviceScope.launch(Dispatchers.Default) {
             var maintenanceTick = 0L
             val startTime = System.currentTimeMillis()
+
+            checkGoalReminders()
+
             while (true) {
                 try {
                     lastLoopTick = System.currentTimeMillis()

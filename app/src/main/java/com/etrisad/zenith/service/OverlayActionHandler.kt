@@ -411,6 +411,8 @@ class OverlayActionHandler(
     fun shouldBypassBlocking(packageName: String): Boolean {
         if (packageName == contextPkg) return true
 
+        if (SharedMonitoringState.isFinancialApp(packageName)) return true
+
         val prefs = SharedMonitoringState.currentPreferences
         val isBedtimeOrWindDown = SharedMonitoringState.isBedtimeActive || (SharedMonitoringState.isWindDownActive && prefs?.bedtimeWindDownEnabled == true)
 

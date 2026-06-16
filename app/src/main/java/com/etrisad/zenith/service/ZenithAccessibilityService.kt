@@ -291,7 +291,7 @@ class ZenithAccessibilityService : AccessibilityService() {
                                 shieldRepository.updateShield(updated)
                                 currentShieldCache = updated
                             }
-                        } else {
+                        } else if (!InterceptOverlayManager.isShowing) {
                             checkIfAppIsShielded(currentPkg)
                         }
                     }
@@ -307,7 +307,7 @@ class ZenithAccessibilityService : AccessibilityService() {
                                         lastKickTime = System.currentTimeMillis()
                                         lastKickedPackage = currentPkg
                                         goToHomeScreen()
-                                    } else {
+                                    } else if (!InterceptOverlayManager.isShowing) {
                                         checkIfAppIsShielded(currentPkg)
                                     }
                                 }
@@ -361,9 +361,22 @@ class ZenithAccessibilityService : AccessibilityService() {
                 }
             }
             currentShieldCache = null
+            if (SharedMonitoringState.isFinancialApp(currentApp)) {
+                sessionUsageOverlayManager.removeAllHUDViews()
+            }
             serviceScope.launch(Dispatchers.Main) {
                 overlayManager.hideOverlay()
             }
+            val bypassedPkg = currentApp
+            mainHandler.postDelayed({
+                if (!InterceptOverlayManager.isShowing) {
+                    val actualPkg = rootInActiveWindow?.packageName?.toString()
+                    if (actualPkg != null && actualPkg != packageName && actualPkg != bypassedPkg && actualPkg != lastForegroundApp) {
+                        AppStateHolder.foregroundApp.value = actualPkg
+                        packageChangeFlow.tryEmit(actualPkg)
+                    }
+                }
+            }, 800)
             return
         }
 
