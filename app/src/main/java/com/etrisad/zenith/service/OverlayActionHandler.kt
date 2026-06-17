@@ -191,14 +191,16 @@ class OverlayActionHandler(
             allowedApps.remove(targetPackageName)
             if (getForegroundAppName() != targetPackageName) return@Runnable
             val s = SharedMonitoringState.allShieldsCache[targetPackageName]
-            if (s == null) return@Runnable
-            if (s.isAutoQuitEnabled) {
+            val mindful = mindfulGatewayStates[targetPackageName]
+            val shield = s ?: mindful
+            if (shield == null) return@Runnable
+            if (shield.isAutoQuitEnabled) {
                 goToHomeScreen()
             } else {
                 showShieldOverlay(
                     targetPackageName = targetPackageName,
-                    shield = s,
-                    isMindfulGateway = false,
+                    shield = shield,
+                    isMindfulGateway = mindful != null,
                     delayDurationSeconds = 0,
                     totalUsageToday = getTotalUsageToday(targetPackageName),
                     totalGlobalUsageToday = getTotalGlobalUsageToday(),
