@@ -40,7 +40,7 @@ class UsageSyncManager(
         }
         val lastSyncTime = cachedLastSyncTimestamp
 
-        if (currentTime - lastSyncTime < 30000) return@withLock
+        if (currentTime - lastSyncTime < 20000) return@withLock
 
         val pm = context.packageManager
         

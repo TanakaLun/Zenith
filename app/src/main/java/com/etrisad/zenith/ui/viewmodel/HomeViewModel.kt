@@ -822,21 +822,22 @@ class HomeViewModel(
             if (!isInitial) _uiState.update { it.copy(isLoading = true) }
             try {
                 val todayStr = getDateFormat().format(Date())
-                ScreenUsageHelper.clearCache()
-
-                updateGlobalFallbackInternal(forceFull = isInitial)
-                performUsageStatsRefresh(showLoading = false)
-
-                repairDataInternal(todayStr)
 
                 val syncManager = UsageSyncManager(this@HomeViewModel.context, shieldRepository, userPreferencesRepository)
                 kotlinx.coroutines.withTimeoutOrNull(25000) {
                     syncManager.syncUsageData()
                 }
+
+                ScreenUsageHelper.clearCache()
+                updateGlobalFallbackInternal(forceFull = isInitial)
+                performUsageStatsRefresh(showLoading = false)
+
+                repairDataInternal(todayStr)
             } catch (e: Exception) {
                 android.util.Log.e("HomeVM", "Sync failed: ${e.message}")
             } finally {
                 userPreferencesRepository.refreshAllAppStreaks(shieldRepository)
+                ScreenUsageHelper.clearCache()
                 performUsageStatsRefresh(showLoading = false)
             }
         }
@@ -1298,7 +1299,11 @@ class HomeViewModel(
             Triple(storedShieldUsage ?: 0L, storedGoalUsage ?: 0L, storedOtherUsage ?: 0L)
         }
 
-        val dbHourly = withTimeout(5000) { shieldRepository.getHourlyUsageForDateSync(selectedDateStr) }
+        val dbHourly = try {
+            withTimeout(15000) { shieldRepository.getHourlyUsageForDateSync(selectedDateStr) }
+        } catch (_: Exception) {
+            emptyList()
+        }
         val currentHour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
         val newlyLocked = mutableListOf<HourlyUsageEntity>()
         val carryOverChunksByPkg = mutableMapOf<String, Long>()
@@ -1672,9 +1677,9 @@ class HomeViewModel(
                 }
                 val remainingToTarget = (currentTargetMinutes * 60 * 1000L - _uiState.value.totalScreenTime).coerceAtLeast(0L)
                 val interval = when {
-                    remainingToTarget < 30_000L -> 1000L
-                    remainingToTarget < 300_000L -> 3000L
-                    else -> 10_000L
+                    remainingToTarget < 30_000L -> 2000L
+                    remainingToTarget < 300_000L -> 5000L
+                    else -> 15000L
                 }
                 delay(interval)
             }

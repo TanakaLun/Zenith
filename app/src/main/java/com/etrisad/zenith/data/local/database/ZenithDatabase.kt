@@ -241,7 +241,7 @@ abstract class ZenithDatabase : RoomDatabase() {
                         MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21,
                         MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25
                     )
-                    .setQueryExecutor(Executors.newFixedThreadPool(2))
+                    .setQueryExecutor(Executors.newFixedThreadPool(4))
                     .setTransactionExecutor(Executors.newSingleThreadExecutor())
                     .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
                     .fallbackToDestructiveMigration()

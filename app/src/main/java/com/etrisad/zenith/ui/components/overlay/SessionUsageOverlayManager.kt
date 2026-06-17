@@ -156,7 +156,7 @@ class SessionUsageOverlayManager(
 
             val isForeground = currentForegroundPackage.contains(packageName) ||
                     packageName.contains(currentForegroundPackage)
-            if (isForeground && session.hudInstance == null) {
+            if ((isForeground || isGoal) && session.hudInstance == null) {
                 session.hudInstance = createHUDInstance(session)
             }
 

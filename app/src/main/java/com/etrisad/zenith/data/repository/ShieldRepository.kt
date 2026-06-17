@@ -156,12 +156,10 @@ class ShieldRepository(
             _allShieldsCache.value = currentList
         }
 
-        repositoryScope.launch {
-            try {
-                shieldDao.updateShield(shield)
-            } catch (e: Exception) {
-                android.util.Log.e("ShieldRepo", "Gagal update database: ${e.message}")
-            }
+        try {
+            shieldDao.updateShield(shield)
+        } catch (e: Exception) {
+            android.util.Log.e("ShieldRepo", "Gagal update database: ${e.message}")
         }
     }
 

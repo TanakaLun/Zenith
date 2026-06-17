@@ -21,7 +21,7 @@ object ScreenUsageHelper {
     @Volatile
     private var lastQueryTime = 0L
     @Volatile
-    var cacheDuration = 600000L
+    var cacheDuration = 180000L
         private set
 
     fun updateCacheDuration(durationMs: Long) {
