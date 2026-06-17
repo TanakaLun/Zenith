@@ -211,6 +211,7 @@ fun SettingsCategoryScreen(
                             },
                             onRegisterApplyAction = { action -> performanceApplyAction.value = action },
                             onResetPerfMonDelays = { coroutineScope.launch { preferencesRepository.resetPerfMonDelays() } },
+                            onAccessibilityRequiredChange = { required -> coroutineScope.launch { preferencesRepository.setAccessibilityRequired(required) } },
                         )
                     }
                     "developer" -> DeveloperSettings(

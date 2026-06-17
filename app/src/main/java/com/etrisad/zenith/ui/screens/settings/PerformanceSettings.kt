@@ -47,6 +47,7 @@ import com.etrisad.zenith.ui.components.ZenithButtonType
 import com.etrisad.zenith.ui.components.ZenithButtonWeighted
 import com.etrisad.zenith.ui.components.ZenithGroupedButton
 import com.etrisad.zenith.ui.components.focus.PreferenceCategory
+import com.etrisad.zenith.ui.screens.settings.SettingsToggle
 import com.etrisad.zenith.util.isAccessibilityServiceEnabled
 import kotlinx.coroutines.launch
 
@@ -179,6 +180,7 @@ fun PerformanceTuningPanel(
     onSetPerformanceLevel: ((PerformanceLevel) -> Unit)? = null,
     onRegisterApplyAction: ((() -> Unit) -> Unit)? = null,
     onResetPerfMonDelays: (() -> Unit)? = null,
+    onAccessibilityRequiredChange: (Boolean) -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     var tuningExpanded by remember { mutableStateOf(selectedLevel == PerformanceLevel.CUSTOM) }
@@ -390,7 +392,16 @@ fun PerformanceTuningPanel(
             context.startActivity(intent)
         },
         icon = Icons.Outlined.AccessibilityNew,
-        position = TuningGroupPosition.Single
+        position = TuningGroupPosition.Top
+    )
+    Spacer(modifier = Modifier.height(4.dp))
+    SettingsToggle(
+        title = "Make as Requirement",
+        description = "Require Accessibility Service to be granted for permission checks",
+        checked = preferences.accessibilityRequired,
+        onCheckedChange = onAccessibilityRequiredChange,
+        icon = Icons.Outlined.AccessibilityNew,
+        shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp)
     )
     Spacer(modifier = Modifier.height(16.dp))
 

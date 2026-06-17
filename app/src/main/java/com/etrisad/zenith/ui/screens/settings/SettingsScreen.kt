@@ -125,7 +125,6 @@ fun SettingsScreen(
             item {
                 GeneralSettings(
                     preferences = preferences,
-                    onAccessibilityDisabledChange = { disabled -> coroutineScope.launch { preferencesRepository.setAccessibilityDisabled(disabled) } },
                     onSetTarget = { mins -> coroutineScope.launch { preferencesRepository.setScreenTimeTarget(mins) } },
                     onSetEmergencyRecharge = { mins -> coroutineScope.launch { preferencesRepository.setEmergencyRechargeDuration(mins) } },
                     onSetDelayAppDuration = { secs -> coroutineScope.launch { preferencesRepository.setDelayAppDuration(secs) } },

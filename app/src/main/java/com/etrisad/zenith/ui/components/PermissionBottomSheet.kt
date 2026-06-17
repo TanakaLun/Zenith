@@ -80,7 +80,7 @@ fun PermissionBottomSheet(
     var stabilityExpanded by remember { mutableStateOf(false) }
     var optionalExpanded by remember { mutableStateOf(false) }
 
-    val optionalAllGranted = hasAccessibility && hasNotificationListener
+    val optionalAllGranted = if (preferences.accessibilityRequired) hasNotificationListener else (hasAccessibility && hasNotificationListener)
     val stabilityAllGranted = !isBatteryOptimized && canExactAlarm
 
     val notificationLauncher = rememberLauncherForActivityResult(
@@ -95,7 +95,7 @@ fun PermissionBottomSheet(
         }
     )
 
-    val allGranted = hasUsageStats && hasOverlay && hasNotifications && hasNotificationPolicy && (hasAccessibility || preferences.accessibilityDisabled)
+    val allGranted = hasUsageStats && hasOverlay && hasNotifications && hasNotificationPolicy && (hasAccessibility || !preferences.accessibilityRequired)
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -217,20 +217,37 @@ fun PermissionBottomSheet(
                     context.startActivity(intent)
                 },
                 icon = Icons.Outlined.Layers,
-                position = GroupPosition.Bottom
+                position = if (preferences.accessibilityRequired) GroupPosition.Middle else GroupPosition.Bottom
             )
+
+            if (preferences.accessibilityRequired) {
+                Spacer(modifier = Modifier.height(4.dp))
+                PermissionItemRow(
+                    title = "Accessibility Service",
+                    description = "To detect app launches instantly",
+                    isGranted = hasAccessibility,
+                    onClick = {
+                        val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(intent)
+                    },
+                    icon = Icons.Outlined.AccessibilityNew,
+                    position = GroupPosition.Bottom
+                )
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            if (!preferences.accessibilityDisabled) {
-                CollapsibleSection(
-                    title = "Optional Service",
-                    icon = Icons.Outlined.AccessibilityNew,
-                    expanded = optionalExpanded,
-                    onToggle = { optionalExpanded = !optionalExpanded },
-                    isAllGranted = optionalAllGranted
-                ) {
-                    Column {
+            CollapsibleSection(
+                title = "Optional Service",
+                icon = Icons.Outlined.AccessibilityNew,
+                expanded = optionalExpanded,
+                onToggle = { optionalExpanded = !optionalExpanded },
+                isAllGranted = optionalAllGranted
+            ) {
+                Column {
+                    if (!preferences.accessibilityRequired) {
                         PermissionItemRow(
                             title = "Accessibility Service",
                             description = "To detect app launches instantly",
@@ -246,24 +263,24 @@ fun PermissionBottomSheet(
                             isInsideCollapse = true
                         )
                         Spacer(modifier = Modifier.height(4.dp))
-                        PermissionItemRow(
-                            title = "Intercept Service",
-                            description = "Required to block schedule notifications",
-                            isGranted = hasNotificationListener,
-                            onClick = {
-                                val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).apply {
-                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                }
-                                context.startActivity(intent)
-                            },
-                            icon = Icons.Outlined.PhonelinkErase,
-                            position = GroupPosition.Bottom,
-                            isInsideCollapse = true
-                        )
                     }
+                    PermissionItemRow(
+                        title = "Intercept Service",
+                        description = "Required to block schedule notifications",
+                        isGranted = hasNotificationListener,
+                        onClick = {
+                            val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(intent)
+                        },
+                        icon = Icons.Outlined.PhonelinkErase,
+                        position = if (preferences.accessibilityRequired) GroupPosition.Single else GroupPosition.Bottom,
+                        isInsideCollapse = true
+                    )
                 }
-                Spacer(modifier = Modifier.height(16.dp))
             }
+            Spacer(modifier = Modifier.height(16.dp))
 
             CollapsibleSection(
                 title = "App Stability",

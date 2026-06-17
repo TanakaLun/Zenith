@@ -19,7 +19,6 @@ import kotlinx.coroutines.launch
 @Composable
 fun GeneralSettings(
     preferences: UserPreferences,
-    onAccessibilityDisabledChange: (Boolean) -> Unit,
     onSetTarget: (Int) -> Unit,
     onSetEmergencyRecharge: (Int) -> Unit,
     onSetDelayAppDuration: (Int) -> Unit,
@@ -39,16 +38,6 @@ fun GeneralSettings(
             onClick = onOpenPermissions,
             icon = Icons.Outlined.Security,
             shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
-        )
-
-        Spacer(modifier = Modifier.height(4.dp))
-        SettingsToggle(
-            title = "Disable Accessibility",
-            description = "Remove Accessibility requirements from permission checks",
-            checked = preferences.accessibilityDisabled,
-            onCheckedChange = onAccessibilityDisabledChange,
-            icon = Icons.Outlined.AccessibilityNew,
-            shape = RoundedCornerShape(8.dp)
         )
 
         Spacer(modifier = Modifier.height(4.dp))

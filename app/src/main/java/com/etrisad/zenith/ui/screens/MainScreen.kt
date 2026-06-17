@@ -224,15 +224,21 @@ fun MainScreen(
         } else {
             scope.launch {
                 val latestPrefs = userPreferencesRepository.userPreferencesFlow.first()
-                val allOnboardingGranted = hasAccessibility || latestPrefs.accessibilityDisabled
-                
-                if (allOnboardingGranted) {
-                    if (!latestPrefs.onboardingStatsCompleted) {
-                        showOnboardingStatsSheet = true
-                    } else {
-                        showOnboardingStatsSheet = false
-                        if (!latestPrefs.onboardingUpdateCompleted && com.etrisad.zenith.BuildConfig.SHOW_UPDATES) {
-                            showOnboardingUpdateSheet = true
+                val accessibilityRequiredAndMissing = latestPrefs.accessibilityRequired && !hasAccessibility
+
+                if (accessibilityRequiredAndMissing) {
+                    showPermissionSheet = true
+                } else {
+                    val allOnboardingGranted = hasAccessibility || !latestPrefs.accessibilityRequired
+
+                    if (allOnboardingGranted) {
+                        if (!latestPrefs.onboardingStatsCompleted) {
+                            showOnboardingStatsSheet = true
+                        } else {
+                            showOnboardingStatsSheet = false
+                            if (!latestPrefs.onboardingUpdateCompleted && com.etrisad.zenith.BuildConfig.SHOW_UPDATES) {
+                                showOnboardingUpdateSheet = true
+                            }
                         }
                     }
                 }
@@ -244,7 +250,7 @@ fun MainScreen(
     
     LaunchedEffect(
         lifecycleOwner,
-        preferences.accessibilityDisabled,
+        preferences.accessibilityRequired,
         preferences.onboardingStatsCompleted,
         preferences.onboardingUpdateCompleted,
         preferences.whitelistInitialized

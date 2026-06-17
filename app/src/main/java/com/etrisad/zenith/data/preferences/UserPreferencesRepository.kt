@@ -201,6 +201,7 @@ class UserPreferencesRepository(private val context: Context) {
         val FONT_OPTION = stringPreferencesKey("font_option")
         val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
         val ACCESSIBILITY_DISABLED = booleanPreferencesKey("accessibility_disabled")
+        val ACCESSIBILITY_REQUIRED = booleanPreferencesKey("accessibility_required")
         val SCREEN_TIME_TARGET = intPreferencesKey("screen_time_target")
         val EMERGENCY_RECHARGE_DURATION_MINUTES = intPreferencesKey("emergency_recharge_duration_minutes")
         val DELAY_APP_DURATION_SECONDS = intPreferencesKey("delay_app_duration_seconds")
@@ -311,6 +312,7 @@ class UserPreferencesRepository(private val context: Context) {
             fontOption = FontOption.valueOf(settings[PreferencesKeys.FONT_OPTION] ?: FontOption.GOOGLE_SANS_FLEX.name),
             dynamicColor = settings[PreferencesKeys.DYNAMIC_COLOR] ?: true,
             accessibilityDisabled = settings[PreferencesKeys.ACCESSIBILITY_DISABLED] ?: false,
+            accessibilityRequired = settings[PreferencesKeys.ACCESSIBILITY_REQUIRED] ?: false,
             screenTimeTargetMinutes = settings[PreferencesKeys.SCREEN_TIME_TARGET] ?: 0,
             emergencyRechargeDurationMinutes = settings[PreferencesKeys.EMERGENCY_RECHARGE_DURATION_MINUTES] ?: 60,
             delayAppDurationSeconds = settings[PreferencesKeys.DELAY_APP_DURATION_SECONDS] ?: 30,
@@ -439,6 +441,10 @@ class UserPreferencesRepository(private val context: Context) {
 
     suspend fun setAccessibilityDisabled(disabled: Boolean) {
         context.dataStore.edit { preferences -> preferences[PreferencesKeys.ACCESSIBILITY_DISABLED] = disabled }
+    }
+
+    suspend fun setAccessibilityRequired(required: Boolean) {
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.ACCESSIBILITY_REQUIRED] = required }
     }
 
     suspend fun setScreenTimeTarget(minutes: Int) {
@@ -1356,6 +1362,7 @@ data class UserPreferences(
     val fontOption: FontOption = FontOption.GOOGLE_SANS_FLEX,
     val dynamicColor: Boolean = true,
     val accessibilityDisabled: Boolean = false,
+    val accessibilityRequired: Boolean = false,
     val screenTimeTargetMinutes: Int = 0,
     val emergencyRechargeDurationMinutes: Int = 60,
     val delayAppDurationSeconds: Int = 30,
