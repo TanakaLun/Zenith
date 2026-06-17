@@ -27,9 +27,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -40,6 +42,10 @@ import com.etrisad.zenith.data.preferences.UserPreferences
 import com.etrisad.zenith.data.preferences.detectPreset
 import com.etrisad.zenith.data.preferences.isPreset
 import com.etrisad.zenith.data.preferences.toConfig
+import com.etrisad.zenith.ui.components.ZenithButtonSize
+import com.etrisad.zenith.ui.components.ZenithButtonType
+import com.etrisad.zenith.ui.components.ZenithButtonWeighted
+import com.etrisad.zenith.ui.components.ZenithGroupedButton
 import com.etrisad.zenith.ui.components.focus.PreferenceCategory
 import com.etrisad.zenith.util.isAccessibilityServiceEnabled
 import kotlinx.coroutines.launch
@@ -51,6 +57,7 @@ fun PerformanceSettings(
     onSelectLevel: (PerformanceLevel) -> Unit,
 ) {
     val allLevels = PerformanceLevel.values()
+    var pendingBatteryLevel by remember { mutableStateOf<PerformanceLevel?>(null) }
 
     PreferenceCategory(title = "Performance Profile")
 
@@ -58,6 +65,7 @@ fun PerformanceSettings(
         val isSelected = preferences.performanceLevel == level
         val isChecked = selectedLevel == level
         val isCustom = level == PerformanceLevel.CUSTOM
+        val isBatteryPreset = level == PerformanceLevel.BATTERY_SAVER || level == PerformanceLevel.MAX_BATTERY
 
         val shape = when {
             index == 0 -> RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
@@ -73,7 +81,13 @@ fun PerformanceSettings(
         )
 
         Surface(
-            onClick = { onSelectLevel(level) },
+            onClick = {
+                if (isBatteryPreset) {
+                    pendingBatteryLevel = level
+                } else {
+                    onSelectLevel(level)
+                }
+            },
             modifier = Modifier.fillMaxWidth(),
             shape = shape,
             color = bgColor,
@@ -137,6 +151,18 @@ fun PerformanceSettings(
             Spacer(modifier = Modifier.height(4.dp))
         }
     }
+
+    pendingBatteryLevel?.let { level ->
+        BatteryWarningBottomSheet(
+            level = level,
+            onDismiss = { pendingBatteryLevel = null },
+            onConfirm = {
+                pendingBatteryLevel = null
+                onSelectLevel(level)
+            }
+        )
+    }
+
     Spacer(modifier = Modifier.height(8.dp))
     Text(text = "Custom profile lets you tune every parameter manually",
         style = MaterialTheme.typography.bodySmall,
@@ -718,6 +744,113 @@ private fun GroupHeader(text: String, icon: ImageVector) {
         Spacer(modifier = Modifier.width(8.dp))
         Text(text = text, style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BatteryWarningBottomSheet(
+    level: PerformanceLevel,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val iconScale = remember { Animatable(0f) }
+    val contentAlpha = remember { Animatable(0f) }
+
+    LaunchedEffect(Unit) {
+        launch {
+            iconScale.animateTo(
+                targetValue = 1f,
+                animationSpec = spring(dampingRatio = 0.5f, stiffness = 300f)
+            )
+        }
+        launch {
+            contentAlpha.animateTo(
+                targetValue = 1f,
+                animationSpec = spring(dampingRatio = 0.7f, stiffness = 200f)
+            )
+        }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
+        tonalElevation = 0.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp)
+                .navigationBarsPadding(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Surface(
+                modifier = Modifier
+                    .size(64.dp)
+                    .graphicsLayer(
+                        scaleX = iconScale.value,
+                        scaleY = iconScale.value,
+                        alpha = iconScale.value
+                    ),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.errorContainer
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Outlined.WarningAmber,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = level.labelRes,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.graphicsLayer(alpha = contentAlpha.value)
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "This preset reduces background checking frequency to save battery. " +
+                        "Consider enabling Accessibility Service for instant app detection " +
+                        "without polling.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.graphicsLayer(alpha = contentAlpha.value)
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            ZenithGroupedButton(size = ZenithButtonSize.Large) {
+                ZenithButtonWeighted(
+                    onClick = onDismiss,
+                    text = "Cancel",
+                    type = ZenithButtonType.Outlined,
+                    isLast = false,
+                    size = ZenithButtonSize.ExtraLarge
+                )
+                ZenithButtonWeighted(
+                    onClick = onConfirm,
+                    text = "Use Anyway",
+                    type = ZenithButtonType.Filled,
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    isFirst = false,
+                    size = ZenithButtonSize.ExtraLarge
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+        }
     }
 }
 
