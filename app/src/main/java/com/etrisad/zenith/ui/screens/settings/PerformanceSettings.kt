@@ -75,7 +75,7 @@ fun PerformanceSettings(
         }
 
         val bgColor by animateColorAsState(
-            targetValue = if (isChecked) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+            targetValue = if (isChecked) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
             else if (isCustom) MaterialTheme.colorScheme.surfaceContainerHigh
             else MaterialTheme.colorScheme.surfaceContainerLow,
             label = "preset_bg_${level.name}"
@@ -98,7 +98,7 @@ fun PerformanceSettings(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 val circleBg by animateColorAsState(
-                    targetValue = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                    targetValue = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else Color.Transparent,
                     label = "circleBg"
                 )
                 val borderColor by animateColorAsState(
@@ -106,7 +106,7 @@ fun PerformanceSettings(
                     label = "borderColor"
                 )
                 val iconTint by animateColorAsState(
-                    targetValue = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    targetValue = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                     label = "iconTint"
                 )
                 val iconState = when {
@@ -400,8 +400,8 @@ fun PerformanceTuningPanel(
         description = "Require Accessibility Service to be granted for permission checks",
         checked = preferences.accessibilityRequired,
         onCheckedChange = onAccessibilityRequiredChange,
-        icon = Icons.Outlined.AccessibilityNew,
-        shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp)
+        icon = Icons.Outlined.Lock,
+        shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
     )
     Spacer(modifier = Modifier.height(16.dp))
 
@@ -568,7 +568,7 @@ fun PerformanceTuningPanel(
             }
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text("Scan Timing", style = MaterialTheme.typography.titleSmall,
+                Text("Scan Timing", style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold)
                 Text("Fine-tune monitoring frequency for each scenario",
                     style = MaterialTheme.typography.bodySmall,
@@ -1002,13 +1002,12 @@ private fun TuningPermissionItemRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 64.dp)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .size(44.dp)
+                    .size(40.dp)
                     .background(
                         if (isGranted) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
                         else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
@@ -1032,8 +1031,8 @@ private fun TuningPermissionItemRow(
             ) {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
                     color = if (isGranted) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(

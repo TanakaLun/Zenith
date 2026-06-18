@@ -165,6 +165,7 @@ fun MainScreen(
     var bedtimeSwitchVisible by remember { mutableStateOf(false) }
     var bedtimeSwitchInLayout by remember { mutableStateOf(false) }
     var showPauseSheet by remember { mutableStateOf(false) }
+    val performanceBackInterceptor = remember { mutableStateOf<() -> Boolean>({ false }) }
 
     var showBatchDeleteSheet by remember { mutableStateOf(false) }
     var showBatchPauseSheet by remember { mutableStateOf(false) }
@@ -394,7 +395,11 @@ fun MainScreen(
                     isNavRailVisible = useNavigationRail && !isDeepScreen,
                     userName = preferences.userName,
                     categoryName = navBackStackEntry?.arguments?.getString("category"),
-                    onBack = { navController.popBackStack() },
+                    onBack = {
+                        val intercepted = currentRoute?.startsWith("settings_category") == true &&
+                            performanceBackInterceptor.value()
+                        if (!intercepted) navController.popBackStack()
+                    },
                     navigationIcon = {
                         AnimatedContent(
                             targetState = if (currentRoute == Screen.Focus.route) "focus" else "none",
@@ -888,7 +893,8 @@ fun MainScreen(
                             innerPadding = innerPadding,
                             onOpenPermissions = { showPermissionSheet = true },
                             onTriggerOnboardingStats = { showOnboardingStatsSheet = true },
-                            onTriggerOnboardingUpdate = { showOnboardingUpdateSheet = true }
+                            onTriggerOnboardingUpdate = { showOnboardingUpdateSheet = true },
+                            performanceBackInterceptor = performanceBackInterceptor
                         )
                     }
                 }

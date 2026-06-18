@@ -1,6 +1,7 @@
 package com.etrisad.zenith.ui.screens.settings
 
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -38,7 +39,8 @@ fun SettingsCategoryScreen(
     innerPadding: PaddingValues,
     onOpenPermissions: () -> Unit,
     onTriggerOnboardingStats: () -> Unit,
-    onTriggerOnboardingUpdate: () -> Unit
+    onTriggerOnboardingUpdate: () -> Unit,
+    performanceBackInterceptor: MutableState<() -> Boolean> = remember { mutableStateOf({ false }) }
 ) {
     val preferences by preferencesRepository.userPreferencesFlow.collectAsState(initial = UserPreferences())
     val coroutineScope = rememberCoroutineScope()
@@ -124,6 +126,42 @@ fun SettingsCategoryScreen(
 
     val performanceApplyAction = remember { mutableStateOf<() -> Unit>({}) }
     var perfSelectedLevel by remember(preferences.performanceLevel) { mutableStateOf(preferences.performanceLevel) }
+    var perfBackPressedOnce by remember { mutableStateOf(false) }
+
+    if (category.lowercase() == "performance") {
+        val hasPerfUnsavedChanges = perfSelectedLevel != preferences.performanceLevel
+
+        LaunchedEffect(perfSelectedLevel) {
+            if (hasPerfUnsavedChanges) perfBackPressedOnce = false
+        }
+
+        LaunchedEffect(hasPerfUnsavedChanges) {
+            performanceBackInterceptor.value = {
+                if (hasPerfUnsavedChanges) {
+                    if (perfBackPressedOnce) {
+                        perfBackPressedOnce = false
+                        false
+                    } else {
+                        perfBackPressedOnce = true
+                        Toast.makeText(context, "Apply settings first before leaving", Toast.LENGTH_SHORT).show()
+                        true
+                    }
+                } else {
+                    false
+                }
+            }
+        }
+
+        BackHandler(enabled = hasPerfUnsavedChanges) {
+            if (perfBackPressedOnce) {
+                perfBackPressedOnce = false
+                navController.popBackStack()
+            } else {
+                perfBackPressedOnce = true
+                Toast.makeText(context, "Apply settings first before leaving", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
