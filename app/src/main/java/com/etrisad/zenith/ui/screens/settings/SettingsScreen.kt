@@ -5,6 +5,7 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
@@ -12,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
@@ -157,12 +159,27 @@ fun SettingsScreen(
                 )
                 
                 Spacer(modifier = Modifier.height(4.dp))
+                val perfPreset = preferences.buildPerformanceConfig().detectPreset()
                 SettingsActionItem(
                     title = "Performance",
-                    summary = "Responsiveness & battery balance | ${preferences.buildPerformanceConfig().detectPreset().labelRes}",
+                    summary = "Responsiveness & battery balance",
                     onClick = { navController.navigate(Screen.SettingsCategory.createRoute("Performance")) },
                     icon = Icons.Outlined.Timer,
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(8.dp),
+                    badge = {
+                        Surface(
+                            color = MaterialTheme.colorScheme.tertiary,
+                            shape = CircleShape
+                        ) {
+                            Text(
+                                text = perfPreset.labelRes,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onTertiary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 )
 
                 Spacer(modifier = Modifier.height(4.dp))

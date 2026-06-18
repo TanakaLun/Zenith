@@ -154,7 +154,8 @@ fun SettingsActionItem(
     onClick: () -> Unit,
     icon: ImageVector,
     shape: Shape,
-    trailing: @Composable (() -> Unit)? = null
+    trailing: @Composable (() -> Unit)? = null,
+    badge: @Composable (() -> Unit)? = null
 ) {
     Surface(
         onClick = onClick,
@@ -186,11 +187,17 @@ fun SettingsActionItem(
             }
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                    )
+                    if (badge != null) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        badge()
+                    }
+                }
                 Text(
                     text = summary,
                     style = MaterialTheme.typography.bodySmall,
