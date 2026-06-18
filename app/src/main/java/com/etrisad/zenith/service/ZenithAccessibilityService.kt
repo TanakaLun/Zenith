@@ -158,7 +158,7 @@ class ZenithAccessibilityService : AccessibilityService() {
             contextPkg = packageName,
             scope = serviceScope,
             goToHomeScreen = { goToHomeScreen() },
-            getForegroundAppName = { rootInActiveWindow?.packageName?.toString() ?: lastForegroundApp },
+            getForegroundAppName = { lastForegroundApp },
             recheckShield = { pkg -> serviceScope.launch { checkIfAppIsShielded(pkg) } },
             getTotalUsageToday = { pkg -> getTotalUsageToday(pkg) },
             getTotalGlobalUsageToday = { getTotalGlobalUsageToday() },
@@ -240,7 +240,7 @@ class ZenithAccessibilityService : AccessibilityService() {
                 return@postDelayed
             }
             rootInActiveWindow?.packageName?.toString()?.let { pkg ->
-                if (pkg != packageName) {
+                if (pkg != packageName && !shouldBypassBlocking(pkg)) {
                     AppStateHolder.foregroundApp.value = pkg
                     packageChangeFlow.tryEmit(pkg)
                 }
@@ -387,7 +387,10 @@ class ZenithAccessibilityService : AccessibilityService() {
     }
 
     private suspend fun handlePackageChange(currentApp: String) {
-        if (currentApp == lastForegroundApp && currentShieldCache != null) return
+        if (currentApp == lastForegroundApp && currentShieldCache != null) {
+            val allowedUntil = allowedApps[currentApp]
+            if (allowedUntil == null || allowedUntil == 0L || System.currentTimeMillis() <= allowedUntil) return
+        }
 
         val previousApp = lastForegroundApp
         lastForegroundApp = currentApp

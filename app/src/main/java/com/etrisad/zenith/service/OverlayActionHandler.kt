@@ -198,14 +198,11 @@ class OverlayActionHandler(
 
         allowedSessionHandlers[targetPackageName]?.let { mainHandler.removeCallbacks(it) }
         val runnable = Runnable {
-            if (!AppStateHolder.isScreenOn.value) {
-                Log.d("Zenith_SCREEN", "Session timer expired for $targetPackageName but screen OFF, skipping overlay")
-                return@Runnable
-            }
+            if (!AppStateHolder.isScreenOn.value) return@Runnable
             val entryEndTime = allowedApps[targetPackageName] ?: return@Runnable
             if (allowedApps[targetPackageName] != entryEndTime) return@Runnable
-            allowedApps.remove(targetPackageName)
             if (getForegroundAppName() != targetPackageName) return@Runnable
+            allowedApps.remove(targetPackageName)
             val s = SharedMonitoringState.allShieldsCache[targetPackageName]
             val mindful = mindfulGatewayStates[targetPackageName]
             val shield = s ?: mindful
