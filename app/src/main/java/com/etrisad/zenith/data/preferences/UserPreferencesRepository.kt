@@ -429,28 +429,6 @@ class UserPreferencesRepository(private val context: Context) {
             streakRecoveryPerformed = runtime[RuntimeKeys.STREAK_RECOVERY_PERFORMED] ?: false
         )
     }.distinctUntilChanged()
-                ),
-                headline = FontAxes(
-                    weight = settings[PreferencesKeys.GS_H_WGHT] ?: 400f,
-                    width = settings[PreferencesKeys.GS_H_WDTH] ?: 100f,
-                    opsz = settings[PreferencesKeys.GS_H_OPSZ] ?: 32f,
-                    grade = settings[PreferencesKeys.GS_H_GRAD] ?: 0f,
-                    slant = settings[PreferencesKeys.GS_H_SLNT] ?: 0f,
-                    roundness = settings[PreferencesKeys.GS_H_ROND] ?: 0f
-                ),
-                body = FontAxes(
-                    weight = settings[PreferencesKeys.GS_B_WGHT] ?: 400f,
-                    width = settings[PreferencesKeys.GS_B_WDTH] ?: 100f,
-                    opsz = settings[PreferencesKeys.GS_B_OPSZ] ?: 16f,
-                    grade = settings[PreferencesKeys.GS_B_GRAD] ?: 0f,
-                    slant = settings[PreferencesKeys.GS_B_SLNT] ?: 0f,
-                    roundness = settings[PreferencesKeys.GS_B_ROND] ?: 0f
-                ),
-            ),
-            streakRecoveryPerformed = runtime[RuntimeKeys.STREAK_RECOVERY_PERFORMED] ?: false
-        )
-    }.distinctUntilChanged()
-
 
     suspend fun setUserName(name: String) {
         context.dataStore.edit { preferences -> preferences[PreferencesKeys.USER_NAME] = name }
@@ -1472,7 +1450,6 @@ data class UserPreferences(
     val manualResetTimestamps: Map<String, Long> = emptyMap(),
     val gsFlexSettings: GSFlexSettings = GSFlexSettings(),
     val streakRecoveryPerformed: Boolean = false,
-    val foregroundNotificationStatusMode: ForegroundNotificationStatusMode = ForegroundNotificationStatusMode.DEFAULT
 ) {
     fun buildPerformanceConfig(): PerformanceConfig {
         if (performanceLevel.isPreset()) return performanceLevel.toConfig()
