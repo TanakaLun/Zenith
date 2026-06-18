@@ -699,6 +699,13 @@ class AppUsageMonitorService : Service() {
             return
         }
 
+        if (shouldBypassBlocking(currentApp)) {
+            if (!ZenithAccessibilityService.isServiceRunning) {
+                overlayManager.checkAndHide(currentApp)
+            }
+            return
+        }
+
         if (!ZenithAccessibilityService.isServiceRunning) {
             overlayManager.checkAndHide(currentApp)
         }
