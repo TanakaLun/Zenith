@@ -185,7 +185,10 @@ fun SettingsCategoryScreen(
                         onMindfulGatewayEnabledChange = { enabled -> coroutineScope.launch { preferencesRepository.setMindfulGatewayEnabled(enabled) } },
                         onEarlyKickEnabledChange = { enabled -> coroutineScope.launch { preferencesRepository.setEarlyKickEnabled(enabled) } },
                         onInterceptAudioFocusEnabledChange = { enabled -> coroutineScope.launch { preferencesRepository.setInterceptAudioFocusEnabled(enabled) } },
-                        onBatteryStatsResetEnabledChange = { enabled -> coroutineScope.launch { preferencesRepository.setBatteryStatsResetEnabled(enabled) } }
+                        onBatteryStatsResetEnabledChange = { enabled -> coroutineScope.launch { preferencesRepository.setBatteryStatsResetEnabled(enabled) } },
+                        onDailyRecapEnabledChange = { enabled -> coroutineScope.launch { preferencesRepository.setDailyRecapEnabled(enabled) } },
+                        onWeeklyInsightEnabledChange = { enabled -> coroutineScope.launch { preferencesRepository.setWeeklyInsightEnabled(enabled) } },
+                        onTrendMilestoneEnabledChange = { enabled -> coroutineScope.launch { preferencesRepository.setTrendMilestoneEnabled(enabled) } }
                     )
                     "appearance" -> AppearanceSettings(
                         preferences = preferences,

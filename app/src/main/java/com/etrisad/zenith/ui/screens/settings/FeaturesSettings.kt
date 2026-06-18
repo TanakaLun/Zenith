@@ -38,7 +38,10 @@ fun FeaturesSettings(
     onMindfulGatewayEnabledChange: (Boolean) -> Unit,
     onEarlyKickEnabledChange: (Boolean) -> Unit,
     onInterceptAudioFocusEnabledChange: (Boolean) -> Unit,
-    onBatteryStatsResetEnabledChange: (Boolean) -> Unit
+    onBatteryStatsResetEnabledChange: (Boolean) -> Unit,
+    onDailyRecapEnabledChange: (Boolean) -> Unit,
+    onWeeklyInsightEnabledChange: (Boolean) -> Unit,
+    onTrendMilestoneEnabledChange: (Boolean) -> Unit
 ) {
     Column {
         PreferenceCategory(title = "Interface Overlays")
@@ -80,12 +83,42 @@ fun FeaturesSettings(
         }
 
         Spacer(modifier = Modifier.height(16.dp))
-        PreferenceCategory(title = "Status Notifications")
+        PreferenceCategory(title = "Notifications")
 
         ForegroundNotificationStatusSelector(
             selectedMode = preferences.foregroundNotificationStatusMode,
             onModeChange = onForegroundNotificationStatusModeChange,
-            shape = RoundedCornerShape(24.dp)
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
+        )
+
+        Spacer(modifier = Modifier.height(4.dp))
+        SettingsToggle(
+            title = "Daily Focus Recap",
+            description = "Receive a daily summary of your total focus time and screen usage each evening",
+            checked = preferences.dailyRecapEnabled,
+            onCheckedChange = onDailyRecapEnabledChange,
+            icon = Icons.Outlined.Today,
+            shape = RoundedCornerShape(8.dp)
+        )
+
+        Spacer(modifier = Modifier.height(4.dp))
+        SettingsToggle(
+            title = "Weekly Insight",
+            description = "Get a weekly breakdown comparing your focus trends across the week",
+            checked = preferences.weeklyInsightEnabled,
+            onCheckedChange = onWeeklyInsightEnabledChange,
+            icon = Icons.Outlined.Assessment,
+            shape = RoundedCornerShape(8.dp)
+        )
+
+        Spacer(modifier = Modifier.height(4.dp))
+        SettingsToggle(
+            title = "Trend Milestones",
+            description = "Celebrate achievements like focus streaks and usage milestones",
+            checked = preferences.trendMilestoneEnabled,
+            onCheckedChange = onTrendMilestoneEnabledChange,
+            icon = Icons.Outlined.EmojiEvents,
+            shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
         )
 
         Spacer(modifier = Modifier.height(16.dp))

@@ -18,6 +18,7 @@ import android.os.IBinder
 import android.util.Log
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
+import com.etrisad.zenith.R
 import com.etrisad.zenith.data.local.entity.FocusType
 import com.etrisad.zenith.data.local.entity.ShieldEntity
 import com.etrisad.zenith.data.local.database.ZenithDatabase
@@ -32,7 +33,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
@@ -480,7 +480,7 @@ class AppUsageMonitorService : Service() {
         val notification = NotificationCompat.Builder(this, channelId)
             .setContentTitle("Time for ${goal.appName}?")
             .setContentText("Your goal setting suggests it's time to open ${goal.appName} and make some progress!")
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(R.drawable.ic_flag)
             .setLargeIcon(iconBitmap)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setContentIntent(pendingIntent)
@@ -1184,7 +1184,7 @@ class AppUsageMonitorService : Service() {
         val notification = NotificationCompat.Builder(this, channelId)
             .setContentTitle("Goal Achieved!")
             .setContentText("You've reached your target usage for $appName. Keep it up!")
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(R.drawable.ic_flag)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
             .build()
@@ -1217,7 +1217,7 @@ class AppUsageMonitorService : Service() {
         val notification = NotificationCompat.Builder(this, BEDTIME_CHANNEL_ID)
             .setContentTitle("Time for Wind Down")
             .setContentText("Bedtime is in 30 minutes. Prepare and get ready for bed.")
-            .setSmallIcon(android.R.drawable.ic_lock_power_off)
+            .setSmallIcon(R.drawable.ic_fire_department_outlined)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
@@ -1233,7 +1233,7 @@ class AppUsageMonitorService : Service() {
         val notification = NotificationCompat.Builder(this, channelId)
             .setContentTitle("Test Notification ✅")
             .setContentText("Notifications are working correctly!")
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(R.drawable.ic_check)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
             .build()
@@ -1671,7 +1671,7 @@ class AppUsageMonitorService : Service() {
         return NotificationCompat.Builder(this, channelId)
             .setContentTitle("Zenith is active")
             .setContentText(createNotificationStatusText())
-            .setSmallIcon(android.R.drawable.ic_lock_idle_lock)
+            .setSmallIcon(R.drawable.ic_zenith)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setOngoing(true)

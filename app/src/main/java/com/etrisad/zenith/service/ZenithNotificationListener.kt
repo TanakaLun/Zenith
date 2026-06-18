@@ -12,6 +12,7 @@ import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import androidx.core.app.NotificationCompat
 import androidx.core.graphics.drawable.toBitmap
+import com.etrisad.zenith.R
 import com.etrisad.zenith.data.local.database.ZenithDatabase
 import com.etrisad.zenith.data.local.entity.InterceptedNotificationEntity
 import com.etrisad.zenith.data.local.entity.ScheduleMode
@@ -149,7 +150,7 @@ class ZenithNotificationListener : NotificationListenerService() {
                         .setContentTitle(intercepted.title ?: appName)
                         .setContentText(intercepted.text)
                         .setSubText(appName)
-                        .setSmallIcon(android.R.drawable.ic_dialog_info)
+                        .setSmallIcon(R.drawable.ic_notifications)
                         .setLargeIcon(appIcon)
                         .setAutoCancel(true)
                         .setWhen(intercepted.timestamp)

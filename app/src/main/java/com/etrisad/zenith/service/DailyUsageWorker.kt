@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import androidx.core.app.NotificationCompat
 import androidx.work.*
+import com.etrisad.zenith.R
 import com.etrisad.zenith.data.local.database.ZenithDatabase
 import com.etrisad.zenith.data.local.entity.DailyUsageEntity
 import com.etrisad.zenith.data.local.entity.FocusType
@@ -231,7 +232,7 @@ class DailyUsageWorker(context: Context, params: WorkerParameters) : CoroutineWo
         manager.createNotificationChannel(channel)
         manager.notify(999, NotificationCompat.Builder(applicationContext, channelId)
             .setContentTitle("Daily Report Prepared").setContentText("Your usage has been safely saved.")
-            .setSmallIcon(android.R.drawable.ic_menu_save).setPriority(NotificationCompat.PRIORITY_LOW).setAutoCancel(true).build())
+            .setSmallIcon(R.drawable.ic_calendar).setPriority(NotificationCompat.PRIORITY_LOW).setAutoCancel(true).build())
     }
 
     companion object {

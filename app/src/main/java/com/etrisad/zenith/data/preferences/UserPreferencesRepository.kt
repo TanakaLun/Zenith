@@ -244,6 +244,9 @@ class UserPreferencesRepository(private val context: Context) {
         val REFRESH_ON_OPEN_USAGE_STATS = booleanPreferencesKey("refresh_on_open_usage_stats")
         val CHECK_UPDATE_ON_START = booleanPreferencesKey("check_update_on_start")
         val BATTERY_STATS_RESET_ENABLED = booleanPreferencesKey("battery_stats_reset_enabled")
+        val DAILY_RECAP_ENABLED = booleanPreferencesKey("daily_recap_enabled")
+        val WEEKLY_INSIGHT_ENABLED = booleanPreferencesKey("weekly_insight_enabled")
+        val TREND_MILESTONE_ENABLED = booleanPreferencesKey("trend_milestone_enabled")
 
         val PERFORMANCE_LEVEL = stringPreferencesKey("performance_level")
         val PERF_A11Y_ACTIVE_DELAY = longPreferencesKey("perf_a11y_active_delay")
@@ -371,6 +374,9 @@ class UserPreferencesRepository(private val context: Context) {
             refreshOnOpenUsageStats = settings[PreferencesKeys.REFRESH_ON_OPEN_USAGE_STATS] ?: false,
             checkUpdateOnStart = settings[PreferencesKeys.CHECK_UPDATE_ON_START] ?: false,
             batteryStatsResetEnabled = settings[PreferencesKeys.BATTERY_STATS_RESET_ENABLED] ?: false,
+            dailyRecapEnabled = settings[PreferencesKeys.DAILY_RECAP_ENABLED] ?: true,
+            weeklyInsightEnabled = settings[PreferencesKeys.WEEKLY_INSIGHT_ENABLED] ?: true,
+            trendMilestoneEnabled = settings[PreferencesKeys.TREND_MILESTONE_ENABLED] ?: true,
             performanceLevel = PerformanceLevel.valueOf(settings[PreferencesKeys.PERFORMANCE_LEVEL] ?: PerformanceLevel.BALANCED.name),
             perfA11yActiveDelay = settings[PreferencesKeys.PERF_A11Y_ACTIVE_DELAY] ?: PerformanceConfig().a11yActiveDelay,
             perfA11yInactiveDelay = settings[PreferencesKeys.PERF_A11Y_INACTIVE_DELAY] ?: PerformanceConfig().a11yInactiveDelay,
@@ -1090,6 +1096,18 @@ class UserPreferencesRepository(private val context: Context) {
         context.dataStore.edit { preferences -> preferences[PreferencesKeys.BATTERY_STATS_RESET_ENABLED] = enabled }
     }
 
+    suspend fun setDailyRecapEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.DAILY_RECAP_ENABLED] = enabled }
+    }
+
+    suspend fun setWeeklyInsightEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.WEEKLY_INSIGHT_ENABLED] = enabled }
+    }
+
+    suspend fun setTrendMilestoneEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.TREND_MILESTONE_ENABLED] = enabled }
+    }
+
     suspend fun setPerformanceLevel(level: PerformanceLevel) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.PERFORMANCE_LEVEL] = level.name
@@ -1425,6 +1443,9 @@ data class UserPreferences(
     val refreshOnOpenUsageStats: Boolean = false,
     val checkUpdateOnStart: Boolean = false,
     val batteryStatsResetEnabled: Boolean = false,
+    val dailyRecapEnabled: Boolean = true,
+    val weeklyInsightEnabled: Boolean = true,
+    val trendMilestoneEnabled: Boolean = true,
     val performanceLevel: PerformanceLevel = PerformanceLevel.BALANCED,
     val perfA11yActiveDelay: Long = PerformanceConfig().a11yActiveDelay,
     val perfA11yInactiveDelay: Long = PerformanceConfig().a11yInactiveDelay,

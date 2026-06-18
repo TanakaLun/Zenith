@@ -13,6 +13,7 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.inputmethod.InputMethodManager
 import androidx.core.app.NotificationCompat
 import java.util.Calendar
+import com.etrisad.zenith.R
 import com.etrisad.zenith.data.local.database.ZenithDatabase
 import com.etrisad.zenith.data.local.entity.FocusType
 import com.etrisad.zenith.data.local.entity.ScheduleEntity
@@ -543,7 +544,7 @@ class ZenithAccessibilityService : AccessibilityService() {
         val notification = NotificationCompat.Builder(this, channelId)
             .setContentTitle("Goal Achieved!")
             .setContentText("You've reached your target usage for $appName. Keep it up!")
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(R.drawable.ic_flag)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
             .build()
@@ -756,7 +757,7 @@ class ZenithAccessibilityService : AccessibilityService() {
         val notification = NotificationCompat.Builder(this, BEDTIME_CHANNEL_ID)
             .setContentTitle("Time for Wind Down")
             .setContentText("Bedtime is in 30 minutes. Prepare and get ready for bed.")
-            .setSmallIcon(android.R.drawable.ic_lock_power_off)
+            .setSmallIcon(R.drawable.ic_fire_department_outlined)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
