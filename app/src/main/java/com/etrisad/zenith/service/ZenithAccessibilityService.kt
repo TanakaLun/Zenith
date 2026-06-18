@@ -392,10 +392,8 @@ class ZenithAccessibilityService : AccessibilityService() {
             if (allowedUntil == null || allowedUntil == 0L || System.currentTimeMillis() <= allowedUntil) return
         }
 
-        val previousApp = lastForegroundApp
-        lastForegroundApp = currentApp
-
         if (shouldBypassBlocking(currentApp)) {
+            val previousApp = lastForegroundApp
             previousApp?.let { prevPkg ->
                 SharedMonitoringState.allShieldsCache[prevPkg]?.let { shield ->
                     if (shield.isDelayAppEnabled) {
@@ -427,6 +425,8 @@ class ZenithAccessibilityService : AccessibilityService() {
             }, 800)
             return
         }
+
+        lastForegroundApp = currentApp
 
         val shield = SharedMonitoringState.allShieldsCache[currentApp]
         currentShieldCache = shield
