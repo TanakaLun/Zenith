@@ -21,6 +21,7 @@ import androidx.core.app.NotificationCompat
 import com.etrisad.zenith.data.local.entity.FocusType
 import com.etrisad.zenith.data.local.entity.ShieldEntity
 import com.etrisad.zenith.data.local.database.ZenithDatabase
+import com.etrisad.zenith.data.preferences.ForegroundNotificationStatusMode
 import com.etrisad.zenith.data.preferences.UserPreferences
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
 import com.etrisad.zenith.data.repository.ShieldRepository
@@ -98,6 +99,8 @@ class AppUsageMonitorService : Service() {
 
     private var lastMonitoringError: String? = null
     private var lastMonitoringErrorTime = 0L
+    private var foregroundNotificationStarted = false
+    private var lastNotificationRefreshTime = 0L
 
     private var cachedBypassPackage: String? = null
     private var cachedBypassResult = false
@@ -359,6 +362,7 @@ class AppUsageMonitorService : Service() {
         launchCollectors()
 
         startForeground(NOTIFICATION_ID, createNotification())
+        foregroundNotificationStarted = true
         createGoalNotificationChannel()
         createBedtimeNotificationChannel()
 
@@ -519,6 +523,7 @@ class AppUsageMonitorService : Service() {
                     it.type == FocusType.GOAL && it.goalReminderPeriodMinutes > 0
                 }
                 SharedMonitoringState.updateRestrictedPackages()
+                refreshForegroundNotification(force = true)
             }
         }
 
@@ -538,6 +543,7 @@ class AppUsageMonitorService : Service() {
                     )
                 }
                 SharedMonitoringState.updateRestrictedPackages()
+                refreshForegroundNotification(force = true)
             }
         }
 
@@ -557,6 +563,7 @@ class AppUsageMonitorService : Service() {
                 SharedMonitoringState.cachedBedtimeEndMinutes = (endParts.getOrNull(0)?.toIntOrNull() ?: 7) * 60 + (endParts.getOrNull(1)?.toIntOrNull() ?: 0)
 
                 updateBedtimeStatus(preferences)
+                refreshForegroundNotification(force = true)
             }
         }
     }
@@ -1066,6 +1073,17 @@ class AppUsageMonitorService : Service() {
         }
 
         updateShieldInDatabase(shield)
+        refreshForegroundNotification()
+    }
+
+    private fun refreshForegroundNotification(force: Boolean = false) {
+        if (!foregroundNotificationStarted) return
+
+        val currentTime = System.currentTimeMillis()
+        if (!force && currentTime - lastNotificationRefreshTime < NOTIFICATION_UPDATE_INTERVAL) return
+
+        lastNotificationRefreshTime = currentTime
+        notificationManager.notify(NOTIFICATION_ID, createNotification())
     }
 
     private var lastDbUpdateTime = 0L
@@ -1645,12 +1663,35 @@ class AppUsageMonitorService : Service() {
 
         return NotificationCompat.Builder(this, channelId)
             .setContentTitle("Zenith is active")
-            .setContentText("Protecting your focus...")
+            .setContentText(createNotificationStatusText())
             .setSmallIcon(android.R.drawable.ic_lock_idle_lock)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setOngoing(true)
             .build()
+    }
+
+    private fun createNotificationStatusText(): String {
+        val prefs = SharedMonitoringState.currentPreferences ?: UserPreferences()
+        val mode = prefs.foregroundNotificationStatusMode
+        return NotificationStatusFormatter.format(
+            mode = mode,
+            dailyUsageMillis = if (mode == ForegroundNotificationStatusMode.DAILY_USAGE) getTotalGlobalUsageToday() else 0L,
+            activeFocusSummary = if (mode == ForegroundNotificationStatusMode.ACTIVE_FOCUS) {
+                getActiveFocusSummary()
+            } else {
+                ActiveFocusSummary(goals = 0, shields = 0, schedules = 0)
+            }
+        )
+    }
+
+    private fun getActiveFocusSummary(): ActiveFocusSummary {
+        val activeShields = SharedMonitoringState.allShieldsCache.values.filter { !isPaused(it) }
+        return ActiveFocusSummary(
+            goals = activeShields.count { it.type == FocusType.GOAL },
+            shields = activeShields.count { it.type == FocusType.SHIELD },
+            schedules = SharedMonitoringState.activeSchedules.size
+        )
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -1671,6 +1712,7 @@ class AppUsageMonitorService : Service() {
 
     companion object {
         private const val NOTIFICATION_ID = 101
+        private const val NOTIFICATION_UPDATE_INTERVAL = 60000L
         private const val BEDTIME_CHANNEL_ID = "zenith_bedtime_channel"
         private const val WIND_DOWN_NOTIFICATION_ID = 2001
     }

@@ -194,6 +194,10 @@ fun PerformanceLevel.toConfig(): PerformanceConfig = when (this) {
     PerformanceLevel.CUSTOM -> PerformanceConfig()
 }
 
+enum class ForegroundNotificationStatusMode {
+    DAILY_USAGE, ACTIVE_FOCUS, DEFAULT
+}
+
 class UserPreferencesRepository(private val context: Context) {
 
     private object PreferencesKeys {
@@ -215,6 +219,7 @@ class UserPreferencesRepository(private val context: Context) {
         val FLOATING_TAB_BAR_ENABLED = booleanPreferencesKey("floating_tab_bar_enabled")
         val EXPRESSIVE_COLORS = booleanPreferencesKey("expressive_colors")
         val TOTAL_USAGE_PILL_ENABLED = booleanPreferencesKey("total_usage_pill_enabled")
+        val FOREGROUND_NOTIFICATION_STATUS_MODE = stringPreferencesKey("foreground_notification_status_mode")
 
         val BEDTIME_ENABLED = booleanPreferencesKey("bedtime_enabled")
         val BEDTIME_START_TIME = stringPreferencesKey("bedtime_start_time")
@@ -332,6 +337,9 @@ class UserPreferencesRepository(private val context: Context) {
             floatingTabBarEnabled = settings[PreferencesKeys.FLOATING_TAB_BAR_ENABLED] ?: false,
             expressiveColors = settings[PreferencesKeys.EXPRESSIVE_COLORS] ?: false,
             totalUsagePillEnabled = settings[PreferencesKeys.TOTAL_USAGE_PILL_ENABLED] ?: false,
+            foregroundNotificationStatusMode = settings[PreferencesKeys.FOREGROUND_NOTIFICATION_STATUS_MODE]
+                ?.let { runCatching { ForegroundNotificationStatusMode.valueOf(it) }.getOrNull() }
+                ?: ForegroundNotificationStatusMode.DEFAULT,
             lastKnownDailyUsage = runtime[RuntimeKeys.LAST_KNOWN_DAILY_USAGE] ?: 0L,
             lastKnownDailyUsageDate = runtime[RuntimeKeys.LAST_KNOWN_DAILY_USAGE_DATE] ?: "",
             bedtimeEnabled = settings[PreferencesKeys.BEDTIME_ENABLED] ?: false,
@@ -400,6 +408,27 @@ class UserPreferencesRepository(private val context: Context) {
                     grade = settings[PreferencesKeys.GS_D_GRAD] ?: 0f,
                     slant = settings[PreferencesKeys.GS_D_SLNT] ?: 0f,
                     roundness = settings[PreferencesKeys.GS_D_ROND] ?: 0f
+                ),
+                headline = FontAxes(
+                    weight = settings[PreferencesKeys.GS_H_WGHT] ?: 400f,
+                    width = settings[PreferencesKeys.GS_H_WDTH] ?: 100f,
+                    opsz = settings[PreferencesKeys.GS_H_OPSZ] ?: 32f,
+                    grade = settings[PreferencesKeys.GS_H_GRAD] ?: 0f,
+                    slant = settings[PreferencesKeys.GS_H_SLNT] ?: 0f,
+                    roundness = settings[PreferencesKeys.GS_H_ROND] ?: 0f
+                ),
+                body = FontAxes(
+                    weight = settings[PreferencesKeys.GS_B_WGHT] ?: 400f,
+                    width = settings[PreferencesKeys.GS_B_WDTH] ?: 100f,
+                    opsz = settings[PreferencesKeys.GS_B_OPSZ] ?: 16f,
+                    grade = settings[PreferencesKeys.GS_B_GRAD] ?: 0f,
+                    slant = settings[PreferencesKeys.GS_B_SLNT] ?: 0f,
+                    roundness = settings[PreferencesKeys.GS_B_ROND] ?: 0f
+                ),
+            ),
+            streakRecoveryPerformed = runtime[RuntimeKeys.STREAK_RECOVERY_PERFORMED] ?: false
+        )
+    }.distinctUntilChanged()
                 ),
                 headline = FontAxes(
                     weight = settings[PreferencesKeys.GS_H_WGHT] ?: 400f,
@@ -953,6 +982,10 @@ class UserPreferencesRepository(private val context: Context) {
 
     private var lastSavedDailyUsage: Pair<Long, String>? = null
 
+    suspend fun setForegroundNotificationStatusMode(mode: ForegroundNotificationStatusMode) {
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.FOREGROUND_NOTIFICATION_STATUS_MODE] = mode.name }
+    }
+
     suspend fun setLastKnownDailyUsage(usage: Long, date: String) {
         if (lastSavedDailyUsage == Pair(usage, date)) return
         context.runtimeDataStore.edit { preferences -> preferences[RuntimeKeys.LAST_KNOWN_DAILY_USAGE] = usage; preferences[RuntimeKeys.LAST_KNOWN_DAILY_USAGE_DATE] = date }
@@ -1382,6 +1415,7 @@ data class UserPreferences(
     val floatingTabBarEnabled: Boolean = false,
     val expressiveColors: Boolean = false,
     val totalUsagePillEnabled: Boolean = false,
+    val foregroundNotificationStatusMode: ForegroundNotificationStatusMode = ForegroundNotificationStatusMode.DEFAULT,
     val lastKnownDailyUsage: Long = 0L,
     val lastKnownDailyUsageDate: String = "",
     val bedtimeEnabled: Boolean = false,
@@ -1437,7 +1471,8 @@ data class UserPreferences(
     val lastChargeTimestamp: Long = 0L,
     val manualResetTimestamps: Map<String, Long> = emptyMap(),
     val gsFlexSettings: GSFlexSettings = GSFlexSettings(),
-    val streakRecoveryPerformed: Boolean = false
+    val streakRecoveryPerformed: Boolean = false,
+    val foregroundNotificationStatusMode: ForegroundNotificationStatusMode = ForegroundNotificationStatusMode.DEFAULT
 ) {
     fun buildPerformanceConfig(): PerformanceConfig {
         if (performanceLevel.isPreset()) return performanceLevel.toConfig()
