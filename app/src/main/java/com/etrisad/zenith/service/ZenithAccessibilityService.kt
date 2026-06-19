@@ -5,6 +5,7 @@ import android.app.NotificationManager
 import android.accessibilityservice.AccessibilityService
 import android.util.Log
 import android.app.usage.UsageStatsManager
+import android.app.usage.UsageEvents
 import android.content.Context
 import android.content.Intent
 import android.app.PendingIntent
@@ -235,18 +236,38 @@ class ZenithAccessibilityService : AccessibilityService() {
             }
         }
 
-        mainHandler.postDelayed({
-            if (!AppStateHolder.isScreenOn.value) {
-                Log.d("Zenith_SCREEN", "A11Y 1s callback SKIPPED: screen is OFF")
-                return@postDelayed
+        serviceScope.launch {
+            delay(200)
+            val pkg = queryCurrentForegroundApp()
+            if (pkg != null && pkg != packageName && lastForegroundApp == null) {
+                if (SharedMonitoringState.isFinancialApp(pkg)) {
+                    Log.d("ZenithAS", "Financial app already in foreground ($pkg) — disabling accessibility")
+                    showFinancialAppNotification(pkg)
+                    disableSelf()
+                    return@launch
+                }
+                lastForegroundApp = pkg
+                AppStateHolder.foregroundApp.value = pkg
+                packageChangeFlow.tryEmit(pkg)
+                Log.d("ZenithAS", "Initial foreground app detected via UsageStats: $pkg")
             }
-            rootInActiveWindow?.packageName?.toString()?.let { pkg ->
-                if (pkg != packageName && !shouldBypassBlocking(pkg)) {
-                    AppStateHolder.foregroundApp.value = pkg
-                    packageChangeFlow.tryEmit(pkg)
+            if (lastForegroundApp == null) {
+                val windowPkg = withContext(Dispatchers.Main) {
+                    rootInActiveWindow?.packageName?.toString()
+                }
+                if (windowPkg != null && windowPkg != packageName && !shouldBypassBlocking(windowPkg)) {
+                    if (SharedMonitoringState.isFinancialApp(windowPkg)) {
+                        Log.d("ZenithAS", "Financial app already in foreground ($windowPkg) — disabling accessibility")
+                        showFinancialAppNotification(windowPkg)
+                        disableSelf()
+                        return@launch
+                    }
+                    lastForegroundApp = windowPkg
+                    AppStateHolder.foregroundApp.value = windowPkg
+                    packageChangeFlow.tryEmit(windowPkg)
                 }
             }
-        }, 1000)
+        }
 
         monitoringJob?.cancel()
         monitoringJob = serviceScope.launch {
@@ -283,6 +304,12 @@ class ZenithAccessibilityService : AccessibilityService() {
                         }
                     } else {
                         checkInterval = cfg.a11yInactiveDelay
+                        val fallbackPkg = queryCurrentForegroundApp()
+                        if (fallbackPkg != null && fallbackPkg != packageName) {
+                            lastForegroundApp = fallbackPkg
+                            AppStateHolder.foregroundApp.value = fallbackPkg
+                            packageChangeFlow.tryEmit(fallbackPkg)
+                        }
                     }
 
                     if (currentPkg != null) {
@@ -379,12 +406,57 @@ class ZenithAccessibilityService : AccessibilityService() {
 
         if (isKeyboardApp(packageName)) return
 
+        if (SharedMonitoringState.isFinancialApp(packageName)) {
+            Log.d("ZenithAS", "Financial app detected ($packageName) — disabling accessibility service to avoid detection")
+            showFinancialAppNotification(packageName)
+            disableSelf()
+            return
+        }
+
         AppStateHolder.foregroundApp.value = packageName
 
         serviceScope.launch(Dispatchers.Main) {
             overlayManager.checkAndHide(packageName)
             packageChangeFlow.tryEmit(packageName)
         }
+    }
+
+    private fun showFinancialAppNotification(packageName: String) {
+        val appName = try {
+            packageManager.getApplicationLabel(packageManager.getApplicationInfo(packageName, 0)).toString()
+        } catch (_: Exception) { "financial app" }
+
+        val channelId = "zenith_banking_channel"
+        if (notificationManager.getNotificationChannel(channelId) == null) {
+            val channel = NotificationChannel(
+                channelId, "Banking App Compatibility", NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = "Notifications when Zenith disables accessibility for banking app compatibility"
+            }
+            notificationManager.createNotificationChannel(channel)
+        }
+
+        val intent = packageManager.getLaunchIntentForPackage(packageName)
+        val openSettingsIntent = android.content.Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+
+        val notification = NotificationCompat.Builder(this, channelId)
+            .setContentTitle("Accessibility Disabled")
+            .setContentText("Zenith disabled accessibility so $appName can work. Monitoring still active via usage stats.")
+            .setSmallIcon(android.R.drawable.ic_dialog_alert)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setAutoCancel(true)
+            .setContentIntent(
+                PendingIntent.getActivity(
+                    this, 0, openSettingsIntent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+                )
+            )
+            .build()
+
+        try {
+            notificationManager.notify(3001, notification)
+        } catch (_: Exception) {}
     }
 
     private suspend fun handlePackageChange(currentApp: String) {
@@ -663,6 +735,32 @@ class ZenithAccessibilityService : AccessibilityService() {
         }
 
         return SharedMonitoringState.dailyUsageCache[packageName] ?: 0L
+    }
+
+    private fun queryCurrentForegroundApp(): String? {
+        val currentTime = System.currentTimeMillis()
+        val queryStart = currentTime - 5000
+        val usageEvents = try {
+            usageStatsManager.queryEvents(queryStart, currentTime)
+        } catch (_: Exception) { null } ?: return null
+
+        var foundPackage: String? = null
+        val event = UsageEvents.Event()
+        while (usageEvents.hasNextEvent()) {
+            usageEvents.getNextEvent(event)
+            if (event.eventType == UsageEvents.Event.MOVE_TO_FOREGROUND ||
+                event.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
+                val pkg = event.packageName
+                if (pkg != null && pkg != packageName) {
+                    val className = event.className ?: ""
+                    if (className.contains("Toast", ignoreCase = true) ||
+                        className.contains("Notification", ignoreCase = true) ||
+                        className.contains("Tooltip", ignoreCase = true)) continue
+                    foundPackage = pkg
+                }
+            }
+        }
+        return foundPackage
     }
 
     private fun goToHomeScreen() {
