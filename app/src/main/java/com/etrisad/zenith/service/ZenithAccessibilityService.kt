@@ -466,6 +466,11 @@ class ZenithAccessibilityService : AccessibilityService() {
         }
 
         if (shouldBypassBlocking(currentApp)) {
+            if (SharedMonitoringState.launcherPackages.contains(currentApp) || currentApp == packageName) {
+                InterceptOverlayManager.lastKickTime = 0L
+                InterceptOverlayManager.lastKickedPackage = null
+            }
+
             val previousApp = lastForegroundApp
             previousApp?.let { prevPkg ->
                 SharedMonitoringState.allShieldsCache[prevPkg]?.let { shield ->

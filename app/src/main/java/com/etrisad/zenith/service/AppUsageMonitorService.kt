@@ -682,6 +682,8 @@ class AppUsageMonitorService : Service() {
         }
 
         if (SharedMonitoringState.launcherPackages.contains(currentApp) || currentApp == packageName) {
+            InterceptOverlayManager.lastKickTime = 0L
+            InterceptOverlayManager.lastKickedPackage = null
             overlayManager.hideOverlay()
             sessionUsageOverlayManager.destroyAllHUDs()
             lastForegroundApp?.let { prevPkg ->
@@ -1575,11 +1577,6 @@ class AppUsageMonitorService : Service() {
         val now = System.currentTimeMillis()
         if (packageName == cachedBypassPackage && now - cachedBypassTime < 2000) {
             return cachedBypassResult
-        }
-
-        if (packageName == InterceptOverlayManager.lastKickedPackage && now - InterceptOverlayManager.lastKickTime < 500) {
-            cachedBypassPackage = packageName; cachedBypassResult = true; cachedBypassTime = now
-            return true
         }
 
         val result = overlayActionHandler.shouldBypassBlocking(packageName)
