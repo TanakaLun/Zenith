@@ -68,6 +68,8 @@ class ZenithAccessibilityService : AccessibilityService() {
 
     private var monitoringJob: kotlinx.coroutines.Job? = null
     private var bypassCheckRunnable: Runnable? = null
+    @Volatile
+    private var isOverlayCheckInProgress = false
 
     private var cachedTotalGlobalUsage: Long = 0L
     private var lastGlobalUsageCacheTime: Long = 0L
@@ -317,7 +319,7 @@ class ZenithAccessibilityService : AccessibilityService() {
                         sessionUsageOverlayManager.ensureSessionHUDActive(currentPkg)
                     }
 
-                    if (currentPkg != null && !InterceptOverlayManager.isShowing && !shouldBypassBlocking(currentPkg)) {
+                    if (currentPkg != null && !InterceptOverlayManager.isShowing && !isOverlayCheckInProgress && !shouldBypassBlocking(currentPkg)) {
                         val isExpired: Boolean
                         synchronized(allowedApps) {
                             val allowedUntil = allowedApps[currentPkg]
@@ -359,7 +361,7 @@ class ZenithAccessibilityService : AccessibilityService() {
                             }
                         }
                     }
-                    if (!InterceptOverlayManager.isShowing && currentPkg != null && shouldBypassBlocking(currentPkg)) {
+                    if (!InterceptOverlayManager.isShowing && !isOverlayCheckInProgress && currentPkg != null && shouldBypassBlocking(currentPkg)) {
                         val actualPkg = withContext(Dispatchers.Main) {
                             rootInActiveWindow?.packageName?.toString()
                         }
@@ -395,13 +397,14 @@ class ZenithAccessibilityService : AccessibilityService() {
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
     private var lastA11yEventProcessedTime = 0L
+    private val lastA11yPackageTime = java.util.concurrent.ConcurrentHashMap<String, Long>()
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         lastEventTime = System.currentTimeMillis()
         if (!AppStateHolder.isScreenOn.value || event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
 
         val now = System.currentTimeMillis()
-        if (now - lastA11yEventProcessedTime < 200) return
+        if (now - lastA11yEventProcessedTime < 40) return
         lastA11yEventProcessedTime = now
 
         val packageName = event.packageName?.toString() ?: return
@@ -421,8 +424,11 @@ class ZenithAccessibilityService : AccessibilityService() {
             return
         }
 
-        if (packageName == AppStateHolder.foregroundApp.value) return
+        val lastPkgTime = lastA11yPackageTime[packageName] ?: 0L
+        if (now - lastPkgTime < 300) return
+        lastA11yPackageTime[packageName] = now
 
+        lastForegroundApp = packageName
         AppStateHolder.foregroundApp.value = packageName
 
         serviceScope.launch(Dispatchers.Main) {
@@ -470,10 +476,7 @@ class ZenithAccessibilityService : AccessibilityService() {
     }
 
     private suspend fun handlePackageChange(currentApp: String) {
-        if (currentApp == lastForegroundApp && currentShieldCache != null) {
-            val allowedUntil = allowedApps[currentApp]
-            if (allowedUntil == null || allowedUntil == 0L || System.currentTimeMillis() <= allowedUntil) return
-        }
+        if (currentApp == lastForegroundApp && InterceptOverlayManager.isShowing) return
 
         if (shouldBypassBlocking(currentApp)) {
             if (SharedMonitoringState.launcherPackages.contains(currentApp) || currentApp == packageName) {
@@ -535,7 +538,7 @@ class ZenithAccessibilityService : AccessibilityService() {
             val isBedtimeBlocking = SharedMonitoringState.isBedtimeActive || (SharedMonitoringState.isWindDownActive && (SharedMonitoringState.currentPreferences?.bedtimeWindDownEnabled == true))
             val shouldCheckSchedules = (isBedtimeBlocking && currentApp !in SharedMonitoringState.bedtimeWhitelistedPackages) || currentTime > allowedUntil
 
-            if (shouldCheckSchedules && !InterceptOverlayManager.isShowing) {
+            if (shouldCheckSchedules && !InterceptOverlayManager.isShowing && !isOverlayCheckInProgress) {
                 val isScheduled = checkSchedules(currentApp)
                 val prefs = SharedMonitoringState.currentPreferences ?: return
                 if (!isScheduled && (shield != null || (prefs.mindfulGatewayEnabled && !shouldBypassBlocking(currentApp))) && currentTime > allowedUntil) {
@@ -649,38 +652,44 @@ class ZenithAccessibilityService : AccessibilityService() {
         overlayActionHandler.getMindfulShield(packageName, appName)
 
     private suspend fun checkIfAppIsShielded(targetPackageName: String) {
-        if (targetPackageName != lastForegroundApp) {
-            val actualPkg = withContext(Dispatchers.Main) {
-                rootInActiveWindow?.packageName?.toString()
+        if (isOverlayCheckInProgress) return
+        isOverlayCheckInProgress = true
+        try {
+            if (targetPackageName != lastForegroundApp) {
+                val actualPkg = withContext(Dispatchers.Main) {
+                    rootInActiveWindow?.packageName?.toString()
+                }
+                if (targetPackageName != actualPkg) return
             }
-            if (targetPackageName != actualPkg) return
-        }
 
-        if (targetPackageName == InterceptOverlayManager.lastKickedPackage && System.currentTimeMillis() - InterceptOverlayManager.lastKickTime < 500) {
-            return
-        }
+            if (targetPackageName == InterceptOverlayManager.lastKickedPackage && System.currentTimeMillis() - InterceptOverlayManager.lastKickTime < 500) {
+                return
+            }
 
-        val shield = currentShieldCache ?: SharedMonitoringState.allShieldsCache[targetPackageName]
-        val prefs = SharedMonitoringState.currentPreferences ?: return
-        val isMindfulGateway = shield == null && prefs.mindfulGatewayEnabled && !shouldBypassBlocking(targetPackageName)
-        val appName = shield?.appName ?: overlayActionHandler.getAppName(targetPackageName)
-        val effectiveShield = if (isMindfulGateway) overlayActionHandler.getMindfulShield(targetPackageName, appName) else shield
+            val shield = currentShieldCache ?: SharedMonitoringState.allShieldsCache[targetPackageName]
+            val prefs = SharedMonitoringState.currentPreferences ?: return
+            val isMindfulGateway = shield == null && prefs.mindfulGatewayEnabled && !shouldBypassBlocking(targetPackageName)
+            val appName = shield?.appName ?: overlayActionHandler.getAppName(targetPackageName)
+            val effectiveShield = if (isMindfulGateway) overlayActionHandler.getMindfulShield(targetPackageName, appName) else shield
 
-        if (effectiveShield != null && !InterceptOverlayManager.isShowing) {
-            val totalUsageToday = getTotalUsageToday(targetPackageName)
-            val totalGlobalUsageToday = getTotalGlobalUsageToday()
-            val delayDurationSeconds = if (isMindfulGateway) 0 else prefs.delayAppDurationSeconds
+            if (effectiveShield != null && !InterceptOverlayManager.isShowing) {
+                val totalUsageToday = getTotalUsageToday(targetPackageName)
+                val totalGlobalUsageToday = getTotalGlobalUsageToday()
+                val delayDurationSeconds = if (isMindfulGateway) 0 else prefs.delayAppDurationSeconds
 
-            overlayActionHandler.showShieldOverlay(
-                targetPackageName = targetPackageName,
-                shield = effectiveShield,
-                isMindfulGateway = isMindfulGateway,
-                delayDurationSeconds = delayDurationSeconds,
-                totalUsageToday = totalUsageToday,
-                totalGlobalUsageToday = totalGlobalUsageToday,
-                updateShieldCache = { updated -> currentShieldCache = updated },
-                getTotalUsageTodayFn = { getTotalUsageToday(targetPackageName) },
-            )
+                overlayActionHandler.showShieldOverlay(
+                    targetPackageName = targetPackageName,
+                    shield = effectiveShield,
+                    isMindfulGateway = isMindfulGateway,
+                    delayDurationSeconds = delayDurationSeconds,
+                    totalUsageToday = totalUsageToday,
+                    totalGlobalUsageToday = totalGlobalUsageToday,
+                    updateShieldCache = { updated -> currentShieldCache = updated },
+                    getTotalUsageTodayFn = { getTotalUsageToday(targetPackageName) },
+                )
+            }
+        } finally {
+            isOverlayCheckInProgress = false
         }
     }
 
