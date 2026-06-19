@@ -400,8 +400,9 @@ object ScreenUsageHelper {
         return usageMap
     }
 
-    @Synchronized
     fun clearCache() {
-        clearIncrementalState()
+        synchronized(refreshLock) {
+            clearIncrementalState()
+        }
     }
 }

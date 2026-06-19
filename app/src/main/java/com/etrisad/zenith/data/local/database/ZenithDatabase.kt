@@ -5,6 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import androidx.room.Transaction
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import java.util.concurrent.Executors
@@ -43,6 +44,12 @@ abstract class ZenithDatabase : RoomDatabase() {
     abstract fun dailyUsageDao(): DailyUsageDao
     abstract fun hourlyUsageDao(): HourlyUsageDao
     abstract fun interceptedNotificationDao(): InterceptedNotificationDao
+
+    @Transaction
+    open suspend fun deleteUsageForPackageTransaction(date: String, packageName: String) {
+        dailyUsageDao().deleteUsageForPackage(date, packageName)
+        hourlyUsageDao().deleteHourlyUsageForPackage(date, packageName)
+    }
 
     companion object {
         @Volatile

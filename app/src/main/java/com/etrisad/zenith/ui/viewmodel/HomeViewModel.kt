@@ -783,10 +783,14 @@ class HomeViewModel(
                 updateUiStateFromDatabase(allShields, usage, global, prefs, fallbackMap)
                 forceUpdate
             }.debounce(2000).collect { forceUpdate ->
-                refreshMutex.withLock {
-                    if (forceUpdate) _uiState.update { it.copy(isLoading = true) }
-                    updateGlobalFallbackInternal(forceFull = forceUpdate)
-                    performUsageStatsRefresh(showLoading = false)
+                try {
+                    refreshMutex.withLock {
+                        if (forceUpdate) _uiState.update { it.copy(isLoading = true) }
+                        updateGlobalFallbackInternal(forceFull = forceUpdate)
+                        performUsageStatsRefresh(showLoading = false)
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("HomeVM", "Data observer collect failed: ${e.message}")
                 }
             }
         }
@@ -1105,8 +1109,10 @@ class HomeViewModel(
     }
 
     private fun refreshUsageStats(showLoading: Boolean = true) {
-        refreshJob?.cancel()
+        val previousJob = refreshJob
         refreshJob = viewModelScope.launch(Dispatchers.Default) {
+            previousJob?.cancel()
+            previousJob?.join()
             refreshMutex.withLock {
                 performUsageStatsRefresh(showLoading)
             }
@@ -1659,29 +1665,34 @@ class HomeViewModel(
             val cal = Calendar.getInstance()
             var lastUpdateDay = cal.get(Calendar.DAY_OF_YEAR)
             while (true) {
-                if (!isActive) {
+                try {
+                    if (!isActive) {
+                        delay(5000)
+                        continue
+                    }
+                    cal.timeInMillis = System.currentTimeMillis()
+                    val currentDay = cal.get(Calendar.DAY_OF_YEAR)
+                    if (currentDay != lastUpdateDay) {
+                        appInfoCache.clear(); _globalFallbackMap.value = emptyMap(); detailFallbackMap = emptyMap()
+                        val today = getMidnight(0); val yesterday = getMidnight(1)
+                        if (_uiState.value.selectedDateMillis == yesterday) _uiState.update { it.copy(selectedDateMillis = today) }
+                        lastUpdateDay = currentDay
+                    }
+                    refreshMutex.withLock {
+                        performUsageStatsRefresh(showLoading = false)
+                        refreshCurrentAppDetailUsage()
+                    }
+                    val remainingToTarget = (currentTargetMinutes * 60 * 1000L - _uiState.value.totalScreenTime).coerceAtLeast(0L)
+                    val interval = when {
+                        remainingToTarget < 30_000L -> 2000L
+                        remainingToTarget < 300_000L -> 5000L
+                        else -> 15000L
+                    }
+                    delay(interval)
+                } catch (e: Exception) {
+                    android.util.Log.e("HomeVM", "Real-time update failed: ${e.message}")
                     delay(5000)
-                    continue
                 }
-                cal.timeInMillis = System.currentTimeMillis()
-                val currentDay = cal.get(Calendar.DAY_OF_YEAR)
-                if (currentDay != lastUpdateDay) {
-                    appInfoCache.clear(); _globalFallbackMap.value = emptyMap(); detailFallbackMap = emptyMap()
-                    val today = getMidnight(0); val yesterday = getMidnight(1)
-                    if (_uiState.value.selectedDateMillis == yesterday) _uiState.update { it.copy(selectedDateMillis = today) }
-                    lastUpdateDay = currentDay
-                }
-                refreshMutex.withLock {
-                    performUsageStatsRefresh(showLoading = false)
-                    refreshCurrentAppDetailUsage()
-                }
-                val remainingToTarget = (currentTargetMinutes * 60 * 1000L - _uiState.value.totalScreenTime).coerceAtLeast(0L)
-                val interval = when {
-                    remainingToTarget < 30_000L -> 2000L
-                    remainingToTarget < 300_000L -> 5000L
-                    else -> 15000L
-                }
-                delay(interval)
             }
         }
     }

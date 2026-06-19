@@ -4,6 +4,7 @@ import com.etrisad.zenith.data.local.dao.DailyUsageDao
 import com.etrisad.zenith.data.local.dao.HourlyUsageDao
 import com.etrisad.zenith.data.local.dao.ScheduleDao
 import com.etrisad.zenith.data.local.dao.ShieldDao
+import com.etrisad.zenith.data.local.database.ZenithDatabase
 import com.etrisad.zenith.data.local.entity.DailyUsageEntity
 import com.etrisad.zenith.data.local.entity.HourlyUsageEntity
 import com.etrisad.zenith.data.local.entity.ScheduleEntity
@@ -21,7 +22,8 @@ class ShieldRepository(
     private val shieldDao: ShieldDao,
     private val scheduleDao: ScheduleDao,
     private val dailyUsageDao: DailyUsageDao,
-    private val hourlyUsageDao: HourlyUsageDao
+    private val hourlyUsageDao: HourlyUsageDao,
+    private val database: ZenithDatabase
 ) {
     val allowedApps = ConcurrentHashMap<String, Long>()
     val mindfulGatewayStates = ConcurrentHashMap<String, ShieldEntity>()
@@ -122,8 +124,7 @@ class ShieldRepository(
     }
 
     suspend fun deleteUsageForPackage(date: String, packageName: String) {
-        dailyUsageDao.deleteUsageForPackage(date, packageName)
-        hourlyUsageDao.deleteHourlyUsageForPackage(date, packageName)
+        database.deleteUsageForPackageTransaction(date, packageName)
     }
 
     suspend fun insertDailyUsage(usage: DailyUsageEntity) {
