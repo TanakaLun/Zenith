@@ -148,7 +148,47 @@ class OverlayActionHandler(
                     handleCloseApp(targetPackageName, updateShieldCache)
                 },
                 onGoalDismiss = {
-                    allowedApps[targetPackageName] = System.currentTimeMillis() + (60 * 60 * 1000L)
+                    val goalAllowedEnd = System.currentTimeMillis() + (shieldWithTimestamp.timeLimitMinutes * 60 * 1000L)
+                    allowedApps[targetPackageName] = goalAllowedEnd
+
+                    val currentPrefs = SharedMonitoringState.currentPreferences
+                    if (currentPrefs?.sessionUsageOverlayEnabled == true) {
+                        val isGoal = shieldWithTimestamp.type == FocusType.GOAL
+                        val limitMillis = (shieldWithTimestamp.timeLimitMinutes) * 60 * 1000L
+                        val currentUsage = getTotalUsageTodayFn()
+
+                        if (!(isGoal && (currentUsage >= limitMillis || SharedMonitoringState.notifiedGoals.contains(targetPackageName)) && limitMillis > 0)) {
+                            val duration = shieldWithTimestamp.timeLimitMinutes
+                            val currentUsageSeconds = (currentUsage / 1000).toInt()
+
+                            scope.launch(Dispatchers.Main) {
+                                sessionUsageOverlayManager.showHUD(
+                                    targetPackageName,
+                                    duration,
+                                    currentPrefs.sessionUsageOverlaySize,
+                                    currentPrefs.sessionUsageOverlayOpacity,
+                                    isGoal = true,
+                                    initialSeconds = currentUsageSeconds,
+                                    onSessionEnd = {
+                                        allowedApps.remove(targetPackageName)
+                                        this@OverlayActionHandler.scope.launch {
+                                            val s = SharedMonitoringState.allShieldsCache[targetPackageName]
+                                                ?: mindfulGatewayStates[targetPackageName]
+                                                ?: shieldRepository.getShieldByPackageName(targetPackageName)
+                                            if (s?.isAutoQuitEnabled == true) {
+                                                if (getForegroundAppName() == targetPackageName) {
+                                                    goToHomeScreen()
+                                                }
+                                            } else {
+                                                recheckShield(targetPackageName)
+                                            }
+                                        }
+                                    }
+                                )
+                                sessionUsageOverlayManager.updateHUDUsage(targetPackageName, currentUsage)
+                            }
+                        }
+                    }
                 }
             )
         }
