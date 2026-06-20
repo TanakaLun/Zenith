@@ -161,8 +161,7 @@ class AppUsageMonitorService : Service() {
                     Log.d("Zenith_SCREEN", "Calling hideAllHUDViews() due to SCREEN OFF")
                     sessionUsageOverlayManager.hideAllHUDViews()
                     scheduleScreenOffGoalAlarm()
-                    stopForeground(STOP_FOREGROUND_REMOVE)
-                    Log.w("ZenithAUMS", "SCREEN OFF: monitoring cancelled, foreground removed")
+                    Log.w("ZenithAUMS", "SCREEN OFF: monitoring cancelled")
                 }
                     android.os.PowerManager.ACTION_POWER_SAVE_MODE_CHANGED -> {
                         AppStateHolder.isPowerSaveMode.value = powerManager.isPowerSaveMode
