@@ -858,7 +858,6 @@ class HomeViewModel(
                 android.util.Log.e("HomeVM", "Sync failed: ${e.message}")
             } finally {
                 userPreferencesRepository.refreshAllAppStreaks(shieldRepository)
-                ScreenUsageHelper.clearCache()
                 performUsageStatsRefresh(showLoading = false)
             }
         }
@@ -1173,6 +1172,24 @@ class HomeViewModel(
             pkg !in excludePackages && isUserApp
         }.mapValues { (_, usage) ->
             usage.coerceAtMost(timeSinceMidnight)
+        }.toMutableMap()
+
+        if (isSelectedToday && timeSinceMidnight > 300_000L && filteredTodayUsage.values.sum() == 0L) {
+            android.util.Log.w("HomeVM", "UsageHelper empty, falling back to queryAndAggregateUsageStats")
+            val systemFallback = withContext(Dispatchers.IO) {
+                usm.queryAndAggregateUsageStats(todayStart, now)
+            }
+            if (systemFallback != null) {
+                systemFallback.forEach { (pkg, stats) ->
+                    val isUserApp = pkg in launcherApps || pm.getLaunchIntentForPackage(pkg) != null
+                    if (pkg !in excludePackages && isUserApp) {
+                        val time = stats.totalTimeVisible.coerceAtLeast(stats.totalTimeInForeground).coerceAtMost(timeSinceMidnight)
+                        if (time > 0) {
+                            filteredTodayUsage[pkg] = maxOf(filteredTodayUsage[pkg] ?: 0L, time)
+                        }
+                    }
+                }
+            }
         }
 
         val appTotals = mutableMapOf<String, Long>()
@@ -1241,6 +1258,17 @@ class HomeViewModel(
         }
 
         val totalToday = filteredTodayUsage.values.sum().coerceAtMost(timeSinceMidnight)
+
+        if (isSelectedToday && totalToday == 0L && timeSinceMidnight > 300_000L) {
+            android.util.Log.w("HomeVM", "totalToday is 0 after refresh, scheduling deferred repair")
+            val todayStr = dateFormat.format(Date(todayStart))
+            viewModelScope.launch {
+                delay(100)
+                refreshMutex.withLock {
+                    repairDataInternal(todayStr, RepairMode.SYSTEM)
+                }
+            }
+        }
 
         val missingPkgs = appTotals.keys.filter { !appInfoCache.containsKey(it) }
         if (missingPkgs.isNotEmpty()) {
@@ -1702,6 +1730,7 @@ class HomeViewModel(
         viewModelScope.launch {
             val cal = Calendar.getInstance()
             var lastUpdateDay = cal.get(Calendar.DAY_OF_YEAR)
+            var lastSanityCheck = 0L
             while (true) {
                 try {
                     if (!isActive) {
@@ -1719,6 +1748,22 @@ class HomeViewModel(
                     refreshMutex.withLock {
                         performUsageStatsRefresh(showLoading = false)
                         refreshCurrentAppDetailUsage()
+                    }
+                    val now2 = System.currentTimeMillis()
+                    if (now2 - lastSanityCheck > 300_000L) {
+                        lastSanityCheck = now2
+                        val checkTodayStart = getMidnight(0)
+                        val checkTimeSinceMidnight = now2 - checkTodayStart
+                        if (_uiState.value.totalScreenTime == 0L && checkTimeSinceMidnight > 300_000L) {
+                            android.util.Log.w("HomeVM", "Sanity: totalScreenTime=0, scheduling repair")
+                            val todayStr = getDateFormat().format(Date(checkTodayStart))
+                            viewModelScope.launch {
+                                delay(100)
+                                refreshMutex.withLock {
+                                    repairDataInternal(todayStr, RepairMode.SYSTEM)
+                                }
+                            }
+                        }
                     }
                     val remainingToTarget = (currentTargetMinutes * 60 * 1000L - _uiState.value.totalScreenTime).coerceAtLeast(0L)
                     val interval = when {
