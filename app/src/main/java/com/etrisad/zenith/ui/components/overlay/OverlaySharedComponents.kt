@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Bolt
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.*
@@ -26,11 +27,17 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.etrisad.zenith.data.CurrentCalendarEvent
 import com.etrisad.zenith.data.preferences.UserPreferences
 import com.etrisad.zenith.ui.components.ZenithButton
 import com.etrisad.zenith.ui.components.ZenithButtonSize
@@ -555,4 +562,161 @@ fun formatCountdown(millis: Long): String {
     val minutes = (totalSeconds / 60) % 60
     val hours = totalSeconds / 3600
     return String.format(Locale.getDefault(), "%02d:%02d:%02d", hours, minutes, seconds)
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun CurrentEventPill(
+    currentEvent: CurrentCalendarEvent,
+    modifier: Modifier = Modifier
+) {
+    val eventProgress = remember { mutableFloatStateOf(0f) }
+
+    LaunchedEffect(currentEvent) {
+        while (true) {
+            val now = System.currentTimeMillis()
+            val duration = currentEvent.eventEndMillis - currentEvent.eventStartMillis
+            eventProgress.floatValue = if (duration > 0) {
+                ((now - currentEvent.eventStartMillis).toFloat() / duration).coerceIn(0f, 1f)
+            } else 0f
+            delay(100)
+        }
+    }
+
+    val pillColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+    val pillLarge = 24.dp
+    val pillSmall = 4.dp
+
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Surface(
+            color = MaterialTheme.colorScheme.secondaryContainer,
+            shape = RoundedCornerShape(
+                topStart = pillLarge, bottomStart = pillLarge,
+                topEnd = pillSmall, bottomEnd = pillSmall
+            )
+        ) {
+            Box(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.CalendarMonth,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
+        }
+
+        Surface(
+            color = pillColor,
+            shape = RoundedCornerShape(pillSmall),
+            modifier = Modifier.weight(1f)
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+            ) {
+                RollingText(
+                    text = currentEvent.title,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                if (!currentEvent.description.isNullOrBlank()) {
+                    RollingText(
+                        text = currentEvent.description,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
+        Surface(
+            color = pillColor,
+            shape = RoundedCornerShape(
+                topStart = pillSmall, bottomStart = pillSmall,
+                topEnd = pillLarge, bottomEnd = pillLarge
+            )
+        ) {
+            Box(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularWavyProgressIndicator(
+                    progress = { eventProgress.floatValue.coerceIn(0f, 1f) },
+                    modifier = Modifier.size(24.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.outlineVariant,
+                    stroke = Stroke(width = 6.dp.value),
+                    trackStroke = Stroke(width = 6.dp.value),
+                    wavelength = 8.dp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun RollingText(
+    text: String,
+    style: TextStyle,
+    fontWeight: FontWeight? = null,
+    color: Color
+) {
+    val textMeasurer = rememberTextMeasurer()
+    val textWidth = remember(text, style, fontWeight) {
+        val mergedStyle = if (fontWeight != null) style.copy(fontWeight = fontWeight) else style
+        textMeasurer.measure(
+            text = AnnotatedString(text),
+            style = mergedStyle,
+            maxLines = 1,
+            softWrap = false
+        ).size.width
+    }
+    var containerWidth by remember { mutableIntStateOf(0) }
+    val needsScroll = textWidth > containerWidth
+    val offsetX = remember { Animatable(0f) }
+
+    LaunchedEffect(needsScroll, textWidth, containerWidth) {
+        if (needsScroll && textWidth > 0 && containerWidth > 0) {
+            val maxScroll = -(textWidth - containerWidth + 24f).coerceAtMost(0f)
+            while (true) {
+                offsetX.animateTo(
+                    targetValue = maxScroll,
+                    animationSpec = tween(durationMillis = 3000, easing = LinearEasing)
+                )
+                delay(1500)
+                offsetX.animateTo(
+                    targetValue = 0f,
+                    animationSpec = tween(durationMillis = 3000, easing = LinearEasing)
+                )
+                delay(1500)
+            }
+        } else {
+            offsetX.snapTo(0f)
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .graphicsLayer { clip = true }
+            .onSizeChanged { containerWidth = it.width },
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Text(
+            text = text,
+            style = style,
+            fontWeight = fontWeight,
+            color = color,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Visible,
+            modifier = Modifier.graphicsLayer { translationX = offsetX.value }
+        )
+    }
 }

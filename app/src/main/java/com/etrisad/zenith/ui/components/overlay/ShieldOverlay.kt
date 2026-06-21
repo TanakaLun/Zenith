@@ -149,6 +149,35 @@ fun ShieldOverlay(
         mutableStateOf(isDelayEnabled && currentShield != null && currentShield.lastDelayStartTimestamp != 0L && initialProgress < 1f)
     }
 
+    val isPeriodExpired = remember(currentShield) {
+        currentShield != null && (System.currentTimeMillis() - currentShield.lastPeriodResetTimestamp > currentShield.refreshPeriodMinutes * 60 * 1000L)
+    }
+    
+    val currentUses = remember(currentShield, isPeriodExpired) {
+        if (isPeriodExpired) 0 else (currentShield?.currentPeriodUses ?: 0)
+    }
+    val maxUses = currentShield?.maxUsesPerPeriod ?: 5
+    val isUsesExceeded = remember(currentUses, maxUses, isIncentiveLocked) { isIncentiveLocked || currentUses >= maxUses }
+    val isTimeLimitReached = remember(currentTotalUsageToday, currentShield) {
+        currentShield != null && currentShield.timeLimitMinutes > 0 && currentTotalUsageToday >= (currentShield.timeLimitMinutes * 60 * 1000L)
+    }
+
+    val remainingMinutes = remember(currentTotalUsageToday, currentShield) {
+        currentShield?.let {
+            if (it.timeLimitMinutes <= 0) return@let null
+            val limitMillis = it.timeLimitMinutes * 60 * 1000L
+            ((limitMillis - currentTotalUsageToday) / (60 * 1000L)).toInt().coerceAtLeast(0)
+        }
+    }
+
+    val isBlocked by remember(isUsesExceeded, isTimeLimitReached, remainingMinutes, isEmergencyUnlocked, currentShield?.type, isIncentiveLocked) {
+        derivedStateOf {
+            val effectivelyTimeReached = isTimeLimitReached || (remainingMinutes != null && remainingMinutes <= 0)
+            val baseBlocked = (isUsesExceeded || effectivelyTimeReached) && !isEmergencyUnlocked
+            baseBlocked && (currentShield?.type == FocusType.SHIELD || (isIncentiveLocked && currentShield == null))
+        }
+    }
+
     val motivationalMessages = remember {
         listOf(
             "Time for a quick stretch!",
@@ -170,11 +199,16 @@ fun ShieldOverlay(
 
     var currentEvent by remember { mutableStateOf<CurrentCalendarEvent?>(null) }
 
-    LaunchedEffect(isDelaying, userPrefs.showCurrentEvent) {
-        if (isDelaying && userPrefs.showCurrentEvent) {
-            withContext(Dispatchers.IO) {
-                currentEvent = CalendarEventProvider.fetchCurrentEvent(context)
+    LaunchedEffect(userPrefs.showCurrentEvent, isBlocked, isDelaying) {
+        if (userPrefs.showCurrentEvent && (isBlocked || isDelaying)) {
+            while (true) {
+                withContext(Dispatchers.IO) {
+                    currentEvent = CalendarEventProvider.fetchCurrentEvent(context)
+                }
+                delay(60000)
             }
+        } else {
+            currentEvent = null
         }
     }
 
@@ -206,34 +240,6 @@ fun ShieldOverlay(
         }
     }
 
-    val isPeriodExpired = remember(currentShield) {
-        currentShield != null && (System.currentTimeMillis() - currentShield.lastPeriodResetTimestamp > currentShield.refreshPeriodMinutes * 60 * 1000L)
-    }
-    
-    val currentUses = remember(currentShield, isPeriodExpired) {
-        if (isPeriodExpired) 0 else (currentShield?.currentPeriodUses ?: 0)
-    }
-    val maxUses = currentShield?.maxUsesPerPeriod ?: 5
-    val isUsesExceeded = remember(currentUses, maxUses, isIncentiveLocked) { isIncentiveLocked || currentUses >= maxUses }
-    val isTimeLimitReached = remember(currentTotalUsageToday, currentShield) {
-        currentShield != null && currentShield.timeLimitMinutes > 0 && currentTotalUsageToday >= (currentShield.timeLimitMinutes * 60 * 1000L)
-    }
-
-    val remainingMinutes = remember(currentTotalUsageToday, currentShield) {
-        currentShield?.let {
-            if (it.timeLimitMinutes <= 0) return@let null
-            val limitMillis = it.timeLimitMinutes * 60 * 1000L
-            ((limitMillis - currentTotalUsageToday) / (60 * 1000L)).toInt().coerceAtLeast(0)
-        }
-    }
-
-    val isBlocked by remember(isUsesExceeded, isTimeLimitReached, remainingMinutes, isEmergencyUnlocked, currentShield?.type, isIncentiveLocked) {
-        derivedStateOf {
-            val effectivelyTimeReached = isTimeLimitReached || (remainingMinutes != null && remainingMinutes <= 0)
-            val baseBlocked = (isUsesExceeded || effectivelyTimeReached) && !isEmergencyUnlocked
-            baseBlocked && (currentShield?.type == FocusType.SHIELD || (isIncentiveLocked && currentShield == null))
-        }
-    }
 
     val autoKickProgress = remember(packageName) { Animatable(0f) }
     var isEmergencyHolding by remember(packageName) { mutableStateOf(false) }
@@ -869,6 +875,7 @@ fun ShieldSection(
             shield = shield,
             isIncentiveLocked = isIncentiveLocked,
             incentiveProgress = incentiveProgress,
+            currentEvent = currentEvent,
             onEmergencyClick = onEmergencyClick,
             onEmergencyHoldingChange = onEmergencyHoldingChange
         )
@@ -973,9 +980,13 @@ fun ShieldLandscapeContent(
     if ((isUsesExceeded || isTimeLimitReached) && !isEmergencyUnlocked) {
         Column(
             modifier = Modifier.fillMaxHeight(),
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            Spacer(modifier = Modifier.weight(1f))
+            if (currentEvent != null) {
+                CurrentEventPill(currentEvent = currentEvent)
+                Spacer(modifier = Modifier.height(24.dp))
+            }
             LimitReachedContent(
                 isUsesExceeded = isUsesExceeded,
                 isTimeLimitReached = isTimeLimitReached,
@@ -987,7 +998,7 @@ fun ShieldLandscapeContent(
                 Spacer(modifier = Modifier.height(16.dp))
                 EmergencyButton(onEmergencyUse = onEmergencyClick, onHoldingChange = onEmergencyHoldingChange)
             }
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(24.dp))
             CloseAppTextButton(onCloseApp, autoKickProgress, size = ZenithButtonSize.Large)
         }
     } else {
@@ -1030,9 +1041,14 @@ fun LimitReachedSection(
     shield: ShieldEntity?,
     isIncentiveLocked: Boolean = false,
     incentiveProgress: Float = 0f,
+    currentEvent: CurrentCalendarEvent? = null,
     onEmergencyClick: () -> Unit,
     onEmergencyHoldingChange: (Boolean) -> Unit = {}
 ) {
+    if (currentEvent != null) {
+        Spacer(modifier = Modifier.height(16.dp))
+        CurrentEventPill(currentEvent = currentEvent)
+    }
     Spacer(modifier = Modifier.height(24.dp))
     LimitReachedContent(isUsesExceeded, isTimeLimitReached, refreshTimeLeftMillis, isIncentiveLocked, incentiveProgress)
     if (shield != null && shield.emergencyUseCount > 0) {
@@ -1112,102 +1128,12 @@ fun DelayInProgressSection(
     delayDurationSeconds: Int,
     currentEvent: CurrentCalendarEvent? = null
 ) {
-    val eventProgress = remember { mutableFloatStateOf(0f) }
-
-    LaunchedEffect(currentEvent) {
-        if (currentEvent != null) {
-            while (true) {
-                val now = System.currentTimeMillis()
-                val duration = currentEvent.eventEndMillis - currentEvent.eventStartMillis
-                eventProgress.floatValue = if (duration > 0) {
-                    ((now - currentEvent.eventStartMillis).toFloat() / duration).coerceIn(0f, 1f)
-                } else 0f
-                delay(100)
-            }
-        }
-    }
-
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         if (currentEvent != null) {
-            val pillColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-            val pillLarge = 24.dp
-            val pillSmall = 4.dp
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                Surface(
-                    color = MaterialTheme.colorScheme.secondaryContainer,
-                    shape = RoundedCornerShape(
-                        topStart = pillLarge, bottomStart = pillLarge,
-                        topEnd = pillSmall, bottomEnd = pillSmall
-                    )
-                ) {
-                    Box(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.CalendarMonth,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                            tint = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                    }
-                }
-
-                Surface(
-                    color = pillColor,
-                    shape = RoundedCornerShape(pillSmall),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
-                    ) {
-                        RollingText(
-                            text = currentEvent.title,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        if (!currentEvent.description.isNullOrBlank()) {
-                            RollingText(
-                                text = currentEvent.description,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-
-                Surface(
-                    color = pillColor,
-                    shape = RoundedCornerShape(
-                        topStart = pillSmall, bottomStart = pillSmall,
-                        topEnd = pillLarge, bottomEnd = pillLarge
-                    )
-                ) {
-                    Box(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularWavyProgressIndicator(
-                            progress = { eventProgress.floatValue.coerceIn(0f, 1f) },
-                            modifier = Modifier.size(24.dp),
-                            color = MaterialTheme.colorScheme.primary,
-                            trackColor = MaterialTheme.colorScheme.outlineVariant,
-                            stroke = Stroke(width = 6.dp.value),
-                            trackStroke = Stroke(width = 6.dp.value),
-                            wavelength = 8.dp
-                        )
-                    }
-                }
-            }
+            CurrentEventPill(currentEvent = currentEvent)
             Spacer(modifier = Modifier.height(24.dp))
         } else {
             Text(
@@ -1260,62 +1186,3 @@ fun DurationSelectionSection(remainingMinutes: Int?, isEmergencyUnlocked: Boolea
     }
 }
 
-@Composable
-private fun RollingText(
-    text: String,
-    style: TextStyle,
-    fontWeight: FontWeight? = null,
-    color: Color
-) {
-    val textMeasurer = rememberTextMeasurer()
-    val textWidth = remember(text, style, fontWeight) {
-        val mergedStyle = if (fontWeight != null) style.copy(fontWeight = fontWeight) else style
-        textMeasurer.measure(
-            text = AnnotatedString(text),
-            style = mergedStyle,
-            maxLines = 1,
-            softWrap = false
-        ).size.width
-    }
-    var containerWidth by remember { mutableIntStateOf(0) }
-    val needsScroll = textWidth > containerWidth
-    val offsetX = remember { Animatable(0f) }
-
-    LaunchedEffect(needsScroll, textWidth, containerWidth) {
-        if (needsScroll && textWidth > 0 && containerWidth > 0) {
-            val maxScroll = -(textWidth - containerWidth + 24f).coerceAtMost(0f)
-            while (true) {
-                offsetX.animateTo(
-                    targetValue = maxScroll,
-                    animationSpec = tween(durationMillis = 3000, easing = LinearEasing)
-                )
-                delay(1500)
-                offsetX.animateTo(
-                    targetValue = 0f,
-                    animationSpec = tween(durationMillis = 3000, easing = LinearEasing)
-                )
-                delay(1500)
-            }
-        } else {
-            offsetX.snapTo(0f)
-        }
-    }
-
-    Box(
-        modifier = Modifier
-            .graphicsLayer { clip = true }
-            .onSizeChanged { containerWidth = it.width },
-        contentAlignment = Alignment.CenterStart
-    ) {
-        Text(
-            text = text,
-            style = style,
-            fontWeight = fontWeight,
-            color = color,
-            maxLines = 1,
-            softWrap = false,
-            overflow = TextOverflow.Visible,
-            modifier = Modifier.graphicsLayer { translationX = offsetX.value }
-        )
-    }
-}
