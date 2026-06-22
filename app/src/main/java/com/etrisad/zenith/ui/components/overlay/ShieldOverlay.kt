@@ -468,19 +468,40 @@ fun PortraitInterceptLayout(
     onAllowUse: (Int) -> Unit,
     onCloseApp: () -> Unit
 ) {
+    val currentRemainingMinutes = remember(shield, totalUsageToday, remainingMinutes) {
+        shield?.let {
+            if (it.timeLimitMinutes <= 0) return@let null
+            val totalLimitMillis = it.timeLimitMinutes * 60 * 1000L
+            val remainingMillis = (totalLimitMillis - totalUsageToday).coerceAtLeast(0L)
+            (remainingMillis / 60000).toInt()
+        } ?: remainingMinutes
+    }
+
+    val effectivelyTimeReached = isTimeLimitReached || (currentRemainingMinutes != null && currentRemainingMinutes <= 0)
+    val isBlocked = (isUsesExceeded || effectivelyTimeReached) && !isEmergencyUnlocked
+
     Column(
         modifier = Modifier
             .padding(bottom = 24.dp, start = 24.dp, end = 24.dp)
-            .fillMaxWidth()
+            .then(
+                if (userPrefs.overlayFullScreen) Modifier.fillMaxSize()
+                else Modifier.fillMaxWidth().wrapContentHeight()
+            )
             .navigationBarsPadding(),
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(32.dp)
     ) {
-
+        // Center Content: Icon, Title, Description, and Progress
+        Column(
+            modifier = if (userPrefs.overlayFullScreen) Modifier.weight(1f) else Modifier.wrapContentHeight(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically)
+        ) {
             Box(
                 modifier = Modifier
                     .size(80.dp)
                     .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
                 contentAlignment = Alignment.Center
             ) {
                 SubcomposeAsyncImage(
@@ -504,53 +525,80 @@ fun PortraitInterceptLayout(
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "Mindful Pause",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
 
-            Text(
-                text = "Mindful Pause",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold
-            )
+                Text(
+                    text = appName,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
 
-            Text(
-                text = appName,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+                Text(
+                    text = if (shield != null) "Zenith Shield is active for this app." else "Mindful Gateway is guarding your focus.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = if (shield != null) "Zenith Shield is active for this app." else "Mindful Gateway is guarding your focus.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            ShieldSection(
+            ShieldProgressSection(
                 shield = shield,
-                remainingMinutes = remainingMinutes,
                 totalUsageToday = totalUsageToday,
                 totalGlobalUsageToday = totalGlobalUsageToday,
-                userPrefs = userPrefs,
-                isEmergencyUnlocked = isEmergencyUnlocked,
-                isDelaying = isDelaying,
-                randomMessage = randomMessage,
-                currentEvent = currentEvent,
-                delayProgressAnimatable = delayProgressAnimatable,
-                delayDurationSeconds = delayDurationSeconds,
-                isUsesExceeded = isUsesExceeded,
-                isTimeLimitReached = isTimeLimitReached,
-                refreshTimeLeftMillis = refreshTimeLeftMillis,
-                isIncentiveLocked = isIncentiveLocked,
-                incentiveProgress = incentiveProgress,
-                autoKickProgress = autoKickProgress,
-                onEmergencyClick = onEmergencyClick,
-                onEmergencyHoldingChange = onEmergencyHoldingChange,
-                onAllowUse = onAllowUse,
-                onCloseApp = onCloseApp
+                userPrefs = userPrefs
             )
+        }
+
+        // Bottom Actions: Sticky at the bottom
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            if (isBlocked) {
+                LimitReachedSection(
+                    isUsesExceeded = isUsesExceeded,
+                    isTimeLimitReached = effectivelyTimeReached,
+                    refreshTimeLeftMillis = refreshTimeLeftMillis,
+                    shield = shield,
+                    isIncentiveLocked = isIncentiveLocked,
+                    incentiveProgress = incentiveProgress,
+                    currentEvent = currentEvent,
+                    onEmergencyClick = onEmergencyClick,
+                    onEmergencyHoldingChange = onEmergencyHoldingChange
+                )
+            } else {
+                val minutesToDisplay = if (isEmergencyUnlocked) null else currentRemainingMinutes
+
+                AnimatedContent(
+                    targetState = isDelaying,
+                    transitionSpec = {
+                        (fadeIn(animationSpec = spring(stiffness = Spring.StiffnessLow)) +
+                         scaleIn(initialScale = 0.92f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy)))
+                            .togetherWith(fadeOut(animationSpec = spring(stiffness = Spring.StiffnessLow)))
+                    },
+                    label = "delayContent"
+                ) { delaying ->
+                    if (delaying) {
+                        DelayInProgressSection(randomMessage, delayProgressAnimatable, delayDurationSeconds, currentEvent)
+                    } else {
+                        DurationSelectionSection(minutesToDisplay, isEmergencyUnlocked, onAllowUse)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            CloseAppTextButton(onCloseApp, autoKickProgress, size = ZenithButtonSize.ExtraLarge)
+        }
     }
 }
 
@@ -585,14 +633,18 @@ fun LandscapeInterceptLayout(
     onCloseApp: () -> Unit
 ) {
     Column(
-        modifier = modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally
+        modifier = modifier.then(
+            if (userPrefs.overlayFullScreen) Modifier.fillMaxSize()
+            else Modifier.fillMaxWidth().wrapContentHeight()
+        ),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = if (userPrefs.overlayFullScreen) Arrangement.Center else Arrangement.Top
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(IntrinsicSize.Min)
-                .padding(bottom = 24.dp, start = 24.dp, end = 24.dp, top = 12.dp),
+                .padding(horizontal = 24.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(24.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -642,7 +694,7 @@ fun LandscapeInterceptLayout(
                     modifier = Modifier
                         .size(64.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh),
                     contentAlignment = Alignment.Center
                 ) {
                     AsyncImage(
@@ -723,44 +775,14 @@ fun LandscapeInterceptLayout(
 }
 
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun ShieldSection(
+fun ShieldProgressSection(
     shield: ShieldEntity?,
-    remainingMinutes: Int?,
     totalUsageToday: Long,
     totalGlobalUsageToday: Long,
-    userPrefs: UserPreferences,
-    isEmergencyUnlocked: Boolean,
-    isDelaying: Boolean,
-    randomMessage: String,
-    currentEvent: CurrentCalendarEvent?,
-    delayProgressAnimatable: Animatable<Float, AnimationVector1D>,
-    delayDurationSeconds: Int,
-    isUsesExceeded: Boolean,
-    isTimeLimitReached: Boolean,
-    refreshTimeLeftMillis: Long,
-    isIncentiveLocked: Boolean = false,
-    incentiveProgress: Float = 0f,
-    autoKickProgress: () -> Float,
-    onEmergencyClick: () -> Unit,
-    onEmergencyHoldingChange: (Boolean) -> Unit = {},
-    onAllowUse: (Int) -> Unit,
-    onCloseApp: () -> Unit
+    userPrefs: UserPreferences
 ) {
-    val currentRemainingMinutes = remember(shield, totalUsageToday, remainingMinutes) {
-        shield?.let {
-            if (it.timeLimitMinutes <= 0) return@let null
-            val totalLimitMillis = it.timeLimitMinutes * 60 * 1000L
-            val remainingMillis = (totalLimitMillis - totalUsageToday).coerceAtLeast(0L)
-            (remainingMillis / 60000).toInt()
-        } ?: remainingMinutes
-    }
-
-    val effectivelyTimeReached = isTimeLimitReached || (currentRemainingMinutes != null && currentRemainingMinutes <= 0)
-    val isBlocked = (isUsesExceeded || effectivelyTimeReached) && !isEmergencyUnlocked
-
-    Spacer(modifier = Modifier.height(16.dp))
     val totalLimitMillis = shield?.let { it.timeLimitMinutes * 60 * 1000L } ?: 0L
     val remainingMillis = if (totalLimitMillis > 0) (totalLimitMillis - totalUsageToday).coerceAtLeast(0L) else 0L
     val progress = if (totalLimitMillis > 0) remainingMillis.toFloat() / totalLimitMillis else 0f
@@ -805,43 +827,6 @@ fun ShieldSection(
             )
         }
     }
-
-    if (isBlocked) {
-        LimitReachedSection(
-            isUsesExceeded = isUsesExceeded,
-            isTimeLimitReached = effectivelyTimeReached,
-            refreshTimeLeftMillis = refreshTimeLeftMillis,
-            shield = shield,
-            isIncentiveLocked = isIncentiveLocked,
-            incentiveProgress = incentiveProgress,
-            currentEvent = currentEvent,
-            onEmergencyClick = onEmergencyClick,
-            onEmergencyHoldingChange = onEmergencyHoldingChange
-        )
-    } else {
-        val minutesToDisplay = if (isEmergencyUnlocked) null else currentRemainingMinutes
-        Spacer(modifier = Modifier.height(24.dp))
-
-        AnimatedContent(
-            targetState = isDelaying,
-            transitionSpec = {
-                (fadeIn(animationSpec = spring(stiffness = Spring.StiffnessLow)) +
-                 scaleIn(initialScale = 0.92f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy)))
-                    .togetherWith(fadeOut(animationSpec = spring(stiffness = Spring.StiffnessLow)))
-            },
-            label = "delayContent"
-        ) { delaying ->
-            if (delaying) {
-                DelayInProgressSection(randomMessage, delayProgressAnimatable, delayDurationSeconds, currentEvent)
-            } else {
-                DurationSelectionSection(minutesToDisplay, isEmergencyUnlocked, onAllowUse)
-            }
-        }
-    }
-
-    Spacer(modifier = Modifier.height(24.dp))
-
-    CloseAppTextButton(onCloseApp, autoKickProgress, size = ZenithButtonSize.ExtraLarge)
 }
 
 

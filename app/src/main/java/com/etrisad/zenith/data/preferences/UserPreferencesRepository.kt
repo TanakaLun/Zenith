@@ -254,6 +254,11 @@ class UserPreferencesRepository(private val context: Context) {
         val TREND_MILESTONE_ENABLED = booleanPreferencesKey("trend_milestone_enabled")
         val INCENTIVE_LOCK_ENABLED = booleanPreferencesKey("incentive_lock_enabled")
 
+        val OVERLAY_PALETTE_ID = stringPreferencesKey("overlay_palette_id")
+        val OVERLAY_SHEET_OPACITY = floatPreferencesKey("overlay_sheet_opacity")
+        val OVERLAY_FULL_SCREEN = booleanPreferencesKey("overlay_full_screen")
+        val OVERLAY_CUSTOM_HUE = floatPreferencesKey("overlay_custom_hue")
+
         val PERFORMANCE_LEVEL = stringPreferencesKey("performance_level")
         val PERF_A11Y_ACTIVE_DELAY = longPreferencesKey("perf_a11y_active_delay")
         val PERF_A11Y_INACTIVE_DELAY = longPreferencesKey("perf_a11y_inactive_delay")
@@ -448,6 +453,10 @@ class UserPreferencesRepository(private val context: Context) {
                     roundness = settings[PreferencesKeys.GS_B_ROND] ?: 0f
                 ),
             ),
+            overlayPaletteId = settings[PreferencesKeys.OVERLAY_PALETTE_ID] ?: "dynamic",
+            overlaySheetOpacity = settings[PreferencesKeys.OVERLAY_SHEET_OPACITY] ?: 1f,
+            overlayFullScreen = settings[PreferencesKeys.OVERLAY_FULL_SCREEN] ?: false,
+            overlayCustomHue = settings[PreferencesKeys.OVERLAY_CUSTOM_HUE] ?: 270f,
             streakRecoveryPerformed = runtime[RuntimeKeys.STREAK_RECOVERY_PERFORMED] ?: false
         )
     }.distinctUntilChanged()
@@ -986,6 +995,22 @@ class UserPreferencesRepository(private val context: Context) {
 
     suspend fun setExpressiveColors(enabled: Boolean) {
         context.dataStore.edit { preferences -> preferences[PreferencesKeys.EXPRESSIVE_COLORS] = enabled }
+    }
+
+    suspend fun setOverlayPaletteId(paletteId: String) {
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.OVERLAY_PALETTE_ID] = paletteId }
+    }
+
+    suspend fun setOverlaySheetOpacity(opacity: Float) {
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.OVERLAY_SHEET_OPACITY] = opacity }
+    }
+
+    suspend fun setOverlayFullScreen(enabled: Boolean) {
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.OVERLAY_FULL_SCREEN] = enabled }
+    }
+
+    suspend fun setOverlayCustomHue(hue: Float) {
+        context.dataStore.edit { preferences -> preferences[PreferencesKeys.OVERLAY_CUSTOM_HUE] = hue }
     }
 
     suspend fun setTotalUsagePillEnabled(enabled: Boolean) {
@@ -1527,6 +1552,10 @@ data class UserPreferences(
     val incentiveLockEnabled: Boolean = false,
     val incentiveLockDisableRequestTimestamp: Long = 0L,
     val incentiveLockGoalsMetToday: Boolean = false,
+    val overlayPaletteId: String = "dynamic",
+    val overlaySheetOpacity: Float = 1f,
+    val overlayFullScreen: Boolean = false,
+    val overlayCustomHue: Float = 270f,
 ) {
     fun buildPerformanceConfig(): PerformanceConfig {
         if (performanceLevel.isPreset()) return performanceLevel.toConfig()

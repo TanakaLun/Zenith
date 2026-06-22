@@ -969,6 +969,7 @@ fun MainScreen(
                     }
                     composable(Screen.OverlayAppearance.route) {
                         com.etrisad.zenith.ui.screens.settings.OverlayAppearanceScreen(
+                            repository = userPreferencesRepository,
                             onBack = { navController.popBackStack() },
                             innerPadding = innerPadding
                         )

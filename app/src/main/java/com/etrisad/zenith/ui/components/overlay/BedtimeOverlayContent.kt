@@ -129,6 +129,7 @@ fun BedtimeOverlayContent(
         backgroundAlpha = backgroundAlphaState.value,
         isLandscape = isLandscape,
         maxWidthLandscape = 720.dp,
+        userPreferences = userPreferences,
         maxHeightFraction = if (isLandscape) 0.95f else 0.9f,
         showBedtimePill = false
     ) { _ ->
@@ -174,25 +175,24 @@ fun PortraitBedtimeLayout(
 ) {
     Column(
         modifier = Modifier
-            .fillMaxSize()
+            .then(
+                if (exitProgress > 0f) Modifier.fillMaxSize() 
+                else Modifier.fillMaxWidth().wrapContentHeight()
+            )
             .padding(bottom = 24.dp, start = 24.dp, end = 24.dp)
             .navigationBarsPadding(),
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(32.dp)
     ) {
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
+            modifier = if (exitProgress > 0f) Modifier.weight(1f).fillMaxWidth() 
+                      else Modifier.fillMaxWidth().wrapContentHeight(),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterVertically)
         ) {
             BedtimeHeader(appName, appIcon)
 
-            Spacer(modifier = Modifier.height(40.dp))
-
             BedtimeProgress(bedtimeUiState)
-
-            Spacer(modifier = Modifier.height(40.dp))
 
             BedtimeDescription()
         }
@@ -254,45 +254,45 @@ fun LandscapeBedtimeLayout(
 
 @Composable
 private fun BedtimeHeader(appName: String, appIcon: androidx.compose.ui.graphics.ImageBitmap?, isSmall: Boolean = false) {
-    Box(
-        modifier = Modifier
-            .size(if (isSmall) 64.dp else 80.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant),
-        contentAlignment = Alignment.Center
-    ) {
-        if (appIcon != null) {
-            Image(
-                bitmap = appIcon,
-                contentDescription = null,
-                modifier = Modifier.size(if (isSmall) 48.dp else 60.dp).clip(CircleShape),
-                contentScale = ContentScale.Crop
-            )
-        } else {
-            Icon(
-                Icons.Outlined.Bedtime,
-                contentDescription = null,
-                modifier = Modifier.size(if (isSmall) 36.dp else 48.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Box(
+            modifier = Modifier
+                .size(if (isSmall) 64.dp else 80.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center
+        ) {
+            if (appIcon != null) {
+                Image(
+                    bitmap = appIcon,
+                    contentDescription = null,
+                    modifier = Modifier.size(if (isSmall) 48.dp else 60.dp).clip(CircleShape),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Icon(
+                    Icons.Outlined.Bedtime,
+                    contentDescription = null,
+                    modifier = Modifier.size(if (isSmall) 36.dp else 48.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
         }
+
+        Text(
+            text = "Bedtime Mode",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Bold
+        )
+
+        Text(
+            text = appName,
+            style = if (isSmall) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
     }
-
-    Spacer(modifier = Modifier.height(16.dp))
-
-    Text(
-        text = "Bedtime Mode",
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
-        fontWeight = FontWeight.Bold
-    )
-
-    Text(
-        text = appName,
-        style = if (isSmall) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineSmall,
-        fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.onSurface
-    )
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)

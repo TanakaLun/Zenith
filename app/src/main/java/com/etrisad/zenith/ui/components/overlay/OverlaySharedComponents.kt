@@ -37,6 +37,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.toArgb
 import com.etrisad.zenith.data.CurrentCalendarEvent
 import com.etrisad.zenith.data.preferences.UserPreferences
 import com.etrisad.zenith.ui.components.ZenithButton
@@ -46,6 +47,125 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Calendar
 import java.util.Locale
+
+data class OverlayColorPalette(
+    val id: String,
+    val seed: Color,
+    val label: String,
+    val isDynamic: Boolean = false
+)
+
+val PREDEFINED_PALETTES = listOf(
+    OverlayColorPalette("dynamic", Color.Transparent, "Dynamic", isDynamic = true),
+    OverlayColorPalette("custom", Color.Transparent, "Custom"),
+    OverlayColorPalette("monochrome", Color(0xFF616161), "Monochrome"),
+    OverlayColorPalette("zenith", Color(0xFF4D568D), "Zenith"),
+    OverlayColorPalette("ocean", Color(0xFF0061A4), "Ocean"),
+    OverlayColorPalette("forest", Color(0xFF386B01), "Forest"),
+    OverlayColorPalette("rose", Color(0xFF9C4146), "Rose"),
+    OverlayColorPalette("sunset", Color(0xFF825500), "Sunset"),
+    OverlayColorPalette("lavender", Color(0xFF6750A4), "Lavender"),
+    OverlayColorPalette("mint", Color(0xFF006B5D), "Mint")
+)
+
+fun generateDynamicColorScheme(seed: Color, isDark: Boolean, currentScheme: ColorScheme, isForPreview: Boolean = false): ColorScheme {
+    val hsv = FloatArray(3)
+    android.graphics.Color.colorToHSV(seed.toArgb(), hsv)
+    
+    val hue = hsv[0]
+    val sat = hsv[1]
+    
+    // Check if the color is neutral (monochrome)
+    val isMonochrome = sat < 0.05f
+    
+    // M3 Tonal Palette Approximations (Light: Tone 40, Dark: Tone 80)
+    // Primary
+    val primaryV = if (isMonochrome) {
+        if (isDark) 0.95f else 0.1f
+    } else {
+        if (isDark) 0.82f else 0.50f
+    }
+    val primarySat = if (isMonochrome) 0f else sat.coerceIn(0.1f, 0.8f)
+    val primary = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, primarySat, primaryV)))
+    
+    // Secondary: Same hue, lower chroma
+    val secondaryV = if (isMonochrome) {
+        if (isDark) 0.7f else 0.8f
+    } else {
+        if (isDark) 0.90f else 0.78f
+    }
+    val secondarySat = if (isMonochrome) 0f else (sat * 0.2f).coerceAtMost(0.15f)
+    val secondary = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, secondarySat, secondaryV)))
+    
+    // Tertiary: Hue shift + 60 (unless monochrome)
+    val tertiaryV = if (isMonochrome) {
+        if (isDark) 0.4f else 0.5f
+    } else {
+        if (isDark) {
+            if (isForPreview) 0.88f else 0.65f
+        } else {
+            if (isForPreview) 0.75f else 0.45f
+        }
+    }
+    val tertiaryHue = if (isMonochrome) hue else (hue + 60f) % 360f
+    val tertiarySat = if (isMonochrome) 0f else (sat * 0.4f).coerceIn(0.1f, 0.4f)
+    val tertiary = Color(android.graphics.Color.HSVToColor(floatArrayOf(tertiaryHue, tertiarySat, tertiaryV)))
+
+    val surfaceV = if (isDark) 0.12f else if (isForPreview) 0.98f else 0.97f
+    val surfaceSat = if (isMonochrome) 0f else if (isDark) (sat * 0.45f).coerceIn(0.12f, 0.32f) else if (isForPreview) (sat * 0.05f).coerceAtMost(0.04f) else (sat * 0.12f).coerceIn(0.02f, 0.08f)
+    val surface = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, surfaceSat, surfaceV)))
+    
+    val surfaceContainerLowest = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, if (isMonochrome) 0f else sat * 0.08f, if (isDark) 0.07f else 1.0f)))
+    val surfaceContainerLow = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, if (isMonochrome) 0f else sat * 0.18f, if (isDark) 0.15f else 0.96f)))
+    val surfaceContainer = if (isForPreview) {
+        Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, if (isMonochrome) 0f else sat * 0.25f, if (isDark) 0.18f else 0.94f)))
+    } else {
+        surface 
+    }
+    val surfaceContainerHigh = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, if (isMonochrome) 0f else sat * 0.35f, if (isDark) 0.24f else 0.9f)))
+
+    val secondaryContainerV = if (isDark) 0.25f else 0.92f
+    val secondaryContainerSat = if (isMonochrome) 0f else (sat * 0.3f).coerceIn(0.1f, 0.25f)
+    val secondaryContainer = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, secondaryContainerSat, secondaryContainerV)))
+
+    val tertiaryContainerV = if (isDark) 0.25f else 0.92f
+    val tertiaryContainerSat = if (isMonochrome) 0f else (tertiarySat * 0.6f).coerceIn(0.1f, 0.25f)
+    val tertiaryContainer = Color(android.graphics.Color.HSVToColor(floatArrayOf(tertiaryHue, tertiaryContainerSat, tertiaryContainerV)))
+
+    return currentScheme.copy(
+        primary = primary,
+        onPrimary = if (isDark) Color.Black else Color.White,
+        primaryContainer = primary.copy(alpha = if (isDark) 0.3f else 0.15f),
+        onPrimaryContainer = primary,
+        
+        secondary = secondary,
+        onSecondary = if (isDark) Color.Black else Color.White,
+        secondaryContainer = if (isForPreview) secondary.copy(alpha = if (isDark) 0.25f else 0.2f) else secondaryContainer,
+        onSecondaryContainer = if (isForPreview) secondary else (if (isDark) secondary else Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, (secondaryContainerSat * 2f).coerceAtMost(0.8f), 0.3f)))),
+        
+        tertiary = tertiary,
+        onTertiary = if (isDark) Color.Black else Color.White,
+        tertiaryContainer = if (isForPreview) tertiary.copy(alpha = if (isDark) 0.25f else 0.14f) else tertiaryContainer,
+        onTertiaryContainer = if (isForPreview) tertiary else (if (isDark) tertiary else Color(android.graphics.Color.HSVToColor(floatArrayOf(tertiaryHue, (tertiaryContainerSat * 2f).coerceAtMost(0.8f), 0.3f)))),
+
+        surface = surface,
+        onSurface = if (isDark) Color.White else Color.Black,
+        surfaceVariant = surfaceContainer,
+        onSurfaceVariant = if (isDark) Color.LightGray else Color.DarkGray,
+        surfaceContainerLowest = surfaceContainerLowest,
+        surfaceContainerLow = surfaceContainerLow,
+        surfaceContainer = surfaceContainer,
+        surfaceContainerHigh = surfaceContainerHigh,
+        surfaceContainerHighest = surfaceContainerHigh.copy(alpha = 0.9f)
+    )
+}
+
+fun lightenColorHSV(color: Color, targetV: Float): Color {
+    val hsv = FloatArray(3)
+    android.graphics.Color.colorToHSV(color.toArgb(), hsv)
+    hsv[2] = targetV
+    return Color(android.graphics.Color.HSVToColor(hsv))
+}
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable

@@ -39,42 +39,43 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import androidx.compose.ui.platform.LocalContext
+import com.etrisad.zenith.data.preferences.ThemeConfig
+import com.etrisad.zenith.data.preferences.UserPreferences
+import com.etrisad.zenith.data.preferences.UserPreferencesRepository
+import com.etrisad.zenith.ui.components.overlay.OverlayColorPalette
+import com.etrisad.zenith.ui.components.overlay.PREDEFINED_PALETTES
 import com.etrisad.zenith.ui.components.overlay.ShieldOverlay
-
-data class OverlayColorPalette(
-    val id: String,
-    val seed: Color,
-    val label: String,
-    val isDynamic: Boolean = false
-)
+import com.etrisad.zenith.ui.components.overlay.generateDynamicColorScheme
+import com.etrisad.zenith.ui.components.overlay.lightenColorHSV
 
 @Composable
 fun OverlayAppearanceScreen(
+    repository: UserPreferencesRepository,
     onBack: () -> Unit,
     innerPadding: PaddingValues
 ) {
-    val isDark = isSystemInDarkTheme()
-    val currentScheme = MaterialTheme.colorScheme
-    
-    val predefinedPalettes = remember {
-        listOf(
-            OverlayColorPalette("dynamic", Color.Transparent, "Dynamic", isDynamic = true),
-            OverlayColorPalette("custom", Color.Transparent, "Custom"),
-            OverlayColorPalette("monochrome", Color(0xFF616161), "Monochrome"),
-            OverlayColorPalette("zenith", Color(0xFF4D568D), "Zenith"),
-            OverlayColorPalette("ocean", Color(0xFF0061A4), "Ocean"),
-            OverlayColorPalette("forest", Color(0xFF386B01), "Forest"),
-            OverlayColorPalette("rose", Color(0xFF9C4146), "Rose"),
-            OverlayColorPalette("sunset", Color(0xFF825500), "Sunset"),
-            OverlayColorPalette("lavender", Color(0xFF6750A4), "Lavender"),
-            OverlayColorPalette("mint", Color(0xFF006B5D), "Mint")
-        )
+    val preferences by repository.userPreferencesFlow.collectAsState(initial = UserPreferences())
+    val isDark = when (preferences.themeConfig) {
+        ThemeConfig.LIGHT -> false
+        ThemeConfig.DARK -> true
+        else -> isSystemInDarkTheme()
+    }
+    val context = LocalContext.current
+    val baseScheme = if (preferences.dynamicColor && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+        if (isDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+    } else {
+        if (isDark) darkColorScheme() else lightColorScheme()
     }
 
-    var selectedPaletteId by remember { mutableStateOf("dynamic") }
-    var sheetOpacity by remember { mutableFloatStateOf(1f) }
-    var fullScreen by remember { mutableStateOf(false) }
-    var customHue by remember { mutableFloatStateOf(270f) }
+    val scope = rememberCoroutineScope()
+    
+    val predefinedPalettes = PREDEFINED_PALETTES
+
+    val selectedPaletteId = preferences.overlayPaletteId
+    val sheetOpacity = preferences.overlaySheetOpacity
+    val fullScreen = preferences.overlayFullScreen
+    val customHue = preferences.overlayCustomHue
     
     val customSeed = remember(customHue) {
         Color(android.graphics.Color.HSVToColor(floatArrayOf(customHue, 0.6f, 0.55f)))
@@ -84,11 +85,23 @@ fun OverlayAppearanceScreen(
         predefinedPalettes.find { it.id == selectedPaletteId } ?: predefinedPalettes.first()
     }
 
-    val paletteScheme = remember(selectedPalette, isDark, currentScheme, customSeed) {
+    val paletteScheme = remember(selectedPalette, isDark, baseScheme, customSeed) {
         when {
-            selectedPalette.isDynamic -> currentScheme
-            selectedPalette.id == "custom" -> generateDynamicColorScheme(customSeed, isDark, currentScheme)
-            else -> generateDynamicColorScheme(selectedPalette.seed, isDark, currentScheme)
+            selectedPalette.isDynamic -> {
+                // Apply subtle surface tint even for Dynamic system palette when active
+                val hsv = FloatArray(3)
+                android.graphics.Color.colorToHSV(baseScheme.primary.toArgb(), hsv)
+                val hue = hsv[0]
+                val tintSurface = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, 0.28f, if (isDark) 0.12f else 0.97f)))
+                baseScheme.copy(
+                    surface = tintSurface,
+                    surfaceContainer = tintSurface,
+                    surfaceContainerLow = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, 0.18f, if (isDark) 0.16f else 0.96f))),
+                    surfaceContainerHigh = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, 0.38f, if (isDark) 0.24f else 0.9f)))
+                )
+            }
+            selectedPalette.id == "custom" -> generateDynamicColorScheme(customSeed, isDark, baseScheme, isForPreview = false)
+            else -> generateDynamicColorScheme(selectedPalette.seed, isDark, baseScheme, isForPreview = false)
         }
     }
 
@@ -139,7 +152,7 @@ fun OverlayAppearanceScreen(
                             totalUsageToday = 0L,
                             totalGlobalUsageToday = 0L,
                             previewMode = true,
-                            maxHeightFraction = if (fullScreen) null else 0.9f,
+                            maxHeightFraction = null,
                             sheetContentAlpha = sheetOpacity,
                             onAllowUse = { _, _ -> },
                             onCloseApp = { }
@@ -155,10 +168,10 @@ fun OverlayAppearanceScreen(
         ColorPaletteSelector(
             palettes = predefinedPalettes,
             selectedPaletteId = selectedPaletteId,
-            onPaletteSelect = { selectedPaletteId = it },
+            onPaletteSelect = { scope.launch { repository.setOverlayPaletteId(it) } },
             shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 8.dp, bottomEnd = 8.dp),
             isDark = isDark,
-            currentScheme = currentScheme,
+            currentScheme = baseScheme,
             customHue = customHue
         )
 
@@ -171,7 +184,7 @@ fun OverlayAppearanceScreen(
                 Spacer(modifier = Modifier.height(4.dp))
                 HueSelector(
                     hue = customHue,
-                    onHueChange = { customHue = it },
+                    onHueChange = { scope.launch { repository.setOverlayCustomHue(it) } },
                     shape = RoundedCornerShape(8.dp)
                 )
             }
@@ -181,7 +194,7 @@ fun OverlayAppearanceScreen(
 
         OpacitySelector(
             opacity = sheetOpacity,
-            onOpacityChange = { sheetOpacity = it },
+            onOpacityChange = { scope.launch { repository.setOverlaySheetOpacity(it) } },
             shape = RoundedCornerShape(8.dp)
         )
 
@@ -191,7 +204,7 @@ fun OverlayAppearanceScreen(
             title = "Full Screen",
             description = "Sheet fills the entire screen",
             checked = fullScreen,
-            onCheckedChange = { fullScreen = it },
+            onCheckedChange = { scope.launch { repository.setOverlayFullScreen(it) } },
             icon = Icons.Outlined.Fullscreen,
             shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
         )
@@ -270,9 +283,9 @@ fun ColorPaletteSelector(
                             )
                         } else if (palette.id == "custom") {
                             val seed = Color(android.graphics.Color.HSVToColor(floatArrayOf(customHue, 0.6f, 0.55f)))
-                            generateDynamicColorScheme(seed, isDark, currentScheme)
+                            generateDynamicColorScheme(seed, isDark, currentScheme, isForPreview = true)
                         } else {
-                            generateDynamicColorScheme(palette.seed, isDark, currentScheme)
+                            generateDynamicColorScheme(palette.seed, isDark, currentScheme, isForPreview = true)
                         }
                     }
                     
@@ -626,89 +639,6 @@ fun HueSelector(
             )
         }
     }
-}
-
-private fun generateDynamicColorScheme(seed: Color, isDark: Boolean, currentScheme: ColorScheme): ColorScheme {
-    val hsv = FloatArray(3)
-    android.graphics.Color.colorToHSV(seed.toArgb(), hsv)
-    
-    val hue = hsv[0]
-    val sat = hsv[1]
-    
-    // Check if the color is neutral (monochrome)
-    val isMonochrome = sat < 0.05f
-    
-    // M3 Tonal Palette Approximations (Light: Tone 40, Dark: Tone 80)
-    // Primary
-    val primaryV = if (isMonochrome) {
-        if (isDark) 0.95f else 0.1f
-    } else {
-        if (isDark) 0.82f else 0.50f
-    }
-    val primarySat = if (isMonochrome) 0f else sat.coerceIn(0.1f, 0.8f)
-    val primary = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, primarySat, primaryV)))
-    
-    // Secondary: Same hue, lower chroma
-    val secondaryV = if (isMonochrome) {
-        if (isDark) 0.7f else 0.8f
-    } else {
-        if (isDark) 0.90f else 0.78f
-    }
-    val secondarySat = if (isMonochrome) 0f else (sat * 0.2f).coerceAtMost(0.15f)
-    val secondary = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, secondarySat, secondaryV)))
-    
-    // Tertiary: Hue shift + 60 (unless monochrome)
-    val tertiaryV = if (isMonochrome) {
-        if (isDark) 0.4f else 0.5f
-    } else {
-        if (isDark) 0.88f else 0.75f
-    }
-    val tertiaryHue = if (isMonochrome) hue else (hue + 60f) % 360f
-    val tertiarySat = if (isMonochrome) 0f else (sat * 0.4f).coerceIn(0.1f, 0.4f)
-    val tertiary = Color(android.graphics.Color.HSVToColor(floatArrayOf(tertiaryHue, tertiarySat, tertiaryV)))
-
-    val surfaceV = if (isDark) 0.05f else 0.98f
-    val surfaceSat = if (isMonochrome) 0f else (sat * 0.05f).coerceAtMost(0.04f)
-    val surface = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, surfaceSat, surfaceV)))
-    
-    val surfaceContainerLowest = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, if (isMonochrome) 0f else sat * 0.02f, if (isDark) 0.02f else 1.0f)))
-    val surfaceContainerLow = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, if (isMonochrome) 0f else sat * 0.04f, if (isDark) 0.08f else 0.96f)))
-    val surfaceContainer = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, if (isMonochrome) 0f else sat * 0.06f, if (isDark) 0.12f else 0.94f)))
-    val surfaceContainerHigh = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, if (isMonochrome) 0f else sat * 0.08f, if (isDark) 0.17f else 0.9f)))
-
-    return currentScheme.copy(
-        primary = primary,
-        onPrimary = if (isDark) Color.Black else Color.White,
-        primaryContainer = primary.copy(alpha = if (isDark) 0.3f else 0.15f),
-        onPrimaryContainer = primary,
-        
-        secondary = secondary,
-        onSecondary = if (isDark) Color.Black else Color.White,
-        secondaryContainer = secondary.copy(alpha = if (isDark) 0.25f else 0.2f),
-        onSecondaryContainer = secondary,
-        
-        tertiary = tertiary,
-        onTertiary = if (isDark) Color.Black else Color.White,
-        tertiaryContainer = tertiary.copy(alpha = if (isDark) 0.25f else 0.14f),
-        onTertiaryContainer = tertiary,
-
-        surface = surface,
-        onSurface = if (isDark) Color.White else Color.Black,
-        surfaceVariant = surfaceContainer,
-        onSurfaceVariant = if (isDark) Color.LightGray else Color.DarkGray,
-        surfaceContainerLowest = surfaceContainerLowest,
-        surfaceContainerLow = surfaceContainerLow,
-        surfaceContainer = surfaceContainer,
-        surfaceContainerHigh = surfaceContainerHigh,
-        surfaceContainerHighest = surfaceContainerHigh.copy(alpha = 0.9f)
-    )
-}
-
-private fun lightenColorHSV(color: Color, targetV: Float): Color {
-    val hsv = FloatArray(3)
-    android.graphics.Color.colorToHSV(color.toArgb(), hsv)
-    hsv[2] = targetV
-    return Color(android.graphics.Color.HSVToColor(hsv))
 }
 
 

@@ -269,11 +269,20 @@ fun PortraitScheduleLayout(
     Column(
         modifier = Modifier
             .padding(bottom = 24.dp, start = 24.dp, end = 24.dp)
-            .fillMaxWidth()
+            .then(
+                if (userPrefs.overlayFullScreen) Modifier.fillMaxSize()
+                else Modifier.fillMaxWidth().wrapContentHeight()
+            )
             .navigationBarsPadding(),
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(32.dp)
     ) {
-
+        // Center Content: Icon, Title, Mode, and Progress
+        Column(
+            modifier = if (userPrefs.overlayFullScreen) Modifier.weight(1f) else Modifier.wrapContentHeight(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically)
+        ) {
             Box(
                 modifier = Modifier
                     .size(80.dp)
@@ -293,35 +302,34 @@ fun PortraitScheduleLayout(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "Schedule Active: ${schedule.name}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
 
-            Text(
-                text = "Schedule Active: ${schedule.name}",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold
-            )
+                Text(
+                    text = appName,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
 
-            Text(
-                text = appName,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            val modeText = if (schedule.mode == ScheduleMode.BLOCK)
-                "This app is blocked by your schedule."
+                val modeText = if (schedule.mode == ScheduleMode.BLOCK)
+                    "This app is blocked by your schedule."
                 else "Only selected apps are allowed during this schedule."
 
-            Text(
-                text = modeText,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = modeText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+            }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -337,8 +345,6 @@ fun PortraitScheduleLayout(
                 )
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
-
             if (schedule.mode == ScheduleMode.ALLOW) {
                 TotalUsagePill(totalGlobalUsageToday, userPrefs)
                 CircularWavyProgressIndicator(
@@ -351,31 +357,32 @@ fun PortraitScheduleLayout(
                     wavelength = 36.dp,
                     trackColor = MaterialTheme.colorScheme.surfaceVariant,
                 )
-                Spacer(modifier = Modifier.height(20.dp))
             }
+        }
 
+        // Bottom Actions: Sticky Actions
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             if (!isEmergencyUnlocked) {
                 if (schedule.emergencyUseCount > 0) {
                     EmergencyButton(onEmergencyUse = onEmergencyClick, onHoldingChange = onEmergencyHoldingChange)
                     Spacer(modifier = Modifier.height(20.dp))
                 }
             } else {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "Emergency Use: Select Duration",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    DurationButtonsGrid(null, onAllowUse)
-                    Spacer(modifier = Modifier.height(20.dp))
-                }
+                Text(
+                    text = "Emergency Use: Select Duration",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                DurationButtonsGrid(null, onAllowUse)
+                Spacer(modifier = Modifier.height(20.dp))
             }
 
             CloseAppTextButton(onCloseApp, autoKickProgress, size = ZenithButtonSize.ExtraLarge)
+        }
     }
 }
 
@@ -397,14 +404,18 @@ fun LandscapeScheduleLayout(
     onCloseApp: () -> Unit
 ) {
     Column(
-        modifier = modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally
+        modifier = modifier.then(
+            if (userPrefs.overlayFullScreen) Modifier.fillMaxSize()
+            else Modifier.fillMaxWidth().wrapContentHeight()
+        ),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = if (userPrefs.overlayFullScreen) Arrangement.Center else Arrangement.Top
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(IntrinsicSize.Min)
-                .padding(bottom = 24.dp, start = 24.dp, end = 24.dp, top = 12.dp),
+                .padding(horizontal = 24.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(24.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {

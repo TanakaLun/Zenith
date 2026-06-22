@@ -184,60 +184,79 @@ fun PortraitGoalLayout(
     Column(
         modifier = Modifier
             .padding(bottom = 24.dp, start = 24.dp, end = 24.dp)
-            .fillMaxWidth()
+            .then(
+                if (userPrefs.overlayFullScreen) Modifier.fillMaxSize()
+                else Modifier.fillMaxWidth().wrapContentHeight()
+            )
             .navigationBarsPadding(),
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(32.dp)
     ) {
-
-        Box(
-            modifier = Modifier
-                .size(80.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-            contentAlignment = Alignment.Center
+        // Center Content: Icon, Title, Description, and Progress
+        Column(
+            modifier = if (userPrefs.overlayFullScreen) Modifier.weight(1f) else Modifier.wrapContentHeight(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically)
         ) {
-            if (appIcon != null) {
-                Image(
-                    bitmap = appIcon,
-                    contentDescription = null,
-                    modifier = Modifier.size(60.dp).clip(CircleShape),
-                    contentScale = ContentScale.Crop
+            Box(
+                modifier = Modifier
+                    .size(80.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center
+            ) {
+                if (appIcon != null) {
+                    Image(
+                        bitmap = appIcon,
+                        contentDescription = null,
+                        modifier = Modifier.size(60.dp).clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Icon(
+                        Icons.Outlined.Flag,
+                        contentDescription = null,
+                        modifier = Modifier.size(48.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "Goal Pursuit",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
                 )
-            } else {
-                Icon(
-                    Icons.Outlined.Flag,
-                    contentDescription = null,
-                    modifier = Modifier.size(48.dp),
-                    tint = MaterialTheme.colorScheme.primary
+
+                Text(
+                    text = appName,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Text(
+                    text = "You're working towards your usage goal.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+            
+            GoalProgressSection(shield, totalUsageToday, totalGlobalUsageToday, userPrefs)
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(
-            text = "Goal Pursuit",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Bold
+        // Bottom Actions
+        ZenithButton(
+            onClick = onGoalDismiss,
+            text = "Got it, let's continue",
+            icon = Icons.Outlined.CheckCircle,
+            fillMaxWidth = true
         )
-
-        Text(
-            text = appName,
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            text = "You're working towards your usage goal.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
-        GoalSection(shield, totalUsageToday, totalGlobalUsageToday, userPrefs, onGoalDismiss)
     }
 }
 
@@ -254,14 +273,18 @@ fun LandscapeGoalLayout(
     onGoalDismiss: () -> Unit
 ) {
     Column(
-        modifier = modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally
+        modifier = modifier.then(
+            if (userPrefs.overlayFullScreen) Modifier.fillMaxSize()
+            else Modifier.fillMaxWidth().wrapContentHeight()
+        ),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = if (userPrefs.overlayFullScreen) Arrangement.Center else Arrangement.Top
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(IntrinsicSize.Min)
-                .padding(bottom = 24.dp, start = 24.dp, end = 24.dp, top = 12.dp),
+                .padding(horizontal = 24.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(24.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -331,9 +354,9 @@ fun LandscapeGoalLayout(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun GoalSection(shield: ShieldEntity, totalUsageToday: Long, totalGlobalUsageToday: Long, userPrefs: UserPreferences, onGoalDismiss: () -> Unit) {
+fun GoalProgressSection(shield: ShieldEntity, totalUsageToday: Long, totalGlobalUsageToday: Long, userPrefs: UserPreferences) {
     val targetLimitMillis = shield.timeLimitMinutes * 60 * 1000L
     val progress = if (targetLimitMillis > 0) totalUsageToday.toFloat() / targetLimitMillis else 0f
     val remainingMillis = (targetLimitMillis - totalUsageToday).coerceAtLeast(0L)
@@ -355,8 +378,6 @@ fun GoalSection(shield: ShieldEntity, totalUsageToday: Long, totalGlobalUsageTod
         )
     }
     val randomAchievedMessage = remember { achievedMessages.random() }
-
-    Spacer(modifier = Modifier.height(16.dp))
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Box(
@@ -448,16 +469,6 @@ fun GoalSection(shield: ShieldEntity, totalUsageToday: Long, totalGlobalUsageTod
             }
         }
     }
-
-
-    Spacer(modifier = Modifier.height(24.dp))
-
-    ZenithButton(
-        onClick = onGoalDismiss,
-        text = "Got it, let's continue",
-        icon = Icons.Outlined.CheckCircle,
-        fillMaxWidth = true
-    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
