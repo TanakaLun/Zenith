@@ -65,6 +65,9 @@ fun ShieldOverlay(
     totalUsageToday: Long,
     totalGlobalUsageToday: Long,
     delayDurationSeconds: Int = 0,
+    previewMode: Boolean = false,
+    maxHeightFraction: Float? = null,
+    sheetContentAlpha: Float = 1f,
     onAllowUse: (Int, Boolean) -> Unit,
     onCloseApp: () -> Unit,
     onGoalDismiss: () -> Unit = {}
@@ -254,7 +257,8 @@ fun ShieldOverlay(
         }
     }
 
-    LaunchedEffect(packageName) {
+    LaunchedEffect(packageName, previewMode) {
+        if (previewMode) return@LaunchedEffect
         snapshotFlow { 
             ShieldOverlayState(isBlocked, isEmergencyHolding, isDelaying, isEmergencyUnlocked)
         }
@@ -342,6 +346,8 @@ fun ShieldOverlay(
         backgroundAlpha = backgroundAlpha,
         isLandscape = isLandscape,
         showBedtimePill = true,
+        maxHeightFraction = maxHeightFraction,
+        sheetContentAlpha = sheetContentAlpha,
         userPreferences = userPrefs,
         dragHandleCurrentUses = if (currentShield?.type == FocusType.SHIELD) currentUses else null,
         dragHandleMaxUses = if (currentShield?.type == FocusType.SHIELD) maxUses else null,

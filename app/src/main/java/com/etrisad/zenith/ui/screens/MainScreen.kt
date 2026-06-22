@@ -140,6 +140,7 @@ fun MainScreen(
                 currentRoute == Screen.FontTest.route ||
                 currentRoute == Screen.GSFlexCustomizer.route ||
                 currentRoute == Screen.SystemUsageDebug.route ||
+                currentRoute == Screen.OverlayAppearance.route ||
                 currentRoute?.startsWith("settings_category") == true ||
                 currentRoute?.startsWith("app_detail") == true
 
@@ -372,6 +373,7 @@ fun MainScreen(
                     currentRoute != Screen.FontTest.route &&
                     currentRoute != Screen.GSFlexCustomizer.route &&
                     currentRoute != Screen.SystemUsageDebug.route &&
+                    currentRoute != Screen.OverlayAppearance.route &&
                     currentRoute?.startsWith("settings_category") == false &&
                     currentRoute?.startsWith("app_detail") == false
 
@@ -773,6 +775,7 @@ fun MainScreen(
                                     targetRoute == Screen.FontTest.route ||
                                     targetRoute == Screen.GSFlexCustomizer.route ||
                                     targetRoute == Screen.SystemUsageDebug.route ||
+                                    targetRoute == Screen.OverlayAppearance.route ||
                                     targetRoute?.startsWith("settings_category") == true ||
                                     targetRoute?.startsWith("app_detail") == true
                         val isInitialDeep =
@@ -784,6 +787,7 @@ fun MainScreen(
                                     initialRoute == Screen.FontTest.route ||
                                     initialRoute == Screen.GSFlexCustomizer.route ||
                                     initialRoute == Screen.SystemUsageDebug.route ||
+                                    initialRoute == Screen.OverlayAppearance.route ||
                                     initialRoute?.startsWith("settings_category") == true ||
                                     initialRoute?.startsWith("app_detail") == true
 
@@ -827,6 +831,7 @@ fun MainScreen(
                                     targetRoute == Screen.FontTest.route ||
                                     targetRoute == Screen.GSFlexCustomizer.route ||
                                     targetRoute == Screen.SystemUsageDebug.route ||
+                                    targetRoute == Screen.OverlayAppearance.route ||
                                     targetRoute?.startsWith("settings_category") == true ||
                                     targetRoute?.startsWith("app_detail") == true
 
@@ -839,6 +844,7 @@ fun MainScreen(
                                     initialRoute == Screen.FontTest.route ||
                                     initialRoute == Screen.GSFlexCustomizer.route ||
                                     initialRoute == Screen.SystemUsageDebug.route ||
+                                    initialRoute == Screen.OverlayAppearance.route ||
                                     initialRoute?.startsWith("settings_category") == true ||
                                     initialRoute?.startsWith("app_detail") == true
 
@@ -961,6 +967,12 @@ fun MainScreen(
                             innerPadding = innerPadding
                         )
                     }
+                    composable(Screen.OverlayAppearance.route) {
+                        com.etrisad.zenith.ui.screens.settings.OverlayAppearanceScreen(
+                            onBack = { navController.popBackStack() },
+                            innerPadding = innerPadding
+                        )
+                    }
                     composable(Screen.SystemUsageDebug.route) {
                         com.etrisad.zenith.ui.screens.settings.SystemUsageDebugScreen(
                             viewModel = homeViewModel,
@@ -1012,6 +1024,7 @@ fun MainScreen(
                             currentRoute != Screen.FontTest.route &&
                             currentRoute != Screen.GSFlexCustomizer.route &&
                             currentRoute != Screen.SystemUsageDebug.route &&
+                            currentRoute != Screen.OverlayAppearance.route &&
                             currentRoute?.startsWith("settings_category") == false &&
                             currentRoute?.startsWith("app_detail") == false
 

@@ -31,6 +31,7 @@ fun InterceptBottomSheet(
     dragHandleMaxUses: Int? = null,
     dragHandleEmergencyCount: Int? = null,
     dragHandleIsIncentiveLocked: Boolean = false,
+    sheetContentAlpha: Float = 1f,
     contentKey: Any? = Unit,
     content: @Composable ColumnScope.(key: Any?) -> Unit
 ) {
@@ -89,7 +90,8 @@ fun InterceptBottomSheet(
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .imePadding(),
+                        .imePadding()
+                        .graphicsLayer { alpha = sheetContentAlpha },
                     shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surface
