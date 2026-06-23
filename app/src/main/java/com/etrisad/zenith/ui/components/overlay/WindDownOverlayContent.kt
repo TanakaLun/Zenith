@@ -155,6 +155,7 @@ fun WindDownOverlayContent(
                 delayProgressAnimatable = delayProgressAnimatable,
                 delayDurationSeconds = delayDurationSeconds,
                 autoKickProgress = autoKickProgress.value,
+                userPrefs = userPreferences,
                 onAllowUse = { minutes ->
                     scope.launch {
                         showContent = false
@@ -180,6 +181,7 @@ fun WindDownOverlayContent(
                 delayProgressAnimatable = delayProgressAnimatable,
                 delayDurationSeconds = delayDurationSeconds,
                 autoKickProgress = autoKickProgress.value,
+                userPrefs = userPreferences,
                 onAllowUse = { minutes ->
                     scope.launch {
                         showContent = false
@@ -209,37 +211,79 @@ fun PortraitWindDownLayout(
     delayProgressAnimatable: Animatable<Float, AnimationVector1D>,
     delayDurationSeconds: Int,
     autoKickProgress: Float,
+    userPrefs: com.etrisad.zenith.data.preferences.UserPreferences? = null,
     onAllowUse: (Int) -> Unit,
     onCloseApp: () -> Unit
 ) {
     Column(
         modifier = Modifier
             .padding(bottom = 24.dp, start = 24.dp, end = 24.dp)
-            .fillMaxWidth()
+            .then(
+                if (userPrefs?.overlayFullScreen == true) Modifier.fillMaxSize()
+                else Modifier.fillMaxWidth()
+            )
             .navigationBarsPadding(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        if (userPrefs?.overlayFullScreen == true) {
+            // Header centered in upper area
+            Column(
+                modifier = Modifier.weight(1f),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                WindDownHeader(appName, appIcon, sessionUsed)
+            }
 
-        WindDownHeader(appName, appIcon, sessionUsed)
+            // Bottom: wavy/duration selector + close button
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                WindDownActionSection(
+                    sessionUsed = sessionUsed,
+                    isDelaying = isDelaying,
+                    randomMessage = randomMessage,
+                    delayProgressAnimatable = delayProgressAnimatable,
+                    delayDurationSeconds = delayDurationSeconds,
+                    onAllowUse = onAllowUse,
+                    isFullScreen = true
+                )
 
-        Spacer(modifier = Modifier.height(32.dp))
+                CloseAppTextButton(
+                    onCloseApp = onCloseApp,
+                    autoKickProgress = { autoKickProgress },
+                    size = ZenithButtonSize.ExtraLarge
+                )
+            }
+        } else {
+            Column(
+                modifier = Modifier.wrapContentHeight(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                WindDownHeader(appName, appIcon, sessionUsed)
 
-        WindDownActionSection(
-            sessionUsed = sessionUsed,
-            isDelaying = isDelaying,
-            randomMessage = randomMessage,
-            delayProgressAnimatable = delayProgressAnimatable,
-            delayDurationSeconds = delayDurationSeconds,
-            onAllowUse = onAllowUse
-        )
+                Spacer(modifier = Modifier.height(32.dp))
 
-        Spacer(modifier = Modifier.height(24.dp))
+                WindDownActionSection(
+                    sessionUsed = sessionUsed,
+                    isDelaying = isDelaying,
+                    randomMessage = randomMessage,
+                    delayProgressAnimatable = delayProgressAnimatable,
+                    delayDurationSeconds = delayDurationSeconds,
+                    onAllowUse = onAllowUse
+                )
+            }
 
-        CloseAppTextButton(
-            onCloseApp = onCloseApp,
-            autoKickProgress = { autoKickProgress },
-            size = ZenithButtonSize.ExtraLarge
-        )
+            Spacer(modifier = Modifier.height(24.dp))
+
+            CloseAppTextButton(
+                onCloseApp = onCloseApp,
+                autoKickProgress = { autoKickProgress },
+                size = ZenithButtonSize.ExtraLarge
+            )
+        }
     }
 }
 
@@ -253,21 +297,20 @@ fun LandscapeWindDownLayout(
     delayProgressAnimatable: Animatable<Float, AnimationVector1D>,
     delayDurationSeconds: Int,
     autoKickProgress: Float,
+    userPrefs: com.etrisad.zenith.data.preferences.UserPreferences? = null,
     onAllowUse: (Int) -> Unit,
     onCloseApp: () -> Unit
 ) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
+    if (userPrefs?.overlayFullScreen == true) {
         Row(
             modifier = Modifier
+                .fillMaxSize()
                 .displayCutoutPadding()
-                .padding(start = 24.dp, end = 24.dp, bottom = 24.dp)
-                .fillMaxWidth(),
+                .padding(start = 24.dp, end = 24.dp),
             horizontalArrangement = Arrangement.spacedBy(24.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Left: app info
             Column(
                 modifier = Modifier.weight(1f),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -276,6 +319,7 @@ fun LandscapeWindDownLayout(
                 WindDownHeader(appName, appIcon, sessionUsed, isSmall = true)
             }
 
+            // Right: wavy/duration selector + close button
             Column(
                 modifier = Modifier.weight(1.2f),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -288,7 +332,8 @@ fun LandscapeWindDownLayout(
                     delayProgressAnimatable = delayProgressAnimatable,
                     delayDurationSeconds = delayDurationSeconds,
                     onAllowUse = onAllowUse,
-                    isSmall = true
+                    isSmall = true,
+                    isFullScreen = true
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -298,6 +343,52 @@ fun LandscapeWindDownLayout(
                     autoKickProgress = { autoKickProgress },
                     size = ZenithButtonSize.Large
                 )
+            }
+        }
+    } else {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row(
+                modifier = Modifier
+                    .displayCutoutPadding()
+                    .padding(start = 24.dp, end = 24.dp, bottom = 24.dp)
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(24.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    WindDownHeader(appName, appIcon, sessionUsed, isSmall = true)
+                }
+
+                Column(
+                    modifier = Modifier.weight(1.2f),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    WindDownActionSection(
+                        sessionUsed = sessionUsed,
+                        isDelaying = isDelaying,
+                        randomMessage = randomMessage,
+                        delayProgressAnimatable = delayProgressAnimatable,
+                        delayDurationSeconds = delayDurationSeconds,
+                        onAllowUse = onAllowUse,
+                        isSmall = true
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    CloseAppTextButton(
+                        onCloseApp = onCloseApp,
+                        autoKickProgress = { autoKickProgress },
+                        size = ZenithButtonSize.Large
+                    )
+                }
             }
         }
     }
@@ -370,7 +461,8 @@ private fun WindDownActionSection(
     delayProgressAnimatable: Animatable<Float, AnimationVector1D>,
     delayDurationSeconds: Int,
     onAllowUse: (Int) -> Unit,
-    isSmall: Boolean = false
+    isSmall: Boolean = false,
+    isFullScreen: Boolean = false
 ) {
     if (!sessionUsed) {
         AnimatedContent(
@@ -383,7 +475,7 @@ private fun WindDownActionSection(
             label = "delayContent"
         ) { delaying ->
             if (delaying) {
-                WindDownDelaySection(randomMessage, delayProgressAnimatable, delayDurationSeconds)
+                WindDownDelaySection(randomMessage, delayProgressAnimatable, delayDurationSeconds, isFullScreen)
             } else {
                 WindDownDurationSection(onAllowUse = onAllowUse)
             }
@@ -413,8 +505,12 @@ private fun WindDownActionSection(
 fun WindDownDelaySection(
     message: String,
     progressAnimatable: Animatable<Float, AnimationVector1D>,
-    durationSeconds: Int
+    durationSeconds: Int,
+    isFullScreen: Boolean = false
 ) {
+    val circleSize = if (isFullScreen) 160.dp else 100.dp
+    val waveLength = if (isFullScreen) 40.dp else 30.dp
+
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -431,10 +527,10 @@ fun WindDownDelaySection(
         Box(contentAlignment = Alignment.Center) {
             CircularWavyProgressIndicator(
                 progress = { progressAnimatable.value },
-                modifier = Modifier.size(100.dp),
+                modifier = Modifier.size(circleSize),
                 color = MaterialTheme.colorScheme.tertiary,
                 amplitude = { 1f },
-                wavelength = 30.dp,
+                wavelength = waveLength,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant,
             )
             val secondsLeft by remember(durationSeconds) {

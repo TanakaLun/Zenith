@@ -139,6 +139,7 @@ fun BedtimeOverlayContent(
                 appIcon = appIcon,
                 bedtimeUiState = bedtimeUiState,
                 exitProgress = exitProgress,
+                userPrefs = userPreferences,
                 onCloseApp = {
                     scope.launch {
                         showContent = false
@@ -153,6 +154,7 @@ fun BedtimeOverlayContent(
                 appIcon = appIcon,
                 bedtimeUiState = bedtimeUiState,
                 exitProgress = exitProgress,
+                userPrefs = userPreferences,
                 onCloseApp = {
                     scope.launch {
                         showContent = false
@@ -171,12 +173,15 @@ fun PortraitBedtimeLayout(
     appIcon: androidx.compose.ui.graphics.ImageBitmap?,
     bedtimeUiState: Triple<Float, String, String>,
     exitProgress: Float,
+    userPrefs: com.etrisad.zenith.data.preferences.UserPreferences? = null,
     onCloseApp: () -> Unit
 ) {
+    val isFullScreen = exitProgress > 0f || userPrefs?.overlayFullScreen == true
+
     Column(
         modifier = Modifier
             .then(
-                if (exitProgress > 0f) Modifier.fillMaxSize() 
+                if (isFullScreen) Modifier.fillMaxSize() 
                 else Modifier.fillMaxWidth().wrapContentHeight()
             )
             .padding(bottom = 24.dp, start = 24.dp, end = 24.dp)
@@ -185,14 +190,14 @@ fun PortraitBedtimeLayout(
         verticalArrangement = Arrangement.spacedBy(32.dp)
     ) {
         Column(
-            modifier = if (exitProgress > 0f) Modifier.weight(1f).fillMaxWidth() 
+            modifier = if (isFullScreen) Modifier.weight(1f).fillMaxWidth() 
                       else Modifier.fillMaxWidth().wrapContentHeight(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterVertically)
         ) {
             BedtimeHeader(appName, appIcon)
 
-            BedtimeProgress(bedtimeUiState)
+            BedtimeProgress(bedtimeUiState, isFullScreen = isFullScreen)
 
             BedtimeDescription()
         }
@@ -211,8 +216,11 @@ fun LandscapeBedtimeLayout(
     appIcon: androidx.compose.ui.graphics.ImageBitmap?,
     bedtimeUiState: Triple<Float, String, String>,
     exitProgress: Float,
+    userPrefs: com.etrisad.zenith.data.preferences.UserPreferences? = null,
     onCloseApp: () -> Unit
 ) {
+    val isFullScreen = exitProgress > 0f || userPrefs?.overlayFullScreen == true
+
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -230,7 +238,7 @@ fun LandscapeBedtimeLayout(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                BedtimeHeader(appName, appIcon, isSmall = true)
+                BedtimeHeader(appName, appIcon, isSmall = !isFullScreen)
                 Spacer(modifier = Modifier.height(20.dp))
                 BedtimeDescription()
             }
@@ -240,7 +248,7 @@ fun LandscapeBedtimeLayout(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                BedtimeProgress(bedtimeUiState, isSmall = true)
+                BedtimeProgress(bedtimeUiState, isSmall = !isFullScreen, isFullScreen = isFullScreen)
                 Spacer(modifier = Modifier.height(24.dp))
                 CloseAppTextButton(
                     onCloseApp = onCloseApp,
@@ -297,20 +305,31 @@ private fun BedtimeHeader(appName: String, appIcon: androidx.compose.ui.graphics
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun BedtimeProgress(bedtimeUiState: Triple<Float, String, String>, isSmall: Boolean = false) {
+private fun BedtimeProgress(bedtimeUiState: Triple<Float, String, String>, isSmall: Boolean = false, isFullScreen: Boolean = false) {
+    val size = when {
+        isFullScreen -> 220.dp
+        isSmall -> 160.dp
+        else -> 220.dp
+    }
+    val waveLen = when {
+        isFullScreen -> 58.dp
+        isSmall -> 40.dp
+        else -> 58.dp
+    }
+
     Box(contentAlignment = Alignment.Center) {
         CircularWavyProgressIndicator(
             progress = { bedtimeUiState.first },
-            modifier = Modifier.size(if (isSmall) 160.dp else 220.dp),
+            modifier = Modifier.size(size),
             color = MaterialTheme.colorScheme.tertiary,
             amplitude = { 1f },
-            wavelength = if (isSmall) 40.dp else 58.dp,
+            wavelength = waveLen,
             trackColor = MaterialTheme.colorScheme.surfaceVariant,
         )
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = bedtimeUiState.second,
-                style = if (isSmall) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.displaySmall,
+                style = if (isSmall && !isFullScreen) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.displaySmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.tertiary
             )

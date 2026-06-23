@@ -77,8 +77,15 @@ fun ShieldOverlay(
     val shieldRepository = app.shieldRepository
     val scope = rememberCoroutineScope()
 
+    data class ShieldOverlayCombinedState(
+        val shield: ShieldEntity?,
+        val totalUsageToday: Long,
+        val totalGlobalUsageToday: Long,
+        val isRealShield: Boolean
+    )
+
     val combinedStateState = produceState(
-        initialValue = Triple(shield, totalUsageToday, totalGlobalUsageToday),
+        initialValue = ShieldOverlayCombinedState(shield, totalUsageToday, totalGlobalUsageToday, shield != null),
         packageName,
         shield
     ) {
@@ -106,18 +113,21 @@ fun ShieldOverlay(
             val s = shieldRepository.getShieldByPackageNameFlow(packageName).first()
             val liveAppUsage = detailedUsage.appUsageMap[packageName] ?: 0L
 
-            value = Triple(
-                s ?: shield, 
-                liveAppUsage.coerceAtMost(timeSinceMidnight), 
-                detailedUsage.totalGlobalUsage.coerceAtMost(timeSinceMidnight)
+            value = ShieldOverlayCombinedState(
+                shield = s ?: shield,
+                totalUsageToday = liveAppUsage.coerceAtMost(timeSinceMidnight),
+                totalGlobalUsageToday = detailedUsage.totalGlobalUsage.coerceAtMost(timeSinceMidnight),
+                isRealShield = s != null
             )
             delay(30000)
         }
     }
 
-    val currentShield = combinedStateState.value.first
-    val currentTotalUsageToday = combinedStateState.value.second
-    val currentTotalGlobalUsageToday = combinedStateState.value.third
+    val combinedState = combinedStateState.value
+    val currentShield = combinedState.shield
+    val currentTotalUsageToday = combinedState.totalUsageToday
+    val currentTotalGlobalUsageToday = combinedState.totalGlobalUsageToday
+    val isRealShield = combinedState.isRealShield
     
     var showContent by remember { mutableStateOf(false) }
     var isEmergencyUnlocked by remember { mutableStateOf(false) }
@@ -130,7 +140,7 @@ fun ShieldOverlay(
     val incentiveProgress by produceState(initialValue = 0f) {
         shieldRepository.getIncentiveGoalProgress().collect { value = it }
     }
-    val isIncentiveLocked = userPrefs.incentiveLockEnabled && !userPrefs.incentiveLockGoalsMetToday && (currentShield?.type == FocusType.SHIELD || currentShield == null)
+    val isIncentiveLocked = userPrefs.incentiveLockEnabled && !userPrefs.incentiveLockGoalsMetToday && isRealShield && currentShield?.type == FocusType.SHIELD
 
     val isDelayEnabled = currentShield != null && currentShield.isDelayAppEnabled && currentShield.type == FocusType.SHIELD
     
@@ -787,43 +797,106 @@ fun ShieldProgressSection(
     val remainingMillis = if (totalLimitMillis > 0) (totalLimitMillis - totalUsageToday).coerceAtLeast(0L) else 0L
     val progress = if (totalLimitMillis > 0) remainingMillis.toFloat() / totalLimitMillis else 0f
 
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Box(
-            modifier = Modifier.fillMaxWidth(),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = formatMillis(totalUsageToday),
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.align(Alignment.CenterStart)
-            )
-            TotalUsagePill(totalGlobalUsageToday, userPrefs)
-            if (totalLimitMillis > 0) {
+    if (userPrefs.overlayFullScreen) {
+        ShieldFullScreenProgress(
+            totalUsageToday = totalUsageToday,
+            totalLimitMillis = totalLimitMillis,
+            remainingMillis = remainingMillis,
+            progress = progress
+        )
+    } else {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
                 Text(
-                    text = "${formatMillis(remainingMillis)} left today",
+                    text = formatMillis(totalUsageToday),
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.align(Alignment.CenterEnd)
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.align(Alignment.CenterStart)
+                )
+                TotalUsagePill(totalGlobalUsageToday, userPrefs)
+                if (totalLimitMillis > 0) {
+                    Text(
+                        text = "${formatMillis(remainingMillis)} left today",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.align(Alignment.CenterEnd)
+                    )
+                }
+            }
+            
+            if (totalLimitMillis > 0) {
+                val animatedProgressState = animateFloatAsState(
+                    targetValue = progress.coerceIn(0f, 1f),
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessLow),
+                    label = "progress"
+                )
+                LinearWavyProgressIndicator(
+                    progress = { animatedProgressState.value },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp)
+                        .height(10.dp),
+                    color = if (progress < 0.2f) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                    wavelength = 40.dp
                 )
             }
         }
-        
-        if (totalLimitMillis > 0) {
-            val animatedProgressState = animateFloatAsState(
-                targetValue = progress.coerceIn(0f, 1f),
-                animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessLow),
-                label = "progress"
-            )
-            LinearWavyProgressIndicator(
-                progress = { animatedProgressState.value },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp)
-                    .height(10.dp),
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun ShieldFullScreenProgress(
+    totalUsageToday: Long,
+    totalLimitMillis: Long,
+    remainingMillis: Long,
+    progress: Float
+) {
+    val animatedProgress = animateFloatAsState(
+        targetValue = progress.coerceIn(0f, 1f),
+        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessLow),
+        label = "fullScreenProgress"
+    )
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            CircularWavyProgressIndicator(
+                progress = { animatedProgress.value },
+                modifier = Modifier.size(220.dp),
                 color = if (progress < 0.2f) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                amplitude = { 1f },
+                wavelength = 58.dp,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                wavelength = 40.dp
+            )
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "used today",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = formatMillis(totalUsageToday),
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = if (progress < 0.2f) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+
+        if (totalLimitMillis > 0) {
+            Text(
+                text = "${formatMillis(remainingMillis)} limit left",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.SemiBold
             )
         }
     }
@@ -837,37 +910,100 @@ fun ShieldProgressMini(shield: ShieldEntity?, totalUsageToday: Long, totalGlobal
     val remainingMillis = if (totalLimitMillis > 0) (totalLimitMillis - totalUsageToday).coerceAtLeast(0L) else 0L
     val progress = if (totalLimitMillis > 0) remainingMillis.toFloat() / totalLimitMillis else 0f
 
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Box(
-            modifier = Modifier.fillMaxWidth(),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = formatMillis(totalUsageToday),
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.align(Alignment.CenterStart)
-            )
-            TotalUsagePill(totalGlobalUsageToday, userPrefs)
-            if (totalLimitMillis > 0) {
+    if (userPrefs.overlayFullScreen) {
+        ShieldFullScreenProgressMini(
+            totalUsageToday = totalUsageToday,
+            totalLimitMillis = totalLimitMillis,
+            remainingMillis = remainingMillis,
+            progress = progress
+        )
+    } else {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
                 Text(
-                    text = "${formatMillis(remainingMillis)} left",
+                    text = formatMillis(totalUsageToday),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.align(Alignment.CenterEnd)
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.align(Alignment.CenterStart)
+                )
+                TotalUsagePill(totalGlobalUsageToday, userPrefs)
+                if (totalLimitMillis > 0) {
+                    Text(
+                        text = "${formatMillis(remainingMillis)} left",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.align(Alignment.CenterEnd)
+                    )
+                }
+            }
+            if (totalLimitMillis > 0) {
+                LinearWavyProgressIndicator(
+                    progress = { progress.coerceIn(0f, 1f) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp)
+                        .height(10.dp),
+                    color = if (progress < 0.2f) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                    wavelength = 40.dp
                 )
             }
         }
-        if (totalLimitMillis > 0) {
-            LinearWavyProgressIndicator(
-                progress = { progress.coerceIn(0f, 1f) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp)
-                    .height(10.dp),
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun ShieldFullScreenProgressMini(
+    totalUsageToday: Long,
+    totalLimitMillis: Long,
+    remainingMillis: Long,
+    progress: Float
+) {
+    val animatedProgress = animateFloatAsState(
+        targetValue = progress.coerceIn(0f, 1f),
+        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessLow),
+        label = "fullScreenProgressMini"
+    )
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            CircularWavyProgressIndicator(
+                progress = { animatedProgress.value },
+                modifier = Modifier.size(140.dp),
                 color = if (progress < 0.2f) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                amplitude = { 1f },
+                wavelength = 36.dp,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                wavelength = 40.dp
+            )
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "used today",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = formatMillis(totalUsageToday),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = if (progress < 0.2f) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+
+        if (totalLimitMillis > 0) {
+            Text(
+                text = "${formatMillis(remainingMillis)} limit left",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.SemiBold
             )
         }
     }

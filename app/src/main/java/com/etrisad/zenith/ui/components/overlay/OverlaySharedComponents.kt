@@ -738,7 +738,10 @@ fun CurrentEventPill(
             modifier = Modifier.weight(1f)
         ) {
             Column(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+                modifier = Modifier
+                    .padding(horizontal = 12.dp, vertical = 10.dp)
+                    .heightIn(min = 48.dp),
+                verticalArrangement = Arrangement.Center
             ) {
                 RollingText(
                     text = currentEvent.title,

@@ -346,17 +346,26 @@ fun PortraitScheduleLayout(
             }
 
             if (schedule.mode == ScheduleMode.ALLOW) {
-                TotalUsagePill(totalGlobalUsageToday, userPrefs)
-                CircularWavyProgressIndicator(
-                    progress = { progress },
-                    modifier = Modifier
-                        .padding(top = 8.dp)
-                        .size(120.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                    amplitude = { 1f },
-                    wavelength = 36.dp,
-                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                )
+                if (userPrefs.overlayFullScreen) {
+                    ScheduleFullScreenProgress(
+                        progress = progress,
+                        totalGlobalUsageToday = totalGlobalUsageToday,
+                        schedule = schedule,
+                        userPrefs = userPrefs
+                    )
+                } else {
+                    TotalUsagePill(totalGlobalUsageToday, userPrefs)
+                    CircularWavyProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier
+                            .padding(top = 8.dp)
+                            .size(120.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        amplitude = { 1f },
+                        wavelength = 36.dp,
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                    )
+                }
             }
         }
 
@@ -505,17 +514,26 @@ fun LandscapeScheduleLayout(
                 }
 
                 if (schedule.mode == ScheduleMode.ALLOW) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    TotalUsagePill(totalGlobalUsageToday, userPrefs)
-                    CircularWavyProgressIndicator(
-                        progress = { progress },
-                        modifier = Modifier
-                            .padding(top = 8.dp)
-                            .size(80.dp),
-                        color = MaterialTheme.colorScheme.primary,
-                        wavelength = 24.dp,
-                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                    )
+                    if (userPrefs.overlayFullScreen) {
+                        ScheduleFullScreenProgressMini(
+                            progress = progress,
+                            totalGlobalUsageToday = totalGlobalUsageToday,
+                            schedule = schedule,
+                            userPrefs = userPrefs
+                        )
+                    } else {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        TotalUsagePill(totalGlobalUsageToday, userPrefs)
+                        CircularWavyProgressIndicator(
+                            progress = { progress },
+                            modifier = Modifier
+                                .padding(top = 8.dp)
+                                .size(80.dp),
+                            color = MaterialTheme.colorScheme.primary,
+                            wavelength = 24.dp,
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                        )
+                    }
                 }
             }
 
@@ -553,5 +571,109 @@ fun LandscapeScheduleLayout(
                 CloseAppTextButton(onCloseApp, autoKickProgress, size = ZenithButtonSize.Large)
             }
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun ScheduleFullScreenProgress(
+    progress: Float,
+    totalGlobalUsageToday: Long,
+    schedule: ScheduleEntity,
+    userPrefs: UserPreferences
+) {
+    val animatedProgress = animateFloatAsState(
+        targetValue = progress.coerceIn(0f, 1f),
+        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessLow),
+        label = "scheduleFullScreenProgress"
+    )
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            CircularWavyProgressIndicator(
+                progress = { animatedProgress.value },
+                modifier = Modifier.size(220.dp),
+                color = MaterialTheme.colorScheme.primary,
+                amplitude = { 1f },
+                wavelength = 58.dp,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+            )
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "used today",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = formatMillis(totalGlobalUsageToday),
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+
+        Text(
+            text = "${schedule.startTime} - ${schedule.endTime}",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.SemiBold
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun ScheduleFullScreenProgressMini(
+    progress: Float,
+    totalGlobalUsageToday: Long,
+    schedule: ScheduleEntity,
+    userPrefs: UserPreferences
+) {
+    val animatedProgress = animateFloatAsState(
+        targetValue = progress.coerceIn(0f, 1f),
+        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessLow),
+        label = "scheduleFullScreenProgressMini"
+    )
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            CircularWavyProgressIndicator(
+                progress = { animatedProgress.value },
+                modifier = Modifier.size(140.dp),
+                color = MaterialTheme.colorScheme.primary,
+                amplitude = { 1f },
+                wavelength = 36.dp,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+            )
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "used today",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = formatMillis(totalGlobalUsageToday),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+
+        Text(
+            text = "${schedule.startTime} - ${schedule.endTime}",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.SemiBold
+        )
     }
 }
