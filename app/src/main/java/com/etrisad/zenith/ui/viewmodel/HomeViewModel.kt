@@ -1174,13 +1174,12 @@ class HomeViewModel(
             usage.coerceAtMost(timeSinceMidnight)
         }.toMutableMap()
 
-        if (isSelectedToday && timeSinceMidnight > 300_000L && filteredTodayUsage.values.sum() == 0L) {
-            android.util.Log.w("HomeVM", "UsageHelper empty, falling back to queryAndAggregateUsageStats")
-            val systemFallback = withContext(Dispatchers.IO) {
+        if (isSelectedToday) {
+            val systemStats = withContext(Dispatchers.IO) {
                 usm.queryAndAggregateUsageStats(todayStart, now)
             }
-            if (systemFallback != null) {
-                systemFallback.forEach { (pkg, stats) ->
+            if (systemStats != null) {
+                systemStats.forEach { (pkg, stats) ->
                     val isUserApp = pkg in launcherApps || pm.getLaunchIntentForPackage(pkg) != null
                     if (pkg !in excludePackages && isUserApp) {
                         val time = stats.totalTimeVisible.coerceAtLeast(stats.totalTimeInForeground).coerceAtMost(timeSinceMidnight)
@@ -1257,7 +1256,7 @@ class HomeViewModel(
             }
         }
 
-        val totalToday = filteredTodayUsage.values.sum().coerceAtMost(timeSinceMidnight)
+        val totalToday = appTotals.values.sum().coerceAtMost(timeSinceMidnight)
 
         if (isSelectedToday && totalToday == 0L && timeSinceMidnight > 300_000L) {
             android.util.Log.w("HomeVM", "totalToday is 0 after refresh, scheduling deferred repair")

@@ -89,6 +89,19 @@ class DailyUsageWorker(context: Context, params: WorkerParameters) : CoroutineWo
                     finalAppUsages[pkg] = time.coerceAtMost(timeSinceMidnight)
                 }
             }
+            val todayStats = try {
+                usm.queryAndAggregateUsageStats(startTime, System.currentTimeMillis())
+            } catch (e: Exception) {
+                null
+            }
+            todayStats?.forEach { (pkg, stat) ->
+                if (pkg !in excludePackages && pkg in launcherApps) {
+                    val time = stat.totalTimeVisible.coerceAtLeast(stat.totalTimeInForeground)
+                    if (time > 0) {
+                        finalAppUsages[pkg] = maxOf(finalAppUsages[pkg] ?: 0L, time.coerceAtMost(timeSinceMidnight))
+                    }
+                }
+            }
         } else {
             val stats = try {
                 usm.queryAndAggregateUsageStats(startTime, endTime)
