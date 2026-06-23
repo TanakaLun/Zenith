@@ -699,12 +699,15 @@ fun CurrentEventPill(
     val pillSmall = 4.dp
 
     Row(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         Surface(
             color = MaterialTheme.colorScheme.secondaryContainer,
+            modifier = Modifier.fillMaxHeight(),
             shape = RoundedCornerShape(
                 topStart = pillLarge, bottomStart = pillLarge,
                 topEnd = pillSmall, bottomEnd = pillSmall
@@ -726,12 +729,12 @@ fun CurrentEventPill(
         Surface(
             color = pillColor,
             shape = RoundedCornerShape(pillSmall),
-            modifier = Modifier.weight(1f)
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
         ) {
             Column(
-                modifier = Modifier
-                    .padding(horizontal = 12.dp, vertical = 10.dp)
-                    .heightIn(min = 48.dp),
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalArrangement = Arrangement.Center
             ) {
                 RollingText(
@@ -752,6 +755,7 @@ fun CurrentEventPill(
 
         Surface(
             color = pillColor,
+            modifier = Modifier.fillMaxHeight(),
             shape = RoundedCornerShape(
                 topStart = pillSmall, bottomStart = pillSmall,
                 topEnd = pillLarge, bottomEnd = pillLarge
