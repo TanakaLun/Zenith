@@ -88,7 +88,6 @@ fun OverlayAppearanceScreen(
     val paletteScheme = remember(selectedPalette, isDark, baseScheme, customSeed) {
         when {
             selectedPalette.isDynamic -> {
-                // Apply subtle surface tint even for Dynamic system palette when active
                 val hsv = FloatArray(3)
                 android.graphics.Color.colorToHSV(baseScheme.primary.toArgb(), hsv)
                 val hue = hsv[0]
@@ -371,7 +370,6 @@ fun ColorPaletteCircle(
                 }
                 .clip(RoundedCornerShape(cornerSize))
         ) {
-            // Adaptive Ring (Closer to the circle)
             Canvas(modifier = Modifier.fillMaxSize()) {
                 if (ringAlpha > 0.01f) {
                     val stroke = 2.5.dp.toPx()
@@ -387,8 +385,6 @@ fun ColorPaletteCircle(
                     )
                 }
             }
-
-            // Segmented Rounded Square
             Canvas(
                 modifier = Modifier
                     .size(48.dp)
@@ -402,20 +398,14 @@ fun ColorPaletteCircle(
                 val h = size.height
                 val halfW = w / 2f
                 val halfH = h / 2f
-
-                // Top segment: primary
                 val topPath = Path().apply {
                     addRoundRect(RoundRect(0f, 0f, w, halfH, CornerRadius(cr), CornerRadius(cr), CornerRadius.Zero, CornerRadius.Zero))
                 }
                 drawPath(topPath, color = primary)
-
-                // Bottom-left: secondary
                 val blPath = Path().apply {
                     addRoundRect(RoundRect(0f, halfH, halfW, h, CornerRadius.Zero, CornerRadius.Zero, CornerRadius.Zero, CornerRadius(cr)))
                 }
                 drawPath(blPath, color = secondary)
-
-                // Bottom-right: tertiary
                 val brPath = Path().apply {
                     addRoundRect(RoundRect(halfW, halfH, w, h, CornerRadius.Zero, CornerRadius.Zero, CornerRadius(cr), CornerRadius.Zero))
                 }

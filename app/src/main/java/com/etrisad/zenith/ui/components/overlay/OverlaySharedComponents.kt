@@ -74,12 +74,7 @@ fun generateDynamicColorScheme(seed: Color, isDark: Boolean, currentScheme: Colo
     
     val hue = hsv[0]
     val sat = hsv[1]
-    
-    // Check if the color is neutral (monochrome)
     val isMonochrome = sat < 0.05f
-    
-    // M3 Tonal Palette Approximations (Light: Tone 40, Dark: Tone 80)
-    // Primary
     val primaryV = if (isMonochrome) {
         if (isDark) 0.95f else 0.1f
     } else {
@@ -87,8 +82,6 @@ fun generateDynamicColorScheme(seed: Color, isDark: Boolean, currentScheme: Colo
     }
     val primarySat = if (isMonochrome) 0f else sat.coerceIn(0.1f, 0.8f)
     val primary = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, primarySat, primaryV)))
-    
-    // Secondary: Same hue, lower chroma
     val secondaryV = if (isMonochrome) {
         if (isDark) 0.7f else 0.8f
     } else {
@@ -96,8 +89,6 @@ fun generateDynamicColorScheme(seed: Color, isDark: Boolean, currentScheme: Colo
     }
     val secondarySat = if (isMonochrome) 0f else (sat * 0.2f).coerceAtMost(0.15f)
     val secondary = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, secondarySat, secondaryV)))
-    
-    // Tertiary: Hue shift + 60 (unless monochrome)
     val tertiaryV = if (isMonochrome) {
         if (isDark) 0.4f else 0.5f
     } else {

@@ -277,7 +277,6 @@ fun PortraitScheduleLayout(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(32.dp)
     ) {
-        // Center Content: Icon, Title, Mode, and Progress
         Column(
             modifier = if (userPrefs.overlayFullScreen) Modifier.weight(1f) else Modifier.wrapContentHeight(),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -368,8 +367,6 @@ fun PortraitScheduleLayout(
                 }
             }
         }
-
-        // Bottom Actions: Sticky Actions
         Column(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally

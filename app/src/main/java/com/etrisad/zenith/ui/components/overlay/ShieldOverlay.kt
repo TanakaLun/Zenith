@@ -501,7 +501,6 @@ fun PortraitInterceptLayout(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(32.dp)
     ) {
-        // Center Content: Icon, Title, Description, and Progress
         Column(
             modifier = if (userPrefs.overlayFullScreen) Modifier.weight(1f) else Modifier.wrapContentHeight(),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -567,8 +566,6 @@ fun PortraitInterceptLayout(
                 userPrefs = userPrefs
             )
         }
-
-        // Bottom Actions: Sticky at the bottom
         Column(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally

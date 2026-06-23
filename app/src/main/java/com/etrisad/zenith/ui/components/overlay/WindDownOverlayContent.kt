@@ -226,7 +226,6 @@ fun PortraitWindDownLayout(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         if (userPrefs?.overlayFullScreen == true) {
-            // Header centered in upper area
             Column(
                 modifier = Modifier.weight(1f),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -234,8 +233,6 @@ fun PortraitWindDownLayout(
             ) {
                 WindDownHeader(appName, appIcon, sessionUsed)
             }
-
-            // Bottom: wavy/duration selector + close button
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(24.dp)
@@ -310,7 +307,6 @@ fun LandscapeWindDownLayout(
             horizontalArrangement = Arrangement.spacedBy(24.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Left: app info
             Column(
                 modifier = Modifier.weight(1f),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -318,8 +314,6 @@ fun LandscapeWindDownLayout(
             ) {
                 WindDownHeader(appName, appIcon, sessionUsed, isSmall = true)
             }
-
-            // Right: wavy/duration selector + close button
             Column(
                 modifier = Modifier.weight(1.2f),
                 horizontalAlignment = Alignment.CenterHorizontally,

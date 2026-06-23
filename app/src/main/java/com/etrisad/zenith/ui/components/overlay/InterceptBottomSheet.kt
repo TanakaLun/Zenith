@@ -62,7 +62,6 @@ fun InterceptBottomSheet(
 
         when {
             paletteId == "dynamic" -> {
-                // Apply subtle surface tint even for Dynamic system palette when active
                 val hsv = FloatArray(3)
                 android.graphics.Color.colorToHSV(currentScheme.primary.toArgb(), hsv)
                 val hue = hsv[0]
