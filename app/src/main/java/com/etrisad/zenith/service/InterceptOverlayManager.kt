@@ -451,6 +451,21 @@ class InterceptOverlayManager(
                     composeView.disposeComposition()
                     return
                 }
+                composeView.addOnAttachStateChangeListener(object : android.view.View.OnAttachStateChangeListener {
+                    override fun onViewDetachedFromWindow(v: android.view.View) {
+                        synchronized(this@InterceptOverlayManager) {
+                            if (v == overlayView) {
+                                isShowing = false
+                                currentPackage = null
+                                overlayView = null
+                                lifecycleOwner = null
+                                viewModelStore = null
+                                overlayUsageState = null
+                            }
+                        }
+                    }
+                    override fun onViewAttachedToWindow(v: android.view.View) {}
+                })
                 windowManager.addView(composeView, params)
                 overlayView = composeView
             }
@@ -508,48 +523,57 @@ class InterceptOverlayManager(
     }
 
     fun hideOverlay() {
+        val viewToRemove: ComposeView?
+        val lOwnerToDestroy: MyLifecycleOwner?
+        val vStoreToClear: ViewModelStore?
+
         synchronized(this) {
             if (!isShowing && overlayView == null) return
-            
+
             isShowing = false
-            val target = currentPackage
             currentPackage = null
-            
+
             resumeMedia()
 
-            if (Looper.myLooper() != Looper.getMainLooper()) {
-                mainHandler.post { hideOverlay() }
-                return
-            }
+            viewToRemove = overlayView
+            lOwnerToDestroy = lifecycleOwner
+            vStoreToClear = viewModelStore
+            overlayView = null
+            lifecycleOwner = null
+            viewModelStore = null
+            overlayUsageState = null
+        }
 
-            val view = overlayView
-            if (view != null) {
-                try {
-                    lifecycleOwner?.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
-                    lifecycleOwner?.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
-                    lifecycleOwner?.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
-                    
-                    view.disposeComposition()
-                    windowManager.removeViewImmediate(view)
-                    
-                    viewModelStore?.clear()
-                } catch (e: Exception) {
-                    val currentTime = System.currentTimeMillis()
-                    if (e.message != lastOverlayError || currentTime - lastOverlayErrorTime > 30000) {
-                        Log.e(TAG, "Error removing overlay for $target: ${e.message}", e)
-                        lastOverlayError = e.message
-                        lastOverlayErrorTime = currentTime
-                    }
-                } finally {
-                    overlayView = null
-                    lifecycleOwner = null
-                    viewModelStore = null
-                    overlayUsageState = null
-                }
-            } else {
-                lifecycleOwner = null
-                viewModelStore = null
-                overlayUsageState = null
+        if (viewToRemove == null) return
+
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            mainHandler.post {
+                removeOverlayViewImmediate(viewToRemove, lOwnerToDestroy, vStoreToClear)
+            }
+            return
+        }
+
+        removeOverlayViewImmediate(viewToRemove, lOwnerToDestroy, vStoreToClear)
+    }
+
+    private fun removeOverlayViewImmediate(
+        view: ComposeView,
+        lOwner: MyLifecycleOwner?,
+        vStore: ViewModelStore?
+    ) {
+        try {
+            lOwner?.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
+            lOwner?.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
+            lOwner?.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
+            view.disposeComposition()
+            windowManager.removeViewImmediate(view)
+            vStore?.clear()
+        } catch (e: Exception) {
+            val currentTime = System.currentTimeMillis()
+            if (e.message != lastOverlayError || currentTime - lastOverlayErrorTime > 30000) {
+                Log.e(TAG, "Error removing overlay: ${e.message}", e)
+                lastOverlayError = e.message
+                lastOverlayErrorTime = currentTime
             }
         }
     }
@@ -657,6 +681,39 @@ class InterceptOverlayManager(
         } else {
             @Suppress("DEPRECATION")
             audioManager.abandonAudioFocus(afChangeListener)
+        }
+    }
+
+    fun resetState() {
+        val viewToRemove: ComposeView?
+        val lOwnerToDestroy: MyLifecycleOwner?
+        val vStoreToClear: ViewModelStore?
+
+        synchronized(this) {
+            if (!isShowing && overlayView == null) return
+
+            viewToRemove = overlayView
+            lOwnerToDestroy = lifecycleOwner
+            vStoreToClear = viewModelStore
+            isShowing = false
+            currentPackage = null
+            overlayView = null
+            lifecycleOwner = null
+            viewModelStore = null
+            overlayUsageState = null
+        }
+
+        if (viewToRemove != null) {
+            try {
+                lOwnerToDestroy?.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
+                lOwnerToDestroy?.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
+                lOwnerToDestroy?.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
+                viewToRemove.disposeComposition()
+                windowManager.removeViewImmediate(viewToRemove)
+                vStoreToClear?.clear()
+            } catch (_: Exception) {
+                // View was already removed by system
+            }
         }
     }
 

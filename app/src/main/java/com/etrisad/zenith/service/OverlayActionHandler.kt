@@ -393,7 +393,7 @@ class OverlayActionHandler(
             val s = SharedMonitoringState.allShieldsCache[targetPackageName]
                 ?: shieldRepository.getShieldByPackageName(targetPackageName)
             if (s != null && s.isDelayAppEnabled) {
-                val updated = s.copy(lastDelayStartTimestamp = 0L)
+                val updated = s.copy(lastDelayStartTimestamp = 0L, lastSessionEndTimestamp = 0L)
                 shieldRepository.updateShield(updated)
                 updateShieldCache(updated)
             }

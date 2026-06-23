@@ -130,11 +130,19 @@ class AppUsageMonitorService : Service() {
                     } catch (e: Exception) {
                         Log.e("ZenithAUMS", "startForeground failed: ${e.message}")
                     }
+                    overlayManager.hideOverlay()
                     val currentApp = getForegroundApp()
                     if (currentApp != null) {
                         lastForegroundApp = currentApp
-                        if (currentApp != AppStateHolder.foregroundApp.value) {
-                            AppStateHolder.foregroundApp.value = currentApp
+                        AppStateHolder.foregroundApp.value = currentApp
+                        serviceScope.launch {
+                            delay(300)
+                            if (isScreenOn && !shouldBypassBlocking(currentApp)) {
+                                checkBlockingInstant(currentApp, currentShieldCache)
+                                if (ZenithAccessibilityService.isServiceRunning) {
+                                    ZenithAccessibilityService.lastEventTime = 0L
+                                }
+                            }
                         }
                     }
                     if (!monitoringLoopActive) {
@@ -741,8 +749,10 @@ class AppUsageMonitorService : Service() {
         }
 
         if (SharedMonitoringState.launcherPackages.contains(currentApp) || currentApp == packageName) {
-            InterceptOverlayManager.lastKickTime = 0L
-            InterceptOverlayManager.lastKickedPackage = null
+            if (System.currentTimeMillis() - InterceptOverlayManager.lastKickTime >= 500) {
+                InterceptOverlayManager.lastKickTime = 0L
+                InterceptOverlayManager.lastKickedPackage = null
+            }
             overlayManager.hideOverlay()
             sessionUsageOverlayManager.destroyAllHUDs()
             lastForegroundApp?.let { prevPkg ->

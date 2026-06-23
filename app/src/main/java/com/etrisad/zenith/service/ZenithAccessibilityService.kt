@@ -509,8 +509,10 @@ class ZenithAccessibilityService : AccessibilityService() {
         if (shouldBypassBlocking(currentApp)) {
             Log.d("Zenith_HPC", "Bypass branch: $currentApp (lfga was $lastForegroundApp)")
             if (SharedMonitoringState.launcherPackages.contains(currentApp) || currentApp == packageName) {
-                InterceptOverlayManager.lastKickTime = 0L
-                InterceptOverlayManager.lastKickedPackage = null
+                if (System.currentTimeMillis() - InterceptOverlayManager.lastKickTime >= 500) {
+                    InterceptOverlayManager.lastKickTime = 0L
+                    InterceptOverlayManager.lastKickedPackage = null
+                }
             }
 
             val previousApp = lastForegroundApp
