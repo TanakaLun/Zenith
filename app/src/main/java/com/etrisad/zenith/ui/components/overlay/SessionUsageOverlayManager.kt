@@ -343,8 +343,15 @@ class SessionUsageOverlayManager(
                                 
                             if (isTimeUp) {
                                 session.isVisibleState.value = false
+                                hideHUD(session.packageName)
+                            } else if (session.isTemporarilyHiddenState.value) {
+                                session.hudInstance?.let {
+                                    destroyHUDInstance(it, session.packageName)
+                                    session.hudInstance = null
+                                }
+                            } else {
+                                hideHUD(session.packageName)
                             }
-                            hideHUD(session.packageName)
                         }
                     )
                 }
