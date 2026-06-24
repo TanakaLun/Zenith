@@ -51,7 +51,6 @@ class DailyUsageWorker(context: Context, params: WorkerParameters) : CoroutineWo
                 database.shieldDao().resetAllRemainingTimes()
                 val prefsRepo = UserPreferencesRepository(applicationContext)
                 prefsRepo.setIncentiveLockGoalsMetToday(false)
-                prefsRepo.setIncentiveLockGoalsMetDate("")
             } catch (_: Exception) {}
         }
         val dateString = dateFormat.format(calendar.time)
@@ -71,7 +70,7 @@ class DailyUsageWorker(context: Context, params: WorkerParameters) : CoroutineWo
 
         val allShields = database.shieldDao().getAllShields().first()
         val finalAppUsages = mutableMapOf<String, Long>()
-        
+
         val launcherApps = try {
             pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
                 .map { it.activityInfo.packageName }.toSet()
@@ -82,25 +81,12 @@ class DailyUsageWorker(context: Context, params: WorkerParameters) : CoroutineWo
         val excludePackages = setOfNotNull(applicationContext.packageName, launcherPackage)
 
         val timeSinceMidnight = if (isDateToday) (System.currentTimeMillis() - startTime).coerceAtLeast(0L) else (24 * 60 * 60 * 1000L)
-        
+
         if (isDateToday) {
             val detailedUsage = com.etrisad.zenith.util.ScreenUsageHelper.fetchDetailedUsageToday(usm)
             detailedUsage.appUsageMap.forEach { (pkg, time) ->
                 if (pkg !in excludePackages && pkg in launcherApps && time > 0) {
                     finalAppUsages[pkg] = time.coerceAtMost(timeSinceMidnight)
-                }
-            }
-            val todayStats = try {
-                usm.queryAndAggregateUsageStats(startTime, System.currentTimeMillis())
-            } catch (e: Exception) {
-                null
-            }
-            todayStats?.forEach { (pkg, stat) ->
-                if (pkg !in excludePackages && pkg in launcherApps) {
-                    val time = stat.totalTimeVisible.coerceAtLeast(stat.totalTimeInForeground)
-                    if (time > 0) {
-                        finalAppUsages[pkg] = maxOf(finalAppUsages[pkg] ?: 0L, time.coerceAtMost(timeSinceMidnight))
-                    }
                 }
             }
         } else {
@@ -174,7 +160,7 @@ class DailyUsageWorker(context: Context, params: WorkerParameters) : CoroutineWo
                 }
             }
         }
-        
+
         activePkg?.let { pkg ->
             val segmentStart = maxOf(activeStartTime, startTime)
             val segmentEnd = minOf(System.currentTimeMillis(), endTime)
@@ -226,7 +212,7 @@ class DailyUsageWorker(context: Context, params: WorkerParameters) : CoroutineWo
         finalAppUsages.forEach { (pkg, time) ->
             if (pkg in shieldPkgs) sUsage += time else if (pkg in goalPkgs) gUsage += time
         }
-        
+
         usagesToInsert.add(DailyUsageEntity(date = dateString, packageName = "SHIELD_TOTAL", usageTimeMillis = sUsage))
         usagesToInsert.add(DailyUsageEntity(date = dateString, packageName = "GOAL_TOTAL", usageTimeMillis = gUsage))
         usagesToInsert.add(DailyUsageEntity(date = dateString, packageName = "OTHER_TOTAL", usageTimeMillis = (totalUsage - (sUsage + gUsage)).coerceAtLeast(0L)))
@@ -262,7 +248,7 @@ class DailyUsageWorker(context: Context, params: WorkerParameters) : CoroutineWo
             val now = calendar.timeInMillis
             calendar.set(Calendar.HOUR_OF_DAY, 23); calendar.set(Calendar.MINUTE, 58); calendar.set(Calendar.SECOND, 0)
             if (calendar.timeInMillis <= now) calendar.add(Calendar.DAY_OF_YEAR, 1)
-            
+
             WorkManager.getInstance(context).enqueueUniquePeriodicWork("DailyUsageSyncWorker", ExistingPeriodicWorkPolicy.UPDATE,
                 PeriodicWorkRequestBuilder<DailyUsageWorker>(1, TimeUnit.DAYS).setInitialDelay(calendar.timeInMillis - now, TimeUnit.MILLISECONDS).setConstraints(constraints).setInputData(workDataOf("is_backup" to false)).build())
         }
