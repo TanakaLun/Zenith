@@ -18,6 +18,8 @@ import com.etrisad.zenith.data.local.entity.FocusType
 import com.etrisad.zenith.ui.components.ZenithContainedLoadingIndicator
 import com.etrisad.zenith.ui.viewmodel.AppInfo
 import com.etrisad.zenith.ui.viewmodel.FocusUiState
+import com.etrisad.zenith.R
+import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -73,7 +75,7 @@ fun AppPickerBottomSheet(
                                 onSearch = { },
                                 expanded = false,
                                 onExpandedChange = {},
-                                placeholder = { Text("Search apps...") },
+                                placeholder = { Text(stringResource(R.string.search_apps)) },
                                 leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
                                 trailingIcon = {
                                     if (uiState.searchQuery.isNotEmpty()) {

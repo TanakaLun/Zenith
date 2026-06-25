@@ -1,0 +1,371 @@
+<resources>
+    <!-- App -->
+    <string name="app_name">Zenith</string>
+    <string name="accessibility_service_description">Zenith 使用此服务来监控哪些应用处于打开状态，并在您的使用时间达到限制时显示聚焦护盾。</string>
+    <string name="global_streak_widget_description">跟踪所有应用的总专注天数。</string>
+    <string name="app_streak_widget_description">跟踪特定应用的专注连续天数。</string>
+
+    <!-- Common -->
+    <string name="ok">确定</string>
+    <string name="cancel">取消</string>
+    <string name="save">保存</string>
+    <string name="delete">删除</string>
+    <string name="edit">编辑</string>
+    <string name="close">关闭</string>
+    <string name="continue_to_app">继续进入应用</string>
+    <string name="grant">授权</string>
+    <string name="search_apps">搜索应用…</string>
+    <string name="preview">预览</string>
+    <string name="coming_soon">即将推出</string>
+    <string name="collapse">收起</string>
+    <string name="expand">展开</string>
+    <string name="reset">重置</string>
+    <string name="yes">是</string>
+    <string name="no">否</string>
+    <string name="apply">应用</string>
+
+    <!-- Settings Screen -->
+    <string name="categories">分类</string>
+    <string name="settings_general">通用</string>
+    <string name="settings_about">关于</string>
+    <string name="settings_theming">主题</string>
+    <string name="settings_layout_and_navigation">布局与导航</string>
+    <string name="settings_interface_overlays">界面覆盖层</string>
+    <string name="settings_notifications">通知</string>
+    <string name="settings_entry_control">入口控制</string>
+    <string name="settings_triggers">触发器</string>
+    <string name="settings_backup_and_restore">备份与恢复</string>
+    <string name="settings_sync_and_maintenance">同步与维护</string>
+    <string name="settings_performance_profile">性能配置</string>
+    <string name="settings_instant_detection">即时检测</string>
+    <string name="settings_custom_tuning">自定义调优</string>
+
+    <!-- Settings Categories -->
+    <string name="category_features">功能</string>
+    <string name="category_features_desc">正念入口、会话覆盖层、提前退出等</string>
+    <string name="category_appearance">外观</string>
+    <string name="category_appearance_desc">主题、字体、动态颜色和布局</string>
+    <string name="category_performance">性能</string>
+    <string name="category_performance_desc">响应速度与电池平衡</string>
+    <string name="category_data_management">数据管理</string>
+    <string name="category_data_management_desc">备份、恢复和使用量同步</string>
+    <string name="category_developer">开发者</string>
+    <string name="category_developer_desc">高级调试和实验工具</string>
+
+    <!-- General Settings -->
+    <string name="permissions">权限</string>
+    <string name="permissions_desc">管理和可选的系统权限</string>
+    <string name="permissions_missing_desc">部分必需权限尚未授予</string>
+    <string name="emergency_recharge_time">紧急补充时间</string>
+    <string name="daily_screen_time_target">每日屏幕使用时间目标</string>
+    <string name="app_opening_delay">应用开启延迟</string>
+    <string name="whitelist_apps">白名单应用</string>
+    <string name="apps_bypassed">%d 个应用已绕过</string>
+
+    <!-- Emergency Recharge -->
+    <string name="emergency_recharge">紧急补充</string>
+    <string name="emergency_recharge_desc">设置恢复一次紧急使用次数所需的时间。</string>
+    <string name="save_duration">保存时长</string>
+    <string name="charge_per_label">每 %1$s 充电 1 次</string>
+
+    <!-- Delay App -->
+    <string name="app_opening_delay_desc">设置被踢出后用户可以重新打开应用前的等待秒数。</string>
+    <string name="save_delay">保存延迟</string>
+
+    <!-- Screen Time Target -->
+    <string name="daily_screen_time_target_desc">设置目标以帮助您关注设备使用时间。</string>
+    <string name="hours_label">小时</string>
+    <string name="minutes_label">分钟</string>
+    <string name="remove">移除</string>
+    <string name="save_target">保存目标</string>
+    <string name="limit_exceeded">已超过限制！是时候休息并为明天重置了。</string>
+    <string name="target_format">目标：%1$s（剩余 %2$s）</string>
+
+    <!-- Features Settings -->
+    <string name="total_usage_pill">总使用量药丸</string>
+    <string name="total_usage_pill_desc">在正念暂停覆盖层中显示总屏幕使用时间</string>
+    <string name="session_usage_overlay">会话使用量覆盖层</string>
+    <string name="session_usage_overlay_desc">在允许使用应用时显示剩余时间的浮动界面</string>
+    <string name="show_current_event">显示当前事件</string>
+    <string name="show_current_event_desc">在应用延迟期间显示当前日历事件及进度</string>
+    <string name="show_current_event_no_permission">请在设置中授予日历访问权限</string>
+    <string name="status_notification">状态通知</string>
+    <string name="status_notification_desc">选择 Zenith 在监控活动时显示的内容</string>
+    <string name="notification_usage">使用量</string>
+    <string name="notification_focus">专注</string>
+    <string name="notification_default">默认</string>
+    <string name="daily_focus_recap">每日专注回顾</string>
+    <string name="daily_focus_recap_desc">每晚接收总专注时间和屏幕使用量的每日摘要</string>
+    <string name="weekly_insight">每周洞察</string>
+    <string name="weekly_insight_desc">获取每周对比的专注趋势分析</string>
+    <string name="trend_milestones">趋势里程碑</string>
+    <string name="trend_milestones_desc">庆祝专注连续天数和使用量里程碑等成就</string>
+    <string name="mindful_gateway">正念入口</string>
+    <string name="mindful_gateway_desc">即使是未设置特定护盾的应用也会被正念暂停打断</string>
+    <string name="incentive_lock">激励锁定</string>
+    <string name="incentive_lock_desc">在允许自由使用受保护的应用前，需要完成所有应用目标的 100%</string>
+    <string name="incentive_lock_add_goal_first">请先添加至少一个应用目标</string>
+    <string name="disabling_incentive_lock">正在禁用激励锁定…</string>
+    <string name="feature_will_be_disabled_in">功能将在 %1$s 后禁用（约 %2$s）</string>
+    <string name="grace_period">宽限期</string>
+    <string name="grace_period_desc">设置所有应用解除封锁的时间窗口</string>
+    <string name="pause_media">暂停媒体</string>
+    <string name="pause_media_desc">在覆盖层出现时自动暂停媒体播放</string>
+    <string name="early_kick">提前退出</string>
+    <string name="early_kick_desc">可选在时间限制到期前 5 分钟退出应用</string>
+    <string name="battery_usage_reset">电池使用量重置</string>
+    <string name="battery_usage_reset_desc">跟踪上次充电以来的应用使用量，并在应用详情中提供重置选项</string>
+
+    <!-- Appearance Settings -->
+    <string name="theme_mode">主题模式</string>
+    <string name="theme_system">系统</string>
+    <string name="theme_light">浅色</string>
+    <string name="theme_dark">深色</string>
+    <string name="font_style">字体样式</string>
+    <string name="font_system">系统</string>
+    <string name="dynamic_color">动态颜色</string>
+    <string name="dynamic_color_desc">应用系统壁纸颜色（Android 12+）</string>
+    <string name="expressive_color_set">表现力色彩</string>
+    <string name="expressive_color_set_desc">降低背景饱和度并突出容器</string>
+    <string name="floating_tab_bar">浮动标签栏</string>
+    <string name="floating_tab_bar_desc">使用新的 Material 3 Expressive 浮动导航</string>
+    <string name="overlay_appearance">覆盖层外观</string>
+    <string name="overlay_appearance_desc">自定义底部面板颜色、透明度和尺寸</string>
+    <string name="customize_gs_flex">自定义 GS Flex 变体</string>
+
+    <!-- Data Management Settings -->
+    <string name="auto_backup">自动备份</string>
+    <string name="auto_backup_desc">定期将数据库备份到文件夹</string>
+    <string name="auto_backup_config">自动备份配置</string>
+    <string name="backup_location">备份位置</string>
+    <string name="location_inaccessible">位置不可访问</string>
+    <string name="not_selected">未选择</string>
+    <string name="selected_folder">已选文件夹</string>
+    <string name="last_backup">上次备份</string>
+    <string name="never">从未</string>
+    <string name="backup_interval">备份间隔</string>
+    <string name="backup_now">立即备份</string>
+    <string name="backup_started">备份已开始…</string>
+    <string name="manual_backup">手动备份</string>
+    <string name="manual_backup_desc">立即将设置和计划保存到文件</string>
+    <string name="restore_data">恢复数据</string>
+    <string name="restore_data_desc">从之前的备份文件加载数据</string>
+    <string name="sync_on_entry">进入时同步</string>
+    <string name="sync_on_entry_desc">每次打开统计屏幕时刷新使用统计数据。如遇数据不一致请启用此项。</string>
+    <string name="backup_successful">备份成功！</string>
+    <string name="backup_failed">备份失败：%1$s</string>
+    <string name="invalid_backup_file">无效的备份文件</string>
+    <string name="restore_successful">恢复成功！正在重启应用…</string>
+    <string name="restore_failed">恢复失败：%1$s</string>
+    <string name="apply_settings_first">请先应用设置再离开</string>
+
+    <!-- Performance Settings -->
+    <string name="accessibility_service">无障碍服务</string>
+    <string name="accessibility_active_desc">服务已激活并即时检测启动</string>
+    <string name="accessibility_inactive_desc">即时检测应用启动以获得最佳性能</string>
+    <string name="make_as_requirement">设为必要条件</string>
+    <string name="make_as_requirement_desc">要求权限检查中必须授予无障碍服务</string>
+    <string name="parameter_details">参数详情</string>
+    <string name="parameter_details_expanded">拖动任意滑块后点击应用以保存</string>
+    <string name="parameter_details_collapsed">点击展开自定义调优</string>
+    <string name="check_interval">检查间隔</string>
+    <string name="power_saving">省电模式</string>
+    <string name="data_refresh">数据刷新</string>
+    <string name="storage">存储</string>
+    <string name="scan_timing">扫描时机</string>
+    <string name="scan_timing_desc">针对每个场景微调监控频率</string>
+    <string name="power_and_overlay">电源与覆盖层</string>
+    <string name="goal_shield">目标护盾</string>
+    <string name="regular_shield">常规护盾</string>
+    <string name="default">默认</string>
+    <string name="reset_all">全部重置</string>
+    <string name="custom_profile_hint">自定义配置可手动调整每个参数</string>
+    <string name="battery_warning_desc">此预设会降低后台检查频率以节省电池。建议启用无障碍服务以即时检测应用启动而无需轮询。</string>
+    <string name="use_anyway">仍然使用</string>
+
+    <!-- About Settings -->
+    <string name="check_for_update">检查更新</string>
+    <string name="checking_for_update">正在检查更新…</string>
+    <string name="check_update_on_start">启动时检查更新</string>
+    <string name="check_update_on_start_desc">应用启动时自动检查更新</string>
+    <string name="view_changelog">查看更新日志</string>
+    <string name="view_repository">查看仓库</string>
+    <string name="license_gnu">GNU 通用公共许可证 v3.0</string>
+    <string name="created_by">由 %1$s 创建</string>
+    <string name="zenith_is_up_to_date">Zenith 已是最新版本！</string>
+    <string name="update_check_failed">更新检查失败：%1$s</string>
+    <string name="failed_to_fetch_changelog">获取更新日志失败</string>
+    <string name="developer_mode_enabled">开发者模式已启用！</string>
+    <string name="tap_more_for_dev_mode">再点击 %1$d 次进入开发者模式</string>
+    <string name="failed_to_fetch_latest_release">获取最新版本失败</string>
+    <string name="stats_onboarding_triggered">统计引导已触发</string>
+    <string name="update_onboarding_triggered">更新引导已触发</string>
+    <string name="streak_recovery_completed">连续天数恢复成功！</string>
+    <string name="recovery_failed">恢复失败：%1$s</string>
+
+    <!-- Update Bottom Sheet -->
+    <string name="new_version_available">有新版本可用</string>
+    <string name="later">稍后</string>
+    <string name="update">更新</string>
+    <string name="changelog_history">更新日志历史</string>
+
+    <!-- Home Screen -->
+    <string name="daily_screen_time">每日屏幕使用时间</string>
+    <string name="set_target">设置目标</string>
+    <string name="yesterday">昨天</string>
+    <string name="trend">趋势</string>
+    <string name="top_used_apps">使用最多的应用</string>
+    <string name="see_full_list">查看完整列表</string>
+    <string name="active_goals">活跃目标</string>
+    <string name="active_shields">活跃护盾</string>
+    <string name="no_active_goals">暂无活跃目标。前往专注页面添加一个！</string>
+    <string name="no_active_shields">暂无活跃护盾。前往专注页面添加一个！</string>
+    <string name="shields_are_locked">护盾当前已锁定</string>
+    <string name="shields_locked_desc">完成所有应用目标的 100% 即可解锁受保护的应用并自由使用！</string>
+    <string name="uses_exhausted">使用次数已用完</string>
+    <string name="reset_in_format">将在 %1$s 后重置</string>
+    <string name="to_go">待完成</string>
+    <string name="left">剩余</string>
+    <string name="alarm">闹钟</string>
+    <string name="pomodoro">番茄钟</string>
+    <string name="stats">统计</string>
+    <string name="bedtime">就寝时间</string>
+    <string name="hours_format">%dh</string>
+    <string name="minutes_format">%dm</string>
+    <string name="seconds_format">%ds</string>
+
+    <!-- Data Warning -->
+    <string name="data_warning_fresh">今日数据可能不准确，因为 Zenith 仍在收集您的使用模式。建议使用 Zenith 至少 3 天以获得更准确的追踪和洞察。</string>
+    <string name="data_warning_system">所选日期的数据直接从使用系统获取，可能不完全准确。因此请适当参考。</string>
+
+    <!-- App Detail Screen -->
+    <string name="todays_usage">今日使用量</string>
+    <string name="goal_achieved">目标已达成！继续加油。</string>
+    <string name="goal_format">目标：%1$s（还需 %2$s）</string>
+    <string name="limit_exceeded_app">已超过限制！</string>
+    <string name="limit_format">限制：%1$s（剩余 %2$s）</string>
+    <string name="streak">连续天数</string>
+    <string name="best_streak">最佳连续天数</string>
+    <string name="days_today">今日天数</string>
+    <string name="pause_shield_goal">暂停护盾/目标</string>
+    <string name="temporarily_disable_limits">暂时禁用限制</string>
+    <string name="shield_paused">护盾已暂停</string>
+    <string name="paused_indefinitely">无限期暂停</string>
+    <string name="resumes_in">将在 %1$s 后恢复</string>
+    <string name="resume_now">立即恢复</string>
+    <string name="estimated_time">预计时间：%1$s</string>
+    <string name="daily_average">日均使用量</string>
+    <string name="todays_opens">今日打开次数</string>
+    <string name="peak_usage_hour">使用量高峰时段</string>
+    <string name="most_active_around">最活跃时间约 %1$d %2$s</string>
+    <string name="history_21_days">历史记录（21 天）</string>
+
+    <!-- Focus Screen -->
+    <string name="add_shield">添加护盾</string>
+    <string name="add_goal">添加目标</string>
+    <string name="add_schedule">添加计划</string>
+    <string name="active_schedules">活跃计划</string>
+    <string name="no_active_goals_yet">暂无活跃目标</string>
+    <string name="no_active_shields_yet">暂无活跃护盾</string>
+    <string name="no_active_schedules_yet">暂无活跃计划</string>
+
+    <!-- Bedtime Screen -->
+    <string name="bedtime_mode">就寝模式</string>
+    <string name="bedtime_active_schedule">基于计划生效</string>
+    <string name="bedtime_disabled">当前已禁用</string>
+    <string name="bedtime_ends_in">就寝时间将在以下时间结束</string>
+    <string name="bedtime_starts_in">将在以下时间开始</string>
+    <string name="start">开始</string>
+    <string name="end">结束</string>
+    <string name="usage">使用量</string>
+    <string name="history">历史记录</string>
+    <string name="settings_label">设置</string>
+    <string name="allowed_apps">允许的应用</string>
+    <string name="apps_allowed">%d 个应用已允许</string>
+    <string name="wind_down_notification">放松通知</string>
+    <string name="wind_down_notification_desc">就寝前 30 分钟通知</string>
+    <string name="do_not_disturb">勿扰模式</string>
+    <string name="do_not_disturb_desc">就寝期间静音通知</string>
+    <string name="wind_down_restrictions">放松限制</string>
+    <string name="wind_down_restrictions_desc">就寝前 30 分钟限制应用使用</string>
+    <string name="bedtime_activity">就寝活动</string>
+    <string name="time_distribution">时间分布</string>
+    <string name="usage_efficiency">使用效率</string>
+    <string name="usage_efficiency_good">做得好！使用量非常低。</string>
+    <string name="usage_efficiency_high">就寝期间使用量过高。</string>
+    <string name="total_period">总时段</string>
+    <string name="exceeded">已超出</string>
+    <string name="apps_used_at">在 %1$s 使用的应用</string>
+    <string name="other_apps">其他应用</string>
+    <string name="apps_minimal_usage">%d 个应用使用量极少</string>
+    <string name="usage_recent">使用量</string>
+    <string name="recent">最近</string>
+
+    <!-- Grace Period Screen -->
+    <string name="grace_period_desc_active">所有应用暂时解除封锁</string>
+    <string name="grace_period_desc_info">宽限期覆盖所有限制。激活期间，护盾、计划和就寝时间不会阻止任何应用。</string>
+    <string name="grace_period_ends_in">宽限期将在以下时间结束</string>
+
+    <!-- Whitelist -->
+    <string name="whitelist_title">白名单应用</string>
+
+    <!-- HUD Appearance -->
+    <string name="hud_appearance">HUD 外观</string>
+    <string name="hud_size">大小：%d%%</string>
+    <string name="hud_opacity">透明度：%d%%</string>
+
+    <!-- Days of week -->
+    <string name="day_mon">周一</string>
+    <string name="day_tue">周二</string>
+    <string name="day_wed">周三</string>
+    <string name="day_thu">周四</string>
+    <string name="day_fri">周五</string>
+    <string name="day_sat">周六</string>
+    <string name="day_sun">周日</string>
+
+    <!-- Notification Worker -->
+    <string name="daily_recap_channel">每日回顾</string>
+    <string name="daily_recap_channel_desc">每日专注时间回顾</string>
+    <string name="weekly_insight_channel">每周洞察</string>
+    <string name="weekly_insight_channel_desc">每周专注趋势洞察</string>
+    <string name="milestone_channel">里程碑</string>
+    <string name="milestone_channel_desc">趋势里程碑和成就通知</string>
+
+    <!-- Shield Config -->
+    <string name="shield_type_target">目标</string>
+    <string name="shield_type_limit">限制</string>
+    <string name="shield_status_productive">高效</string>
+    <string name="shield_status_strict">严格</string>
+    <string name="shield_status_normal">正常</string>
+    <string name="shield_limit_format">%1$dh %2$dm %3$s</string>
+    <string name="shield_minutes_format">%1$dm %2$s</string>
+    <string name="emergency_uses_left">%1$d/%2$d 紧急使用次数剩余</string>
+    <string name="emergency_uses_left_label">最大紧急使用次数</string>
+    <string name="times_of_uses">使用次数</string>
+    <string name="refresh_period">刷新周期</string>
+    <string name="remind_of_goal">目标提醒</string>
+    <string name="remind_of_goal_desc">Zenith 会提醒你打开这个应用</string>
+    <string name="no_hourly_data">没有小时数据</string>
+    <string name="no_app_breakdown">没有应用分类数据</string>
+    <string name="how_should_we_call_you">怎么称呼你？</string>
+    <string name="phase_2_verification">第二阶段：验证</string>
+    <string name="hold_circle_seconds">按住圆圈 %1$d 秒</string>
+    <string name="phase_3_processing">第三阶段：处理中</string>
+    <string name="finalizing_permission">正在完成权限授予…</string>
+    <string name="access_granted">已获得访问权限</string>
+    <string name="how_long_should_we_pause">要暂停多长时间？</string>
+    <string name="last_14_days">过去 14 天</string>
+    <string name="target_met">已达标</string>
+    <string name="apps_hidden_by_default">默认隐藏 %d 个应用</string>
+    <string name="schedule_active">生效中</string>
+    <string name="schedule_inactive">未生效</string>
+
+    <!-- Developer Settings -->
+    <string name="update_data">更新数据</string>
+    <string name="test_goal_overlay">测试目标覆盖层</string>
+    <string name="test_update_sheet">测试更新面板</string>
+    <string name="trigger_onboarding_stats">触发统计引导</string>
+    <string name="trigger_onboarding_update">触发更新引导</string>
+    <string name="reset_bedtime_streak">重置就寝连续天数</string>
+    <string name="reset_streak_recovery">重置连续天数恢复</string>
+</resources>

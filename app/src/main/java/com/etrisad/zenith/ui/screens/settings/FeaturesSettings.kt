@@ -21,7 +21,9 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.etrisad.zenith.R
 import com.etrisad.zenith.data.preferences.ForegroundNotificationStatusMode
 import com.etrisad.zenith.data.preferences.UserPreferences
 import com.etrisad.zenith.util.hasCalendarPermission
@@ -29,6 +31,8 @@ import com.etrisad.zenith.ui.components.ZenithButtonSize
 import com.etrisad.zenith.ui.components.ZenithToggleButtonGroup
 import com.etrisad.zenith.ui.components.ZenithToggleOption
 import com.google.accompanist.drawablepainter.rememberDrawablePainter
+import com.etrisad.zenith.R
+import androidx.compose.ui.res.stringResource
 
 @Composable
 fun FeaturesSettings(
@@ -69,11 +73,11 @@ fun FeaturesSettings(
     }
 
     Column {
-        PreferenceCategory(title = "Interface Overlays")
+        PreferenceCategory(title = stringResource(R.string.settings_interface_overlays))
 
         SettingsToggle(
-            title = "Total Usage Pill",
-            description = "Show your total screen time in the mindful pause overlay",
+            title = stringResource(R.string.total_usage_pill),
+            description = stringResource(R.string.total_usage_pill_desc),
             checked = preferences.totalUsagePillEnabled,
             onCheckedChange = onTotalUsagePillEnabledChange,
             icon = Icons.Outlined.Public,
@@ -82,8 +86,8 @@ fun FeaturesSettings(
 
         Spacer(modifier = Modifier.height(4.dp))
         SettingsToggle(
-            title = "Session Usage Overlay",
-            description = "Show a floating HUD with remaining time when an app is allowed",
+            title = stringResource(R.string.session_usage_overlay),
+            description = stringResource(R.string.session_usage_overlay_desc),
             checked = preferences.sessionUsageOverlayEnabled,
             onCheckedChange = onSessionUsageOverlayEnabledChange,
             icon = Icons.Outlined.Timer,
@@ -109,14 +113,14 @@ fun FeaturesSettings(
 
         Spacer(modifier = Modifier.height(4.dp))
         SettingsToggle(
-            title = "Show Current Event",
-            description = if (calendarPermissionGranted) "Show your current calendar event with progress during app delay" else "Grant Calendar Access permission in Settings to enable",
+            title = stringResource(R.string.show_current_event),
+            description = if (calendarPermissionGranted) stringResource(R.string.show_current_event_desc) else stringResource(R.string.show_current_event_desc_no_permission),
             checked = preferences.showCurrentEvent,
             onCheckedChange = { enabled ->
                 if (calendarPermissionGranted) {
                     onShowCurrentEventEnabledChange(enabled)
                 } else {
-                    Toast.makeText(context, "Please enable Calendar Access permission in Settings", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.show_current_event_no_permission), Toast.LENGTH_SHORT).show()
                 }
             },
             icon = Icons.Outlined.CalendarMonth,
@@ -125,7 +129,7 @@ fun FeaturesSettings(
         )
 
         Spacer(modifier = Modifier.height(16.dp))
-        PreferenceCategory(title = "Notifications")
+        PreferenceCategory(title = stringResource(R.string.settings_notifications))
 
         ForegroundNotificationStatusSelector(
             selectedMode = preferences.foregroundNotificationStatusMode,
@@ -135,8 +139,8 @@ fun FeaturesSettings(
 
         Spacer(modifier = Modifier.height(4.dp))
         SettingsToggle(
-            title = "Daily Focus Recap",
-            description = "Receive a daily summary of your total focus time and screen usage each evening",
+            title = stringResource(R.string.daily_focus_recap),
+            description = stringResource(R.string.daily_focus_recap_desc),
             checked = preferences.dailyRecapEnabled,
             onCheckedChange = onDailyRecapEnabledChange,
             icon = Icons.Outlined.Today,
@@ -145,8 +149,8 @@ fun FeaturesSettings(
 
         Spacer(modifier = Modifier.height(4.dp))
         SettingsToggle(
-            title = "Weekly Insight",
-            description = "Get a weekly breakdown comparing your focus trends across the week",
+            title = stringResource(R.string.weekly_insight),
+            description = stringResource(R.string.weekly_insight_desc),
             checked = preferences.weeklyInsightEnabled,
             onCheckedChange = onWeeklyInsightEnabledChange,
             icon = Icons.Outlined.Assessment,
@@ -155,8 +159,8 @@ fun FeaturesSettings(
 
         Spacer(modifier = Modifier.height(4.dp))
         SettingsToggle(
-            title = "Trend Milestones",
-            description = "Celebrate achievements like focus streaks and usage milestones",
+            title = stringResource(R.string.trend_milestones),
+            description = stringResource(R.string.trend_milestones_desc),
             checked = preferences.trendMilestoneEnabled,
             onCheckedChange = onTrendMilestoneEnabledChange,
             icon = Icons.Outlined.EmojiEvents,
@@ -164,11 +168,11 @@ fun FeaturesSettings(
         )
 
         Spacer(modifier = Modifier.height(16.dp))
-        PreferenceCategory(title = "Entry Control")
+        PreferenceCategory(title = stringResource(R.string.settings_entry_control))
 
         SettingsToggle(
-            title = "Mindful Gateway",
-            description = "Interrupt every non-whitelisted app with a mindful pause, even without a specific shield",
+            title = stringResource(R.string.mindful_gateway),
+            description = stringResource(R.string.mindful_gateway_desc),
             checked = preferences.mindfulGatewayEnabled,
             onCheckedChange = onMindfulGatewayEnabledChange,
             icon = Icons.Outlined.AutoFixHigh,
@@ -179,15 +183,15 @@ fun FeaturesSettings(
         val isDisablingIncentiveLock = preferences.incentiveLockDisableRequestTimestamp > 0
 
         SettingsToggle(
-            title = "Incentive Lock",
-            description = "Require 100% goal completion for all apps before allowing free use of shielded apps",
+            title = stringResource(R.string.incentive_lock),
+            description = stringResource(R.string.incentive_lock_desc),
             checked = preferences.incentiveLockEnabled,
             onCheckedChange = { enabled ->
                 if (enabled) {
                     if (goalCount > 0) {
                         onIncentiveLockEnabledChange(true)
                     } else {
-                        Toast.makeText(context, "Please add at least one app goal first", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.incentive_lock_add_goal_first), Toast.LENGTH_SHORT).show()
                     }
                 } else {
                     showConfirmSheet = true
@@ -242,7 +246,7 @@ fun FeaturesSettings(
                         Spacer(modifier = Modifier.width(16.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                "Disabling Incentive Lock...",
+                                stringResource(R.string.disabling_incentive_lock),
                                 style = MaterialTheme.typography.titleSmall,
                                 color = MaterialTheme.colorScheme.onErrorContainer
                             )
@@ -257,7 +261,7 @@ fun FeaturesSettings(
                             )
                         }
                         IconButton(onClick = onIncentiveLockCancelDisableRequest) {
-                            Icon(Icons.Outlined.Close, contentDescription = "Cancel", tint = MaterialTheme.colorScheme.error)
+                            Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.cancel), tint = MaterialTheme.colorScheme.error)
                         }
                     }
                 }
@@ -266,19 +270,19 @@ fun FeaturesSettings(
 
         Spacer(modifier = Modifier.height(4.dp))
         SettingsActionItem(
-            title = "Grace Period",
-            summary = "Set a time window where all apps become unblocked",
+            title = stringResource(R.string.grace_period),
+            summary = stringResource(R.string.grace_period_desc),
             onClick = onNavigateToGracePeriod,
             icon = Icons.Outlined.FreeBreakfast,
             shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
         )
 
         Spacer(modifier = Modifier.height(16.dp))
-        PreferenceCategory(title = "Triggers")
+        PreferenceCategory(title = stringResource(R.string.settings_triggers))
 
         SettingsToggle(
-            title = "Pause Media",
-            description = "Automatically pause media when an overlay appears",
+            title = stringResource(R.string.pause_media),
+            description = stringResource(R.string.pause_media_desc),
             checked = preferences.interceptAudioFocusEnabled,
             onCheckedChange = onInterceptAudioFocusEnabledChange,
             icon = Icons.Outlined.MusicNote,
@@ -287,8 +291,8 @@ fun FeaturesSettings(
 
         Spacer(modifier = Modifier.height(4.dp))
         SettingsToggle(
-            title = "Early Kick",
-            description = "Optionally eject from apps 5 minutes before your time limit expires",
+            title = stringResource(R.string.early_kick),
+            description = stringResource(R.string.early_kick_desc),
             checked = preferences.earlyKickEnabled,
             onCheckedChange = onEarlyKickEnabledChange,
             icon = Icons.Outlined.ExitToApp,
@@ -297,8 +301,8 @@ fun FeaturesSettings(
 
         Spacer(modifier = Modifier.height(4.dp))
         SettingsToggle(
-            title = "Battery Usage Reset",
-            description = "Track app usage since last charge and provide a reset option in app details",
+            title = stringResource(R.string.battery_usage_reset),
+            description = stringResource(R.string.battery_usage_reset_desc),
             checked = preferences.batteryStatsResetEnabled,
             onCheckedChange = onBatteryStatsResetEnabledChange,
             icon = Icons.Outlined.BatteryChargingFull,
@@ -346,7 +350,7 @@ fun ForegroundNotificationStatusSelector(
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Status Notification",
+                        text = stringResource(R.string.status_notification),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
                     )
@@ -407,7 +411,7 @@ fun HUDAppearanceSettings(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                text = "HUD Appearance",
+                text = stringResource(R.string.hud_appearance),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
@@ -427,7 +431,7 @@ fun HUDAppearanceSettings(
                 Icon(Icons.Outlined.PhotoSizeSelectLarge, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Text(
-                text = "Size: ${localSize.toInt()}%",
+                text = stringResource(R.string.hud_size, localSize.toInt()),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.align(Alignment.CenterHorizontally)
@@ -447,7 +451,7 @@ fun HUDAppearanceSettings(
                 Icon(Icons.Outlined.Contrast, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Text(
-                text = "Opacity: ${localOpacity.toInt()}%",
+                text = stringResource(R.string.hud_opacity, localOpacity.toInt()),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.align(Alignment.CenterHorizontally)
@@ -456,7 +460,7 @@ fun HUDAppearanceSettings(
             Spacer(modifier = Modifier.height(24.dp))
             
             Text(
-                text = "Preview",
+                text = stringResource(R.string.preview),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                 modifier = Modifier.align(Alignment.CenterHorizontally)

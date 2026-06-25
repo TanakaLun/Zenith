@@ -51,9 +51,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
 import coil.compose.AsyncImage
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
+import com.etrisad.zenith.R
 import com.etrisad.zenith.data.local.entity.FocusType
 import com.etrisad.zenith.ui.components.ZenithButton
 import com.etrisad.zenith.ui.components.ZenithButtonWeighted
@@ -262,27 +264,11 @@ fun HomeScreenContent(
                     
                     val message = if (showFreshInstallWarning) {
                         buildAnnotatedString {
-                            append("Today's data may be ")
-                            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-                                append("inaccurate")
-                            }
-                            append(" because Zenith is still collecting your usage patterns. We recommend using Zenith for at least ")
-                            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-                                append("3 days")
-                            }
-                            append(" for more accurate tracking and insights.")
+                            append(stringResource(R.string.data_warning_fresh))
                         }
                     } else {
                         buildAnnotatedString {
-                            append("The data for the selected day is taken directly from the usage system and may ")
-                            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-                                append("not be entirely accurate")
-                            }
-                            append(". So take it with a ")
-                            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-                                append("grain of salt")
-                            }
-                            append(".")
+                            append(stringResource(R.string.data_warning_system))
                         }
                     }
 
@@ -356,7 +342,7 @@ fun HomeScreenContent(
 
             item(key = "goals_header") {
                 ShieldSortHeader(
-                    title = "Active Goals",
+                    title = stringResource(R.string.active_goals),
                     currentSortType = uiState.goalSortType,
                     onSortTypeChange = onGoalSortTypeChange
                 )
@@ -372,7 +358,7 @@ fun HomeScreenContent(
                             containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                         )
                     ) {
-                        EmptyShieldsMessage(message = "No active goals. Go to Focus to add one!")
+                        EmptyShieldsMessage(message = stringResource(R.string.no_active_goals))
                     }
                 }
             } else {
@@ -382,7 +368,7 @@ fun HomeScreenContent(
             item(key = "shields_header") {
                 Spacer(modifier = Modifier.height(24.dp))
                 ShieldSortHeader(
-                    title = "Active Shields",
+                    title = stringResource(R.string.active_shields),
                     currentSortType = uiState.shieldSortType,
                     onSortTypeChange = onShieldSortTypeChange
                 )
@@ -420,13 +406,13 @@ fun HomeScreenContent(
                             Spacer(modifier = Modifier.width(16.dp))
                             Column {
                                 Text(
-                                    text = "Shields are currently locked",
+                                    text = stringResource(R.string.shields_are_locked),
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
                                 Text(
-                                    text = "Reach 100% on all your app goals to unlock your shielded apps and use them freely!",
+                                    text = stringResource(R.string.shields_locked_desc),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                                 )
@@ -445,7 +431,7 @@ fun HomeScreenContent(
                             containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                         )
                     ) {
-                        EmptyShieldsMessage(message = "No active shields. Go to Focus to add one!")
+                        EmptyShieldsMessage(message = stringResource(R.string.no_active_shields))
                     }
                 }
             } else {
@@ -519,7 +505,7 @@ fun UsageDashboard(
                 }
 
                 Text(
-                    text = "Daily Screen Time",
+                    text = stringResource(R.string.daily_screen_time),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -532,7 +518,7 @@ fun UsageDashboard(
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Edit,
-                        contentDescription = "Set Target",
+                        contentDescription = stringResource(R.string.set_target),
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp)
                     )
@@ -602,9 +588,9 @@ fun UsageDashboard(
                 ) { (exceeded, remaining) ->
                     Text(
                         text = if (exceeded)
-                            "Limit exceeded! Time to rest and reset for tomorrow."
+                            stringResource(R.string.limit_exceeded)
                         else
-                            "Target: ${formatDuration(targetMillis)} (${formatDuration(remaining)} left)",
+                            stringResource(R.string.target_format, formatDuration(targetMillis), formatDuration(remaining)),
                         style = MaterialTheme.typography.bodyMedium,
                         color = if (exceeded) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
@@ -676,12 +662,12 @@ fun ScreenTimeTargetBottomSheet(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "Daily Screen Time Target",
+                text = stringResource(R.string.daily_screen_time_target),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "Set a goal to help you stay mindful of your device usage.",
+                text = stringResource(R.string.daily_screen_time_target_desc),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -698,7 +684,7 @@ fun ScreenTimeTargetBottomSheet(
                     value = hours,
                     onValueChange = { hours = it },
                     range = 0..23,
-                    label = "Hours"
+                    label = stringResource(R.string.hours_label)
                 )
                 Text(
                     ":",
@@ -709,7 +695,7 @@ fun ScreenTimeTargetBottomSheet(
                     value = minutes,
                     onValueChange = { minutes = it },
                     range = 0..59,
-                    label = "Minutes"
+                    label = stringResource(R.string.minutes_label)
                 )
             }
 
@@ -744,7 +730,7 @@ fun ScreenTimeTargetBottomSheet(
                                 onSave(0)
                             }
                         },
-                        text = "Remove",
+                        text = stringResource(R.string.remove),
                         type = ZenithButtonType.Tonal,
                         containerColor = MaterialTheme.colorScheme.errorContainer,
                         contentColor = MaterialTheme.colorScheme.onErrorContainer,
@@ -761,7 +747,7 @@ fun ScreenTimeTargetBottomSheet(
                             onSave(hours * 60 + minutes)
                         }
                     },
-                    text = "Save Target",
+                    text = stringResource(R.string.save_target),
                     weight = 1.5f,
                     isFirst = initialMinutes <= 0,
                     isLast = true
@@ -790,7 +776,7 @@ fun UsageTrendsRow(
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    "Yesterday",
+                    stringResource(R.string.yesterday),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -812,7 +798,7 @@ fun UsageTrendsRow(
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    "Trend",
+                    stringResource(R.string.trend),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -887,7 +873,7 @@ fun TopAppsSection(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Top Used Apps",
+                    text = stringResource(R.string.top_used_apps),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f)
@@ -926,7 +912,7 @@ fun TopAppsSection(
 
                 Icon(
                     imageVector = if (expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
-                    contentDescription = if (expanded) "Collapse" else "Expand"
+                    contentDescription = if (expanded) stringResource(R.string.collapse) else stringResource(R.string.expand)
                 )
             }
 
@@ -1033,7 +1019,7 @@ fun TopAppsSection(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "See Full List",
+                                text = stringResource(R.string.see_full_list),
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
@@ -1154,20 +1140,20 @@ fun QuickActionsSection(
     ) {
         QuickActionCard(
             icon = Icons.Outlined.Alarm,
-            label = "Alarm"
+            label = stringResource(R.string.alarm)
         )
         QuickActionCard(
             icon = Icons.Outlined.Timer,
-            label = "Pomodoro"
+            label = stringResource(R.string.pomodoro)
         )
         QuickActionCard(
             icon = Icons.Outlined.Insights,
-            label = "Stats",
+            label = stringResource(R.string.stats),
             onClick = onStatsClick
         )
         QuickActionCard(
             icon = Icons.Outlined.Bedtime,
-            label = if (bedtimeStatus.isActive && showRemainingTime) bedtimeStatus.timeRemaining else "Bedtime",
+            label = if (bedtimeStatus.isActive && showRemainingTime) bedtimeStatus.timeRemaining else stringResource(R.string.bedtime),
             onClick = onBedtimeClick,
             content = if (bedtimeStatus.isActive) {
                 {
@@ -1224,7 +1210,7 @@ fun QuickActionCard(
                         if (onClick != null) {
                             onClick()
                         } else {
-                            Toast.makeText(context, "Coming Soon", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.coming_soon), Toast.LENGTH_SHORT).show()
                         }
                     }
                 ),
@@ -1362,7 +1348,7 @@ fun ShieldItem(
                     )
                 },
                 supportingContent = {
-                    val timeLabel = if (shield.type == FocusType.GOAL) "To Go" else "Left"
+                    val timeLabel = if (shield.type == FocusType.GOAL) stringResource(R.string.to_go) else stringResource(R.string.left)
                     
                     AnimatedContent(
                         targetState = Triple(usesExhausted, remainingMillis, remainingResetMillis),
@@ -1372,7 +1358,7 @@ fun ShieldItem(
                         label = "ShieldRemainingTimeAnimation"
                     ) { (isExhausted, remaining, resetMillis) ->
                         val mainText = if (isExhausted && resetMillis > 0) {
-                            "Uses Exhausted • Reset in ${formatDuration(resetMillis)}"
+                            "${stringResource(R.string.uses_exhausted)} • ${stringResource(R.string.reset_in_format, formatDuration(resetMillis))}"
                         } else {
                             "${formatDuration(remaining)} $timeLabel"
                         }

@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.graphics.shapes.toPath
 import com.etrisad.zenith.BuildConfig
 import com.etrisad.zenith.R
+import androidx.compose.ui.res.stringResource
 
 @Composable
 fun AboutSettings(
@@ -48,7 +49,7 @@ fun AboutSettings(
     val versionName = BuildConfig.VERSION_NAME
 
     Column {
-        PreferenceCategory(title = "About")
+        PreferenceCategory(title = stringResource(R.string.settings_about))
 
         AppInfoCard(
             versionName = versionName,
@@ -60,7 +61,7 @@ fun AboutSettings(
         if (BuildConfig.SHOW_UPDATES) {
             Spacer(modifier = Modifier.height(4.dp))
             AboutActionCard(
-                title = if (isCheckingForUpdate) "Checking for update..." else "Check for Update",
+                title = if (isCheckingForUpdate) stringResource(R.string.checking_for_update) else stringResource(R.string.check_for_update),
                 icon = Icons.Outlined.Update,
                 shape = RoundedCornerShape(8.dp),
                 onClick = onCheckForUpdate
@@ -68,8 +69,8 @@ fun AboutSettings(
 
             Spacer(modifier = Modifier.height(4.dp))
             SettingsToggle(
-                title = "Check update on start",
-                description = "Automatically check for updates when the app starts",
+                title = stringResource(R.string.check_update_on_start),
+                description = stringResource(R.string.check_update_on_start_desc),
                 checked = checkUpdateOnStart,
                 onCheckedChange = onCheckUpdateOnStartChange,
                 icon = Icons.Outlined.SystemUpdate,
@@ -78,7 +79,7 @@ fun AboutSettings(
 
             Spacer(modifier = Modifier.height(4.dp))
             AboutActionCard(
-                title = "View Changelog",
+                title = stringResource(R.string.view_changelog),
                 icon = Icons.Outlined.History,
                 shape = RoundedCornerShape(8.dp),
                 onClick = onViewChangelog
@@ -89,7 +90,7 @@ fun AboutSettings(
         DeveloperCard(
             name = "1372Slash",
             onGithubClick = {
-                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/1372Slash"))
+                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/TanakaLun"))
                 context.startActivity(intent)
             },
             onWebsiteClick = {
@@ -105,22 +106,22 @@ fun AboutSettings(
 
         Spacer(modifier = Modifier.height(4.dp))
         AboutActionCard(
-            title = "View Repository",
+            title = stringResource(R.string.view_repository),
             icon = Icons.Outlined.Code,
             shape = RoundedCornerShape(8.dp),
             onClick = {
-                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/1372Slash/Zenith"))
+                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/TanakaLun/Zenith"))
                 context.startActivity(intent)
             }
         )
 
         Spacer(modifier = Modifier.height(4.dp))
         AboutActionCard(
-            title = "GNU General Public Licence v3.0",
+            title = stringResource(R.string.license_gnu),
             icon = Icons.Outlined.Description,
             shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp),
             onClick = {
-                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/1372Slash/Zenith/blob/master/LICENSE"))
+                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/TanakaLun/Zenith/blob/master/LICENSE"))
                 context.startActivity(intent)
             }
         )
@@ -160,11 +161,11 @@ fun AppInfoCard(
                     if (clickCount >= 3) {
                         onDeveloperModeChange(true)
                         haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                        Toast.makeText(context, "Developer mode enabled!", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.developer_mode_enabled), Toast.LENGTH_SHORT).show()
                         clickCount = 0
                     } else {
                         val remaining = 3 - clickCount
-                        Toast.makeText(context, "Tap $remaining more times for Developer Mode", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.tap_more_for_dev_mode, remaining), Toast.LENGTH_SHORT).show()
                     }
                 }
             },
@@ -262,7 +263,7 @@ fun DeveloperCard(
             Spacer(modifier = Modifier.width(16.dp))
             
             Text(
-                text = "Created by $name",
+                text = stringResource(R.string.created_by, name),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f)

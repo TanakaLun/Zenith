@@ -38,6 +38,8 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.etrisad.zenith.data.remote.model.GitHubRelease
 import com.etrisad.zenith.ui.theme.ZenithTheme
+import com.etrisad.zenith.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import kotlinx.coroutines.launch
 
@@ -179,7 +181,7 @@ fun ChangelogBottomSheet(
                 }
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    text = "Changelog History",
+                    text = stringResource(R.string.changelog_history),
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.ExtraBold
                 )
@@ -432,7 +434,7 @@ fun UpdateBottomSheetContent(
                 ZenithButtonWeighted(
                     onClick = onDismiss,
                     weight = 1f,
-                    text = "Later",
+                    text = stringResource(R.string.later),
                     type = ZenithButtonType.Tonal,
                     size = ZenithButtonSize.ExtraLarge,
                     isFirst = true,
@@ -442,7 +444,7 @@ fun UpdateBottomSheetContent(
                 ZenithButtonWeighted(
                     onClick = onUpdate,
                     weight = 1.5f,
-                    text = "Update",
+                    text = stringResource(R.string.update),
                     icon = Icons.Outlined.Download,
                     type = ZenithButtonType.Filled,
                     size = ZenithButtonSize.ExtraLarge,
@@ -487,7 +489,7 @@ private fun UpdateHeaderSection(
         Spacer(modifier = Modifier.height(24.dp))
 
         Text(
-            text = "New Version Available",
+            text = stringResource(R.string.new_version_available),
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.ExtraBold,
             textAlign = TextAlign.Center
@@ -906,9 +908,9 @@ fun UpdateBottomSheetPreview() {
                         ## New Features
                         * ✨ **Material 3 Expressive**: New floating tab bar.
                         * 🚀 **GitHub Update Checker**: Fast updates.
-                        ![Preview Image](https://raw.githubusercontent.com/1372Slash/Zenith/master/art/preview.png)
+                        ![Preview Image](https://raw.githubusercontent.com/TanakaLun/Zenith/master/art/preview.png)
                         
-                        <img src="https://raw.githubusercontent.com/1372Slash/Zenith/master/art/banner.png" alt="Banner" />
+                        <img src="https://raw.githubusercontent.com/TanakaLun/Zenith/master/art/banner.png" alt="Banner" />
 
                         ## Improvements
                         ### Performance
@@ -918,7 +920,7 @@ fun UpdateBottomSheetPreview() {
                         
                         This version is the result of many weeks of work.
                     """.trimIndent(),
-                    htmlUrl = "https://github.com/1372Slash/Zenith",
+                    htmlUrl = "https://github.com/TanakaLun/Zenith",
                     assets = emptyList()
                 ),
                 containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,

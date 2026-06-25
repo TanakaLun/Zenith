@@ -1,6 +1,371 @@
 <resources>
+    <!-- App -->
     <string name="app_name">Zenith</string>
     <string name="accessibility_service_description">Zenith uses this service to monitor which apps are open and show focus shields when your time limit is reached.</string>
     <string name="global_streak_widget_description">Track your total focused days across all apps.</string>
     <string name="app_streak_widget_description">Track your focus streak for a specific app.</string>
+
+    <!-- Common -->
+    <string name="ok">OK</string>
+    <string name="cancel">Cancel</string>
+    <string name="save">Save</string>
+    <string name="delete">Delete</string>
+    <string name="edit">Edit</string>
+    <string name="close">Close</string>
+    <string name="continue_to_app">Continue to App</string>
+    <string name="grant">Grant</string>
+    <string name="search_apps">Search apps…</string>
+    <string name="preview">Preview</string>
+    <string name="coming_soon">Coming Soon</string>
+    <string name="collapse">Collapse</string>
+    <string name="expand">Expand</string>
+    <string name="reset">Reset</string>
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
+    <string name="apply">Apply</string>
+
+    <!-- Settings Screen -->
+    <string name="categories">Categories</string>
+    <string name="settings_general">General</string>
+    <string name="settings_about">About</string>
+    <string name="settings_theming">Theming</string>
+    <string name="settings_layout_and_navigation">Layout &amp; Navigation</string>
+    <string name="settings_interface_overlays">Interface Overlays</string>
+    <string name="settings_notifications">Notifications</string>
+    <string name="settings_entry_control">Entry Control</string>
+    <string name="settings_triggers">Triggers</string>
+    <string name="settings_backup_and_restore">Backup &amp; Restore</string>
+    <string name="settings_sync_and_maintenance">Sync &amp; Maintenance</string>
+    <string name="settings_performance_profile">Performance Profile</string>
+    <string name="settings_instant_detection">Instant Detection</string>
+    <string name="settings_custom_tuning">Custom Tuning</string>
+
+    <!-- Settings Categories -->
+    <string name="category_features">Features</string>
+    <string name="category_features_desc">Mindful Gateway, Session Overlay, Early Kick, and more</string>
+    <string name="category_appearance">Appearance</string>
+    <string name="category_appearance_desc">Theme, Fonts, Dynamic Colors, and Layout</string>
+    <string name="category_performance">Performance</string>
+    <string name="category_performance_desc">Responsiveness &amp; battery balance</string>
+    <string name="category_data_management">Data Management</string>
+    <string name="category_data_management_desc">Backup, Restore, and Usage Sync</string>
+    <string name="category_developer">Developer</string>
+    <string name="category_developer_desc">Advanced debugging and experimental tools</string>
+
+    <!-- General Settings -->
+    <string name="permissions">Permissions</string>
+    <string name="permissions_desc">Manage required and optional system permissions</string>
+    <string name="permissions_missing_desc">Some required permissions are not granted</string>
+    <string name="emergency_recharge_time">Emergency Recharge Time</string>
+    <string name="daily_screen_time_target">Daily Screen Time Target</string>
+    <string name="app_opening_delay">App Opening Delay</string>
+    <string name="whitelist_apps">Whitelist Apps</string>
+    <string name="apps_bypassed">%d apps bypassed</string>
+
+    <!-- Emergency Recharge -->
+    <string name="emergency_recharge">Emergency Recharge</string>
+    <string name="emergency_recharge_desc">Set how long it takes to recover one emergency use count.</string>
+    <string name="save_duration">Save Duration</string>
+    <string name="charge_per_label">1 charge every %1$s</string>
+
+    <!-- Delay App -->
+    <string name="app_opening_delay_desc">Set how many seconds to wait before a user can reopen an app after being kicked out.</string>
+    <string name="save_delay">Save Delay</string>
+
+    <!-- Screen Time Target -->
+    <string name="daily_screen_time_target_desc">Set a goal to help you stay mindful of your device usage.</string>
+    <string name="hours_label">Hours</string>
+    <string name="minutes_label">Minutes</string>
+    <string name="remove">Remove</string>
+    <string name="save_target">Save Target</string>
+    <string name="limit_exceeded">Limit exceeded! Time to rest and reset for tomorrow.</string>
+    <string name="target_format">Target: %1$s (%2$s left)</string>
+
+    <!-- Features Settings -->
+    <string name="total_usage_pill">Total Usage Pill</string>
+    <string name="total_usage_pill_desc">Show your total screen time in the mindful pause overlay</string>
+    <string name="session_usage_overlay">Session Usage Overlay</string>
+    <string name="session_usage_overlay_desc">Show a floating HUD with remaining time when an app is allowed</string>
+    <string name="show_current_event">Show Current Event</string>
+    <string name="show_current_event_desc">Show your current calendar event with progress during app delay</string>
+    <string name="show_current_event_no_permission">Grant Calendar Access permission in Settings to enable</string>
+    <string name="status_notification">Status Notification</string>
+    <string name="status_notification_desc">Choose what Zenith shows while monitoring is active</string>
+    <string name="notification_usage">Usage</string>
+    <string name="notification_focus">Focus</string>
+    <string name="notification_default">Default</string>
+    <string name="daily_focus_recap">Daily Focus Recap</string>
+    <string name="daily_focus_recap_desc">Receive a daily summary of your total focus time and screen usage each evening</string>
+    <string name="weekly_insight">Weekly Insight</string>
+    <string name="weekly_insight_desc">Get a weekly breakdown comparing your focus trends across the week</string>
+    <string name="trend_milestones">Trend Milestones</string>
+    <string name="trend_milestones_desc">Celebrate achievements like focus streaks and usage milestones</string>
+    <string name="mindful_gateway">Mindful Gateway</string>
+    <string name="mindful_gateway_desc">Interrupt every non-whitelisted app with a mindful pause, even without a specific shield</string>
+    <string name="incentive_lock">Incentive Lock</string>
+    <string name="incentive_lock_desc">Require 100% goal completion for all apps before allowing free use of shielded apps</string>
+    <string name="incentive_lock_add_goal_first">Please add at least one app goal first</string>
+    <string name="disabling_incentive_lock">Disabling Incentive Lock…</string>
+    <string name="feature_will_be_disabled_in">Feature will be disabled in %1$s (around %2$s)</string>
+    <string name="grace_period">Grace Period</string>
+    <string name="grace_period_desc">Set a time window where all apps become unblocked</string>
+    <string name="pause_media">Pause Media</string>
+    <string name="pause_media_desc">Automatically pause media when an overlay appears</string>
+    <string name="early_kick">Early Kick</string>
+    <string name="early_kick_desc">Optionally eject from apps 5 minutes before your time limit expires</string>
+    <string name="battery_usage_reset">Battery Usage Reset</string>
+    <string name="battery_usage_reset_desc">Track app usage since last charge and provide a reset option in app details</string>
+
+    <!-- Appearance Settings -->
+    <string name="theme_mode">Theme Mode</string>
+    <string name="theme_system">System</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="font_style">Font Style</string>
+    <string name="font_system">System</string>
+    <string name="dynamic_color">Dynamic Color</string>
+    <string name="dynamic_color_desc">Apply system wallpaper colors (Android 12+)</string>
+    <string name="expressive_color_set">Expressive Color Set</string>
+    <string name="expressive_color_set_desc">Tone down backgrounds and make containers standout</string>
+    <string name="floating_tab_bar">Floating Tab Bar</string>
+    <string name="floating_tab_bar_desc">Use the new Material 3 Expressive floating navigation</string>
+    <string name="overlay_appearance">Overlay Appearance</string>
+    <string name="overlay_appearance_desc">Customize bottom sheet colors, opacity, and sizing</string>
+    <string name="customize_gs_flex">Customize GS Flex Variations</string>
+
+    <!-- Data Management Settings -->
+    <string name="auto_backup">Auto Backup</string>
+    <string name="auto_backup_desc">Periodically backup your database to a folder</string>
+    <string name="auto_backup_config">Auto Backup Configuration</string>
+    <string name="backup_location">Backup Location</string>
+    <string name="location_inaccessible">Location inaccessible</string>
+    <string name="not_selected">Not selected</string>
+    <string name="selected_folder">Selected Folder</string>
+    <string name="last_backup">Last Backup</string>
+    <string name="never">Never</string>
+    <string name="backup_interval">Backup Interval</string>
+    <string name="backup_now">Backup Now</string>
+    <string name="backup_started">Backup started…</string>
+    <string name="manual_backup">Manual Backup</string>
+    <string name="manual_backup_desc">Save your settings and schedules to a file now</string>
+    <string name="restore_data">Restore Data</string>
+    <string name="restore_data_desc">Load data from a previous backup file</string>
+    <string name="sync_on_entry">Sync on Entry</string>
+    <string name="sync_on_entry_desc">Refresh usage stats every time you open the stats screen. Enable this if you experience data inconsistency.</string>
+    <string name="backup_successful">Backup successful!</string>
+    <string name="backup_failed">Backup failed: %1$s</string>
+    <string name="invalid_backup_file">Invalid backup file</string>
+    <string name="restore_successful">Restore successful! Restarting app…</string>
+    <string name="restore_failed">Restore failed: %1$s</string>
+    <string name="apply_settings_first">Apply settings first before leaving</string>
+
+    <!-- Performance Settings -->
+    <string name="accessibility_service">Accessibility Service</string>
+    <string name="accessibility_active_desc">Service is active and detecting launches instantly</string>
+    <string name="accessibility_inactive_desc">Detect app launches instantly for peak performance</string>
+    <string name="make_as_requirement">Make as Requirement</string>
+    <string name="make_as_requirement_desc">Require Accessibility Service to be granted for permission checks</string>
+    <string name="parameter_details">Parameter Details</string>
+    <string name="parameter_details_expanded">Drag any slider then tap Apply to save</string>
+    <string name="parameter_details_collapsed">Tap to expand custom tuning</string>
+    <string name="check_interval">Check Interval</string>
+    <string name="power_saving">Power Saving</string>
+    <string name="data_refresh">Data Refresh</string>
+    <string name="storage">Storage</string>
+    <string name="scan_timing">Scan Timing</string>
+    <string name="scan_timing_desc">Fine-tune monitoring frequency for each scenario</string>
+    <string name="power_and_overlay">Power &amp; Overlay</string>
+    <string name="goal_shield">Goal Shield</string>
+    <string name="regular_shield">Regular Shield</string>
+    <string name="default">Default</string>
+    <string name="reset_all">Reset All</string>
+    <string name="custom_profile_hint">Custom profile lets you tune every parameter manually</string>
+    <string name="battery_warning_desc">This preset reduces background checking frequency to save battery. Consider enabling Accessibility Service for instant app detection without polling.</string>
+    <string name="use_anyway">Use Anyway</string>
+
+    <!-- About Settings -->
+    <string name="check_for_update">Check for Update</string>
+    <string name="checking_for_update">Checking for update…</string>
+    <string name="check_update_on_start">Check update on start</string>
+    <string name="check_update_on_start_desc">Automatically check for updates when the app starts</string>
+    <string name="view_changelog">View Changelog</string>
+    <string name="view_repository">View Repository</string>
+    <string name="license_gnu">GNU General Public Licence v3.0</string>
+    <string name="created_by">Created by %1$s</string>
+    <string name="zenith_is_up_to_date">Zenith is up to date!</string>
+    <string name="update_check_failed">Update check failed: %1$s</string>
+    <string name="failed_to_fetch_changelog">Failed to fetch changelog</string>
+    <string name="developer_mode_enabled">Developer mode enabled!</string>
+    <string name="tap_more_for_dev_mode">Tap %1$d more times for Developer Mode</string>
+    <string name="failed_to_fetch_latest_release">Failed to fetch latest release</string>
+    <string name="stats_onboarding_triggered">Stats onboarding triggered</string>
+    <string name="update_onboarding_triggered">Update onboarding triggered</string>
+    <string name="streak_recovery_completed">Streak recovery completed successfully!</string>
+    <string name="recovery_failed">Recovery failed: %1$s</string>
+
+    <!-- Update Bottom Sheet -->
+    <string name="new_version_available">New Version Available</string>
+    <string name="later">Later</string>
+    <string name="update">Update</string>
+    <string name="changelog_history">Changelog History</string>
+
+    <!-- Home Screen -->
+    <string name="daily_screen_time">Daily Screen Time</string>
+    <string name="set_target">Set Target</string>
+    <string name="yesterday">Yesterday</string>
+    <string name="trend">Trend</string>
+    <string name="top_used_apps">Top Used Apps</string>
+    <string name="see_full_list">See Full List</string>
+    <string name="active_goals">Active Goals</string>
+    <string name="active_shields">Active Shields</string>
+    <string name="no_active_goals">No active goals. Go to Focus to add one!</string>
+    <string name="no_active_shields">No active shields. Go to Focus to add one!</string>
+    <string name="shields_are_locked">Shields are currently locked</string>
+    <string name="shields_locked_desc">Reach 100% on all your app goals to unlock your shielded apps and use them freely!</string>
+    <string name="uses_exhausted">Uses Exhausted</string>
+    <string name="reset_in_format">Reset in %1$s</string>
+    <string name="to_go">To Go</string>
+    <string name="left">Left</string>
+    <string name="alarm">Alarm</string>
+    <string name="pomodoro">Pomodoro</string>
+    <string name="stats">Stats</string>
+    <string name="bedtime">Bedtime</string>
+    <string name="hours_format">%dh</string>
+    <string name="minutes_format">%dm</string>
+    <string name="seconds_format">%ds</string>
+
+    <!-- Data Warning -->
+    <string name="data_warning_fresh">Today\'s data may be inaccurate because Zenith is still collecting your usage patterns. We recommend using Zenith for at least 3 days for more accurate tracking and insights.</string>
+    <string name="data_warning_system">The data for the selected day is taken directly from the usage system and may not be entirely accurate. So take it with a grain of salt.</string>
+
+    <!-- App Detail Screen -->
+    <string name="todays_usage">Today\'s Usage</string>
+    <string name="goal_achieved">Goal achieved! Keep it up.</string>
+    <string name="goal_format">Goal: %1$s (%2$s more to go)</string>
+    <string name="limit_exceeded_app">Limit exceeded!</string>
+    <string name="limit_format">Limit: %1$s (%2$s left)</string>
+    <string name="streak">Streak</string>
+    <string name="best_streak">Best Streak</string>
+    <string name="days_today">days today</string>
+    <string name="pause_shield_goal">Pause Shield/Goal</string>
+    <string name="temporarily_disable_limits">Temporarily disable limits</string>
+    <string name="shield_paused">Shield Paused</string>
+    <string name="paused_indefinitely">Paused indefinitely</string>
+    <string name="resumes_in">Resumes in %1$s</string>
+    <string name="resume_now">Resume Now</string>
+    <string name="estimated_time">Estimated time: %1$s</string>
+    <string name="daily_average">Daily Average</string>
+    <string name="todays_opens">Today\'s Opens</string>
+    <string name="peak_usage_hour">Peak Usage Hour</string>
+    <string name="most_active_around">Most active around %1$d %2$s</string>
+    <string name="history_21_days">History (21 Days)</string>
+
+    <!-- Focus Screen -->
+    <string name="add_shield">Add Shield</string>
+    <string name="add_goal">Add Goal</string>
+    <string name="add_schedule">Add Schedule</string>
+    <string name="active_schedules">Active Schedules</string>
+    <string name="no_active_goals_yet">No active goals yet</string>
+    <string name="no_active_shields_yet">No active shields yet</string>
+    <string name="no_active_schedules_yet">No active schedules yet</string>
+
+    <!-- Bedtime Screen -->
+    <string name="bedtime_mode">Bedtime Mode</string>
+    <string name="bedtime_active_schedule">Active based on schedule</string>
+    <string name="bedtime_disabled">Currently disabled</string>
+    <string name="bedtime_ends_in">Bedtime ends in</string>
+    <string name="bedtime_starts_in">Starts in</string>
+    <string name="start">Start</string>
+    <string name="end">End</string>
+    <string name="usage_label">Usage</string>
+    <string name="history">History</string>
+    <string name="settings_label">Settings</string>
+    <string name="allowed_apps">Allowed Apps</string>
+    <string name="apps_allowed">%d apps allowed</string>
+    <string name="wind_down_notification">Wind Down Notification</string>
+    <string name="wind_down_notification_desc">Notify 30 minutes before bedtime</string>
+    <string name="do_not_disturb">Do Not Disturb</string>
+    <string name="do_not_disturb_desc">Silence notifications during bedtime</string>
+    <string name="wind_down_restrictions">Wind Down Restrictions</string>
+    <string name="wind_down_restrictions_desc">Restrict app usage 30-min before bedtime</string>
+    <string name="bedtime_activity">Bedtime Activity</string>
+    <string name="time_distribution">Time distribution</string>
+    <string name="usage_efficiency">Usage Efficiency</string>
+    <string name="usage_efficiency_good">Great job! Very low usage.</string>
+    <string name="usage_efficiency_high">High usage during bedtime.</string>
+    <string name="total_period">Total Period</string>
+    <string name="exceeded">Exceeded</string>
+    <string name="apps_used_at">Apps used at %1$s</string>
+    <string name="other_apps">Other Apps</string>
+    <string name="apps_minimal_usage">%d apps with minimal usage</string>
+    <string name="usage_toggle">Usage</string>
+    <string name="recent_toggle">Recent</string>
+
+    <!-- Grace Period Screen -->
+    <string name="grace_period_desc_active">All apps are temporarily unblocked</string>
+    <string name="grace_period_desc_info">Grace Period overrides all restrictions. Shields, schedules, and bedtime will not block any apps while active.</string>
+    <string name="grace_period_ends_in">Grace period ends in</string>
+
+    <!-- Whitelist -->
+    <string name="whitelist_title">Whitelist Apps</string>
+
+    <!-- HUD Appearance -->
+    <string name="hud_appearance">HUD Appearance</string>
+    <string name="hud_size">Size: %d%%</string>
+    <string name="hud_opacity">Opacity: %d%%</string>
+
+    <!-- Days of week -->
+    <string name="day_mon">Mon</string>
+    <string name="day_tue">Tue</string>
+    <string name="day_wed">Wed</string>
+    <string name="day_thu">Thu</string>
+    <string name="day_fri">Fri</string>
+    <string name="day_sat">Sat</string>
+    <string name="day_sun">Sun</string>
+
+    <!-- Notification Worker -->
+    <string name="daily_recap_channel">Daily Recap</string>
+    <string name="daily_recap_channel_desc">Daily focus time recap</string>
+    <string name="weekly_insight_channel">Weekly Insight</string>
+    <string name="weekly_insight_channel_desc">Weekly focus trends insight</string>
+    <string name="milestone_channel">Milestones</string>
+    <string name="milestone_channel_desc">Trend milestones and achievement notifications</string>
+
+    <!-- Shield Config -->
+    <string name="shield_type_target">target</string>
+    <string name="shield_type_limit">limit</string>
+    <string name="shield_status_productive">Productive</string>
+    <string name="shield_status_strict">Strict</string>
+    <string name="shield_status_normal">Normal</string>
+    <string name="shield_limit_format">%1$dh %2$dm %3$s</string>
+    <string name="shield_minutes_format">%1$dm %2$s</string>
+    <string name="emergency_uses_left">%1$d/%2$d emergency uses left</string>
+    <string name="emergency_uses_left_label">Max Emergency Uses</string>
+    <string name="times_of_uses">Times of Uses</string>
+    <string name="refresh_period">Refresh Period</string>
+    <string name="remind_of_goal">Remind of Goal</string>
+    <string name="remind_of_goal_desc">Zenith will nudge you to open this app</string>
+    <string name="no_hourly_data">No hourly data available</string>
+    <string name="no_app_breakdown">No app breakdown available</string>
+    <string name="how_should_we_call_you">How should we call you?</string>
+    <string name="phase_2_verification">Phase 2: Verification</string>
+    <string name="hold_circle_seconds">Hold the circle for %1$d seconds</string>
+    <string name="phase_3_processing">Phase 3: Processing</string>
+    <string name="finalizing_permission">Finalizing permission…</string>
+    <string name="access_granted">Access Granted</string>
+    <string name="how_long_should_we_pause">How long should we pause?</string>
+    <string name="last_14_days">Last 14 Days</string>
+    <string name="target_met">Target Met</string>
+    <string name="apps_hidden_by_default">%d apps hidden by default</string>
+    <string name="schedule_active">Active</string>
+    <string name="schedule_inactive">Inactive</string>
+
+    <!-- Developer Settings -->
+    <string name="update_data">Update Data</string>
+    <string name="test_goal_overlay">Test Goal Overlay</string>
+    <string name="test_update_sheet">Test Update Sheet</string>
+    <string name="trigger_onboarding_stats">Trigger Stats Onboarding</string>
+    <string name="trigger_onboarding_update">Trigger Update Onboarding</string>
+    <string name="reset_bedtime_streak">Reset Bedtime Streak</string>
+    <string name="reset_streak_recovery">Reset Streak Recovery</string>
 </resources>

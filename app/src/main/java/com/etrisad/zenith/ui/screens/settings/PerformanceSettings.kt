@@ -30,12 +30,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.etrisad.zenith.R
 import com.etrisad.zenith.data.preferences.PerformanceConfig
 import com.etrisad.zenith.data.preferences.PerformanceLevel
 import com.etrisad.zenith.data.preferences.UserPreferences
@@ -60,7 +62,7 @@ fun PerformanceSettings(
     val allLevels = PerformanceLevel.values()
     var pendingBatteryLevel by remember { mutableStateOf<PerformanceLevel?>(null) }
 
-    PreferenceCategory(title = "Performance Profile")
+    PreferenceCategory(title = stringResource(R.string.settings_performance_profile))
 
     allLevels.forEachIndexed { index, level ->
         val isSelected = preferences.performanceLevel == level
@@ -379,9 +381,9 @@ fun PerformanceTuningPanel(
         }
     }
 
-    PreferenceCategory(title = "Instant Detection")
+    PreferenceCategory(title = stringResource(R.string.settings_instant_detection))
     TuningPermissionItemRow(
-        title = "Accessibility Service",
+        title = stringResource(R.string.accessibility_service),
         description = if (hasAccessibility) "Service is active and detecting launches instantly" 
                       else "Detect app launches instantly for peak performance",
         isGranted = hasAccessibility,
@@ -396,7 +398,7 @@ fun PerformanceTuningPanel(
     )
     Spacer(modifier = Modifier.height(4.dp))
     SettingsToggle(
-        title = "Make as Requirement",
+        title = stringResource(R.string.make_as_requirement),
         description = "Require Accessibility Service to be granted for permission checks",
         checked = preferences.accessibilityRequired,
         onCheckedChange = onAccessibilityRequiredChange,
@@ -405,7 +407,7 @@ fun PerformanceTuningPanel(
     )
     Spacer(modifier = Modifier.height(16.dp))
 
-    PreferenceCategory(title = "Custom Tuning")
+    PreferenceCategory(title = stringResource(R.string.settings_custom_tuning))
 
     val tuningChevronRotation by animateFloatAsState(
         targetValue = if (tuningExpanded) 180f else 0f,
@@ -439,7 +441,7 @@ fun PerformanceTuningPanel(
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Parameter Details",
+                    text = stringResource(R.string.parameter_details),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -568,9 +570,9 @@ fun PerformanceTuningPanel(
             }
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text("Scan Timing", style = MaterialTheme.typography.titleMedium,
+                Text(stringResource(R.string.scan_timing), style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold)
-                Text("Fine-tune monitoring frequency for each scenario",
+                Text(stringResource(R.string.scan_timing_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2)
@@ -661,7 +663,7 @@ fun PerformanceTuningPanel(
                         ) {
                             Icon(Icons.Outlined.RestartAlt, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(4.dp))
-                            Text("Reset All", style = MaterialTheme.typography.labelMedium)
+                            Text(stringResource(R.string.reset_all), style = MaterialTheme.typography.labelMedium)
                         }
                     }
                 }
@@ -844,14 +846,14 @@ private fun BatteryWarningBottomSheet(
             ZenithGroupedButton(size = ZenithButtonSize.Large) {
                 ZenithButtonWeighted(
                     onClick = onDismiss,
-                    text = "Cancel",
+                    text = stringResource(R.string.cancel),
                     type = ZenithButtonType.Outlined,
                     isLast = false,
                     size = ZenithButtonSize.ExtraLarge
                 )
                 ZenithButtonWeighted(
                     onClick = onConfirm,
-                    text = "Use Anyway",
+                    text = stringResource(R.string.use_anyway),
                     type = ZenithButtonType.Filled,
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,

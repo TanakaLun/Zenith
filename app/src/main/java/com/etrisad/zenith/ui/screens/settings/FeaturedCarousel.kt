@@ -176,7 +176,7 @@ fun FeaturedCarousel(
                 icon = Icons.Outlined.Star,
                 isTertiary = true,
                 onClick = {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/1372Slash/Zenith"))
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/TanakaLun/Zenith"))
                     context.startActivity(intent)
                 }
             )

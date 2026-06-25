@@ -32,6 +32,8 @@ import androidx.compose.ui.unit.dp
 import com.etrisad.zenith.data.local.entity.ScheduleEntity
 import com.etrisad.zenith.data.local.entity.ScheduleMode
 import com.etrisad.zenith.data.preferences.UserPreferences
+import com.etrisad.zenith.R
+import androidx.compose.ui.res.stringResource
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
 import com.etrisad.zenith.ui.components.ZenithButton
 import com.etrisad.zenith.ui.components.ZenithButtonSize
@@ -260,7 +262,7 @@ fun ScheduleSettingsBottomSheet(
                 OutlinedTextField(
                     value = maxEmergencyUses,
                     onValueChange = { if (it.all { char -> char.isDigit() }) maxEmergencyUses = it },
-                    label = { Text("Max Emergency Uses") },
+                    label = { Text(stringResource(R.string.emergency_uses_left_label)) },
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                         keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
@@ -348,8 +350,8 @@ fun TimePickerDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        confirmButton = { TextButton(onClick = onConfirm) { Text("OK") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        confirmButton = { TextButton(onClick = onConfirm) { Text(stringResource(R.string.ok)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
         text = { content() }
     )
 }

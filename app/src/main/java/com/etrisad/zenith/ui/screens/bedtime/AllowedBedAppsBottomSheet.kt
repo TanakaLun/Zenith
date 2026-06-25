@@ -27,6 +27,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.etrisad.zenith.ui.components.ZenithContainedLoadingIndicator
 import com.etrisad.zenith.ui.screens.settings.WhitelistAppInfo
+import com.etrisad.zenith.R
+import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -149,7 +151,7 @@ fun AllowedBedAppsBottomSheet(
                                 onSearch = { },
                                 expanded = false,
                                 onExpandedChange = {},
-                                placeholder = { Text("Search apps...") },
+                                placeholder = { Text(stringResource(R.string.search_apps)) },
                                 leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
                                 trailingIcon = {
                                     if (searchQuery.isNotEmpty()) {

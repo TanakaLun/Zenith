@@ -7,10 +7,14 @@ import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.etrisad.zenith.R
 import com.etrisad.zenith.data.preferences.FontOption
 import com.etrisad.zenith.data.preferences.ThemeConfig
 import com.etrisad.zenith.data.preferences.UserPreferences
+import com.etrisad.zenith.R
+import androidx.compose.ui.res.stringResource
 
 @Composable
 fun AppearanceSettings(
@@ -24,7 +28,7 @@ fun AppearanceSettings(
     onNavigateToOverlayAppearance: () -> Unit
 ) {
     Column {
-        PreferenceCategory(title = "Theming")
+        PreferenceCategory(title = stringResource(R.string.settings_theming))
 
         ThemeSelector(
             selectedTheme = preferences.themeConfig,
@@ -42,8 +46,8 @@ fun AppearanceSettings(
 
         Spacer(modifier = Modifier.height(4.dp))
         SettingsToggle(
-            title = "Dynamic Color",
-            description = "Apply system wallpaper colors (Android 12+)",
+            title = stringResource(R.string.dynamic_color),
+            description = stringResource(R.string.dynamic_color_desc),
             checked = preferences.dynamicColor,
             onCheckedChange = onDynamicColorChange,
             icon = Icons.Outlined.Palette,
@@ -52,8 +56,8 @@ fun AppearanceSettings(
 
         Spacer(modifier = Modifier.height(4.dp))
         SettingsToggle(
-            title = "Expressive Color Set",
-            description = "Tone down backgrounds and make containers standout",
+            title = stringResource(R.string.expressive_color_set),
+            description = stringResource(R.string.expressive_color_set_desc),
             checked = preferences.expressiveColors,
             onCheckedChange = onExpressiveColorsChange,
             icon = Icons.Outlined.Layers,
@@ -61,11 +65,11 @@ fun AppearanceSettings(
         )
 
         Spacer(modifier = Modifier.height(16.dp))
-        PreferenceCategory(title = "Layout & Navigation")
+        PreferenceCategory(title = stringResource(R.string.settings_layout_and_navigation))
 
         SettingsToggle(
-            title = "Floating Tab Bar",
-            description = "Use the new Material 3 Expressive floating navigation",
+            title = stringResource(R.string.floating_tab_bar),
+            description = stringResource(R.string.floating_tab_bar_desc),
             checked = preferences.floatingTabBarEnabled,
             onCheckedChange = onFloatingTabBarEnabledChange,
             icon = Icons.Outlined.Flaky,
@@ -74,8 +78,8 @@ fun AppearanceSettings(
 
         Spacer(modifier = Modifier.height(4.dp))
         SettingsActionItem(
-            title = "Overlay Appearance",
-            summary = "Customize bottom sheet colors, opacity, and sizing",
+            title = stringResource(R.string.overlay_appearance),
+            summary = stringResource(R.string.overlay_appearance_desc),
             onClick = onNavigateToOverlayAppearance,
             icon = Icons.Outlined.Style,
             shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)

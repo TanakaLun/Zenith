@@ -14,6 +14,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.etrisad.zenith.data.preferences.UserPreferences
 import com.etrisad.zenith.ui.components.ZenithButton
+import com.etrisad.zenith.R
+import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.launch
 
 @Composable
@@ -31,11 +33,11 @@ fun GeneralSettings(
     var showDelayAppSheet by remember { mutableStateOf(false) }
 
     Column {
-        PreferenceCategory(title = "General")
+        PreferenceCategory(title = stringResource(R.string.settings_general))
 
         SettingsActionItem(
-            title = "Permissions",
-            summary = if (permissionsMissing) "Some required permissions are not granted" else "Manage required and optional system permissions",
+            title = stringResource(R.string.permissions),
+            summary = if (permissionsMissing) stringResource(R.string.permissions_missing_desc) else stringResource(R.string.permissions_desc),
             onClick = onOpenPermissions,
             icon = Icons.Outlined.Security,
             shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 8.dp, bottomEnd = 8.dp),
@@ -53,7 +55,7 @@ fun GeneralSettings(
 
         Spacer(modifier = Modifier.height(4.dp))
         SettingsActionItem(
-            title = "Emergency Recharge Time",
+            title = stringResource(R.string.emergency_recharge_time),
             summary = preferences.emergencyRechargeDurationMinutes.let { mins ->
                 val label = when {
                     mins >= 1440 -> "${mins / 1440} day${if (mins / 1440 > 1) "s" else ""}"
@@ -69,7 +71,7 @@ fun GeneralSettings(
 
         Spacer(modifier = Modifier.height(4.dp))
         SettingsActionItem(
-            title = "Daily Screen Time Target",
+            title = stringResource(R.string.daily_screen_time_target),
             summary = if (preferences.screenTimeTargetMinutes > 0) {
                 val h = preferences.screenTimeTargetMinutes / 60
                 val m = preferences.screenTimeTargetMinutes % 60
@@ -82,7 +84,7 @@ fun GeneralSettings(
 
         Spacer(modifier = Modifier.height(4.dp))
         SettingsActionItem(
-            title = "App Opening Delay",
+            title = stringResource(R.string.app_opening_delay),
             summary = preferences.delayAppDurationSeconds.let { secs ->
                 val label = when {
                     secs >= 3600 -> "${secs / 3600}h"
@@ -98,8 +100,8 @@ fun GeneralSettings(
 
         Spacer(modifier = Modifier.height(4.dp))
         SettingsActionItem(
-            title = "Whitelist Apps",
-            summary = "${preferences.whitelistedPackages.size} apps bypassed",
+            title = stringResource(R.string.whitelist_apps),
+            summary = stringResource(R.string.apps_bypassed, preferences.whitelistedPackages.size),
             onClick = { onShowWhitelistSheetChange(true) },
             icon = Icons.Outlined.VerifiedUser,
             shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
@@ -162,12 +164,12 @@ fun DelayAppBottomSheet(
                 .navigationBarsPadding()
         ) {
             Text(
-                text = "App Opening Delay",
+                text = stringResource(R.string.app_opening_delay),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "Set how many seconds to wait before a user can reopen an app after being kicked out.",
+                text = stringResource(R.string.app_opening_delay_desc),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -227,7 +229,7 @@ fun DelayAppBottomSheet(
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                text = "Save Delay"
+                text = stringResource(R.string.save_delay)
             )
         }
     }
@@ -255,12 +257,12 @@ fun EmergencyRechargeBottomSheet(
                 .navigationBarsPadding()
         ) {
             Text(
-                text = "Emergency Recharge",
+                text = stringResource(R.string.emergency_recharge),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "Set how long it takes to recover one emergency use count.",
+                text = stringResource(R.string.emergency_recharge_desc),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -330,7 +332,7 @@ fun EmergencyRechargeBottomSheet(
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                text = "Save Duration"
+                text = stringResource(R.string.save_duration)
             )
         }
     }

@@ -26,6 +26,8 @@ import androidx.compose.ui.unit.dp
 import androidx.graphics.shapes.toPath
 import com.etrisad.zenith.data.preferences.UserPreferences
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
+import com.etrisad.zenith.R
+import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -270,7 +272,7 @@ fun NameEditCard(
                 value = name,
                 onValueChange = onNameChange,
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("How should we call you?") },
+                placeholder = { Text(stringResource(R.string.how_should_we_call_you)) },
                 singleLine = true,
                 shape = RoundedCornerShape(16.dp),
                 colors = OutlinedTextFieldDefaults.colors(

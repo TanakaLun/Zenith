@@ -34,6 +34,8 @@ import com.etrisad.zenith.ui.components.ZenithButtonSize
 import com.etrisad.zenith.ui.components.ZenithButtonType
 import com.etrisad.zenith.ui.components.ZenithToggleButtonGroup
 import com.etrisad.zenith.ui.components.ZenithToggleOption
+import com.etrisad.zenith.R
+import androidx.compose.ui.res.stringResource
 
 @Composable
 fun PreferenceCategory(title: String) {
@@ -271,7 +273,7 @@ fun ThemeSelector(
                 }
                 Spacer(modifier = Modifier.width(16.dp))
                 Text(
-                    text = "Theme Mode",
+                    text = stringResource(R.string.theme_mode),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                     modifier = Modifier.weight(1f)
@@ -281,9 +283,9 @@ fun ThemeSelector(
             Spacer(modifier = Modifier.height(16.dp))
             
             val themeOptions = listOf(
-                ThemeConfig.FOLLOW_SYSTEM to "System",
-                ThemeConfig.LIGHT to "Light",
-                ThemeConfig.DARK to "Dark"
+                ThemeConfig.FOLLOW_SYSTEM to stringResource(R.string.theme_system),
+                ThemeConfig.LIGHT to stringResource(R.string.theme_light),
+                ThemeConfig.DARK to stringResource(R.string.theme_dark)
             )
 
             ZenithToggleButtonGroup(
@@ -334,7 +336,7 @@ fun FontSelector(
                 }
                 Spacer(modifier = Modifier.width(16.dp))
                 Text(
-                    text = "Font Style",
+                    text = stringResource(R.string.font_style),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                     modifier = Modifier.weight(1f)
@@ -362,7 +364,7 @@ fun FontSelector(
                 ZenithButton(
                     onClick = onCustomizeGSFlex,
                     modifier = Modifier.fillMaxWidth(),
-                    text = "Customize GS Flex Variations",
+                    text = stringResource(R.string.customize_gs_flex),
                     icon = Icons.Outlined.SettingsSuggest,
                     type = ZenithButtonType.Outlined,
                     size = ZenithButtonSize.Large

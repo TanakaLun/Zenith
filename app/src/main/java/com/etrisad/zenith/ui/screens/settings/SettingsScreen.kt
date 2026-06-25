@@ -13,11 +13,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import com.etrisad.zenith.R
 import com.etrisad.zenith.data.manager.GitHubUpdateManager
 import com.etrisad.zenith.data.preferences.PerformanceConfig
 import com.etrisad.zenith.data.preferences.ThemeConfig
@@ -71,10 +73,13 @@ fun SettingsScreen(
                         showUpdateSheet = true
                     }
                     is GitHubUpdateManager.UpdateResult.NoUpdate -> {
-                        Toast.makeText(context, "Zenith is up to date!", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.zenith_is_up_to_date), Toast.LENGTH_SHORT).show()
                     }
                     is GitHubUpdateManager.UpdateResult.Error -> {
-                        Toast.makeText(context, "Update check failed: ${result.message}", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.update_check_failed, result.message), Toast.LENGTH_SHORT).show()
+                    }
+                    is GitHubUpdateManager.UpdateResult.Error -> {
+                        Toast.makeText(context, context.getString(R.string.update_check_failed, result.message), Toast.LENGTH_SHORT).show()
                     }
                 }
                 checkingForUpdate = false
@@ -89,7 +94,7 @@ fun SettingsScreen(
                 allReleases = releases
                 showChangelogSheet = true
             } else {
-                Toast.makeText(context, "Failed to fetch changelog", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.failed_to_fetch_changelog), Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -139,11 +144,11 @@ fun SettingsScreen(
 
             item {
                 Spacer(modifier = Modifier.height(16.dp))
-                PreferenceCategory(title = "Categories")
+                PreferenceCategory(title = stringResource(R.string.categories))
                 
                 SettingsActionItem(
-                    title = "Features",
-                    summary = "Mindful Gateway, Session Overlay, Early Kick, and more",
+                    title = stringResource(R.string.category_features),
+                    summary = stringResource(R.string.category_features_desc),
                     onClick = { navController.navigate(Screen.SettingsCategory.createRoute("Features")) },
                     icon = Icons.Outlined.AutoFixHigh,
                     shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
@@ -151,8 +156,8 @@ fun SettingsScreen(
                 
                 Spacer(modifier = Modifier.height(4.dp))
                 SettingsActionItem(
-                    title = "Appearance",
-                    summary = "Theme, Fonts, Dynamic Colors, and Layout",
+                    title = stringResource(R.string.category_appearance),
+                    summary = stringResource(R.string.category_appearance_desc),
                     onClick = { navController.navigate(Screen.SettingsCategory.createRoute("Appearance")) },
                     icon = Icons.Outlined.Palette,
                     shape = RoundedCornerShape(8.dp)
@@ -161,8 +166,8 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(4.dp))
                 val perfPreset = preferences.buildPerformanceConfig().detectPreset()
                 SettingsActionItem(
-                    title = "Performance",
-                    summary = "Responsiveness & battery balance",
+                    title = stringResource(R.string.category_performance),
+                    summary = stringResource(R.string.category_performance_desc),
                     onClick = { navController.navigate(Screen.SettingsCategory.createRoute("Performance")) },
                     icon = Icons.Outlined.Timer,
                     shape = RoundedCornerShape(8.dp),
@@ -184,8 +189,8 @@ fun SettingsScreen(
 
                 Spacer(modifier = Modifier.height(4.dp))
                 SettingsActionItem(
-                    title = "Data Management",
-                    summary = "Backup, Restore, and Usage Sync",
+                    title = stringResource(R.string.category_data_management),
+                    summary = stringResource(R.string.category_data_management_desc),
                     onClick = { navController.navigate(Screen.SettingsCategory.createRoute("Data Management")) },
                     icon = Icons.Outlined.Storage,
                     shape = if (preferences.developerModeEnabled) RoundedCornerShape(8.dp) else RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
@@ -194,8 +199,8 @@ fun SettingsScreen(
                 if (preferences.developerModeEnabled) {
                     Spacer(modifier = Modifier.height(4.dp))
                     SettingsActionItem(
-                        title = "Developer",
-                        summary = "Advanced debugging and experimental tools",
+                        title = stringResource(R.string.category_developer),
+                        summary = stringResource(R.string.category_developer_desc),
                         onClick = { navController.navigate(Screen.SettingsCategory.createRoute("Developer")) },
                         icon = Icons.Outlined.BugReport,
                         shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)

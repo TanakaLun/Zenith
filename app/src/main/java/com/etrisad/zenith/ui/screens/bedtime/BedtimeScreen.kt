@@ -59,6 +59,8 @@ import kotlinx.coroutines.withContext
 import java.time.Duration
 import java.time.LocalTime
 import java.util.Locale
+import com.etrisad.zenith.R
+import androidx.compose.ui.res.stringResource
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -208,7 +210,7 @@ fun BedtimeScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Usage",
+                        text = stringResource(R.string.usage_label),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -266,8 +268,8 @@ fun BedtimeScreen(
                                 )
                                 ZenithToggleButtonGroup(
                                     options = listOf(
-                                        ZenithToggleOption(text = "Usage", icon = Icons.Outlined.Sort),
-                                        ZenithToggleOption(text = "Recent", icon = Icons.Outlined.Schedule)
+                                        ZenithToggleOption(text = stringResource(R.string.usage_toggle), icon = Icons.Outlined.Sort),
+                                        ZenithToggleOption(text = stringResource(R.string.recent_toggle), icon = Icons.Outlined.Schedule)
                                     ),
                                     selectedIndices = setOf(if (hourlySortType == HourlySortType.USAGE_TIME) 0 else 1),
                                     onToggle = { index ->
@@ -401,7 +403,7 @@ fun BedtimeScreen(
                         targetMillis = bedtimeTargetMillis,
                         focusType = FocusType.SHIELD,
                         formatDuration = { viewModel.formatDuration(it) },
-                        title = "History",
+                        text = stringResource(R.string.history),
                         containerColor = containerColor,
                         shape = RoundedCornerShape(8.dp)
                     )
@@ -438,7 +440,7 @@ fun BedtimeScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Settings",
+                        text = stringResource(R.string.settings_label),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -462,8 +464,8 @@ fun BedtimeScreen(
                 Column(modifier = Modifier.animateItem()) {
                     FeatureCard(
                         icon = Icons.Outlined.NotificationsActive,
-                        title = "Wind Down Notification",
-                        subtitle = "Notify 30 minutes before bedtime",
+                title = stringResource(R.string.wind_down_notification),
+                subtitle = stringResource(R.string.wind_down_notification_desc),
                         enabled = preferences.bedtimeNotificationEnabled,
                         onToggle = { viewModel.setBedtimeNotificationEnabled(it) },
                         containerColor = containerColor,
@@ -477,8 +479,8 @@ fun BedtimeScreen(
                 Column(modifier = Modifier.animateItem()) {
                     FeatureCard(
                         icon = Icons.Outlined.DoNotDisturbOn,
-                        title = "Do Not Disturb",
-                        subtitle = "Silence notifications during bedtime",
+                title = stringResource(R.string.do_not_disturb),
+                subtitle = stringResource(R.string.do_not_disturb_desc),
                         enabled = preferences.bedtimeDndEnabled,
                         onToggle = { viewModel.setBedtimeDndEnabled(it) },
                         containerColor = containerColor,
@@ -492,8 +494,8 @@ fun BedtimeScreen(
                 Column(modifier = Modifier.animateItem()) {
                     FeatureCard(
                         icon = Icons.Outlined.Block,
-                        title = "Wind Down Restrictions",
-                        subtitle = "Restrict app usage 30-min before bedtime",
+                title = stringResource(R.string.wind_down_restrictions),
+                subtitle = stringResource(R.string.wind_down_restrictions_desc),
                         enabled = preferences.bedtimeWindDownEnabled,
                         onToggle = { viewModel.setBedtimeWindDownEnabled(it) },
                         containerColor = containerColor,
@@ -569,6 +571,7 @@ fun BedtimeStatusProgress(
     }
 
     val locale = LocalConfiguration.current.locales[0]
+    val context = androidx.compose.ui.platform.LocalContext.current
     val (label, remainingText, progressValue) = remember(currentTime, startTime, endTime, isBedtime, locale) {
         if (isBedtime) {
             val totalDuration = if (endTime.isAfter(startTime)) {
@@ -588,7 +591,7 @@ fun BedtimeStatusProgress(
             val minutes = remaining.toMinutes() % 60
             
             Triple(
-                "Bedtime ends in",
+                context.getString(R.string.bedtime_ends_in),
                 if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m",
                 (elapsed.toMinutes().toFloat() / totalDuration.toMinutes().toFloat()).coerceIn(0f, 1f)
             )
@@ -603,7 +606,7 @@ fun BedtimeStatusProgress(
             val minutes = timeToStart.toMinutes() % 60
             
             Triple(
-                "Starts in",
+                context.getString(R.string.bedtime_starts_in),
                 if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m",
                 1f - (timeToStart.toMinutes().toFloat() / (24 * 60).toFloat()).coerceIn(0f, 1f)
             )
@@ -809,7 +812,7 @@ fun BedtimeHourlyUsageChart(
             ) {
                 if (hourlyUsage.isNotEmpty()) {
                     Text(String.format(locale, "%02d:00", hourlyUsage.first().hour), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("Time distribution", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                    Text(stringResource(R.string.time_distribution), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
                     Text(String.format(locale, "%02d:00", (hourlyUsage.last().hour + 1) % 24), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
@@ -858,7 +861,7 @@ fun BedtimeEfficiencyCard(
                 Spacer(modifier = Modifier.width(16.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Usage Efficiency",
+                        text = stringResource(R.string.usage_efficiency),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -923,7 +926,7 @@ fun BedtimeEfficiencyCard(
                 ) {
                     Column {
                         Text(
-                            text = "Usage",
+                            text = stringResource(R.string.usage_label),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -1008,12 +1011,12 @@ fun BedtimeToggleCard(enabled: Boolean, onToggle: (Boolean) -> Unit) {
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Bedtime Mode",
+                    text = stringResource(R.string.bedtime_mode),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = if (enabled) "Active based on schedule" else "Currently disabled",
+                    text = if (enabled) stringResource(R.string.bedtime_active_schedule) else stringResource(R.string.bedtime_disabled),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -1546,10 +1549,9 @@ fun TimePickerDialog(
             TextButton(onClick = {
                 val time = String.format(locale, "%02d:%02d", timeState.hour, timeState.minute)
                 onTimeSelected(time)
-            }) { Text("OK") }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            }) { Text(stringResource(R.string.ok)) }
+
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         },
         text = {
             TimePicker(state = timeState)

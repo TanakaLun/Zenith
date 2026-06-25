@@ -27,6 +27,8 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.graphics.shapes.toPath
+import com.etrisad.zenith.R
+import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -335,9 +337,9 @@ fun PhaseTwoHold(durationMillis: Long, onComplete: () -> Unit) {
     }
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("Phase 2: Verification", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.phase_2_verification), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(8.dp))
-        Text("Hold the circle for ${durationMillis / 1000} seconds", style = MaterialTheme.typography.bodyMedium)
+        Text(stringResource(R.string.hold_circle_seconds, durationMillis / 1000), style = MaterialTheme.typography.bodyMedium)
         Spacer(modifier = Modifier.height(48.dp))
 
         Box(
@@ -392,9 +394,9 @@ fun PhaseThreeLoading(durationMillis: Long, onComplete: () -> Unit) {
     }
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("Phase 3: Processing", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.phase_3_processing), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(8.dp))
-        Text("Finalizing permission...", style = MaterialTheme.typography.bodyMedium)
+        Text(stringResource(R.string.finalizing_permission), style = MaterialTheme.typography.bodyMedium)
         Spacer(modifier = Modifier.height(48.dp))
 
         CircularWavyProgressIndicator(
@@ -408,9 +410,9 @@ fun PhaseThreeLoading(durationMillis: Long, onComplete: () -> Unit) {
 @Composable
 fun PhaseFourSelection(onConfirm: (Int?) -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("Access Granted", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.access_granted), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(8.dp))
-        Text("How long should we pause?", style = MaterialTheme.typography.bodyMedium)
+        Text(stringResource(R.string.how_long_should_we_pause), style = MaterialTheme.typography.bodyMedium)
         Spacer(modifier = Modifier.height(32.dp))
 
         val options = listOf(

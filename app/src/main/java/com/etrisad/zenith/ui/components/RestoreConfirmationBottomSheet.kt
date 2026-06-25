@@ -28,6 +28,8 @@ import com.etrisad.zenith.data.preferences.UserPreferences
 import com.etrisad.zenith.ui.viewmodel.AppUsageInfo
 import com.etrisad.zenith.ui.viewmodel.DailyUsage
 import com.etrisad.zenith.ui.viewmodel.HourlyUsageInfo
+import com.etrisad.zenith.R
+import androidx.compose.ui.res.stringResource
 import com.etrisad.zenith.util.BackupUtils
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -411,7 +413,7 @@ private fun HourlyDetail(preferences: UserPreferences, metadata: BackupUtils.Bac
             modifier = Modifier.fillMaxWidth().padding(32.dp),
             contentAlignment = Alignment.Center
         ) {
-            Text("No hourly data available", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.no_hourly_data), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     } else {
         val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
@@ -462,7 +464,7 @@ private fun PiechartDetail(preferences: UserPreferences, metadata: BackupUtils.B
             modifier = Modifier.fillMaxWidth().padding(32.dp),
             contentAlignment = Alignment.Center
         ) {
-            Text("No app breakdown available", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.no_app_breakdown), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     } else {
         val context = LocalContext.current

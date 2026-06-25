@@ -18,6 +18,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.stringResource
+import com.etrisad.zenith.R
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -141,7 +143,7 @@ fun PermissionScreen(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp)
                 ) {
-                    Text("Continue to App", modifier = Modifier.padding(vertical = 8.dp))
+                    Text(stringResource(R.string.continue_to_app), modifier = Modifier.padding(vertical = 8.dp))
                 }
             } else {
                 Text(
@@ -199,7 +201,7 @@ private fun PermissionItemCard(
                         shape = RoundedCornerShape(12.dp),
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp)
                     ) {
-                        Text("Grant", style = MaterialTheme.typography.labelLarge)
+                        Text(stringResource(R.string.grant), style = MaterialTheme.typography.labelLarge)
                     }
                 }
             },

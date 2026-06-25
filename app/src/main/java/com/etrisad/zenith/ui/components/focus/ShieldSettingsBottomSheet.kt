@@ -28,6 +28,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.background
 import com.etrisad.zenith.data.local.entity.ShieldEntity
 import com.etrisad.zenith.data.preferences.UserPreferences
+import com.etrisad.zenith.R
+import androidx.compose.ui.res.stringResource
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
 import com.etrisad.zenith.ui.components.ZenithButton
 import com.etrisad.zenith.ui.viewmodel.AppInfo
@@ -198,7 +200,7 @@ fun ShieldSettingsBottomSheet(
                     OutlinedTextField(
                         value = maxUses,
                         onValueChange = { if (it.all { char -> char.isDigit() }) maxUses = it },
-                        label = { Text("Times of Uses") },
+                        label = { Text(stringResource(R.string.times_of_uses)) },
                         modifier = Modifier.weight(1f),
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                             keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
@@ -216,7 +218,7 @@ fun ShieldSettingsBottomSheet(
                                 ?: "Custom",
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text("Refresh Period") },
+                            label = { Text(stringResource(R.string.refresh_period)) },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isDropdownExpanded) },
                             modifier = Modifier.menuAnchor(
                                 ExposedDropdownMenuAnchorType.PrimaryNotEditable,
@@ -245,7 +247,7 @@ fun ShieldSettingsBottomSheet(
                 OutlinedTextField(
                     value = maxEmergencyUses,
                     onValueChange = { if (it.all { char -> char.isDigit() }) maxEmergencyUses = it },
-                    label = { Text("Max Emergency Uses") },
+                    label = { Text(stringResource(R.string.emergency_uses_left_label)) },
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                         keyboardType = androidx.compose.ui.text.input.KeyboardType.Number

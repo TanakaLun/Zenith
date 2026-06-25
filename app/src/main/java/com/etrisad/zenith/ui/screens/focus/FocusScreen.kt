@@ -47,6 +47,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
+import com.etrisad.zenith.R
 import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -187,7 +189,7 @@ fun FocusScreen(
                     isAppPickerOpen.value = true
                 },
                 icon = { Icon(Icons.Outlined.Shield, contentDescription = null) },
-                text = { Text("Add Shield") }
+                text = { Text(stringResource(R.string.add_shield)) }
             )
 
             ExpressiveFabMenuItem(
@@ -197,7 +199,7 @@ fun FocusScreen(
                     isAppPickerOpen.value = true
                 },
                 icon = { Icon(Icons.Outlined.Flag, contentDescription = null) },
-                text = { Text("Add Goal") }
+                text = { Text(stringResource(R.string.add_goal)) }
             )
 
             ExpressiveFabMenuItem(
@@ -206,7 +208,7 @@ fun FocusScreen(
                     viewModel.openSchedulePicker()
                 },
                 icon = { Icon(Icons.Outlined.Schedule, contentDescription = null) },
-                text = { Text("Add Schedule") }
+                text = { Text(stringResource(R.string.add_schedule)) }
             )
         }
 
@@ -365,7 +367,7 @@ fun FocusScreenContent(
     ) {
         item {
             ShieldSortHeader(
-                title = "Active Goals",
+                title = stringResource(R.string.active_goals),
                 currentSortType = uiState.goalSortType,
                 onSortTypeChange = onGoalSortTypeChange
             )
@@ -381,7 +383,7 @@ fun FocusScreenContent(
                         containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                     )
                 ) {
-                    EmptyFocusMessage(message = "No active goals yet")
+                    EmptyFocusMessage(message = stringResource(R.string.no_active_goals_yet))
                 }
             }
         } else {
@@ -432,7 +434,7 @@ fun FocusScreenContent(
 
         item {
             ShieldSortHeader(
-                title = "Active Shields",
+                title = stringResource(R.string.active_shields),
                 currentSortType = uiState.shieldSortType,
                 onSortTypeChange = onShieldSortTypeChange
             )
@@ -470,13 +472,13 @@ fun FocusScreenContent(
                         Spacer(modifier = Modifier.width(16.dp))
                         Column {
                             Text(
-                                text = "Shields are currently locked",
+                                text = stringResource(R.string.shields_are_locked),
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
                             Text(
-                                text = "Reach 100% on all your app goals to unlock your shielded apps and use them freely!",
+                                text = stringResource(R.string.shields_locked_desc),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                             )
@@ -495,7 +497,7 @@ fun FocusScreenContent(
                         containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                     )
                 ) {
-                    EmptyFocusMessage(message = "No active shields yet")
+                    EmptyFocusMessage(message = stringResource(R.string.no_active_shields_yet))
                 }
             }
         } else {
@@ -546,7 +548,7 @@ fun FocusScreenContent(
 
         item {
             Text(
-                text = "Active Schedules",
+                text = stringResource(R.string.active_schedules),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
@@ -563,7 +565,7 @@ fun FocusScreenContent(
                         containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                     )
                 ) {
-                    EmptyFocusMessage(message = "No active schedules yet")
+                    EmptyFocusMessage(message = stringResource(R.string.no_active_schedules_yet))
                 }
             }
         } else {
@@ -798,7 +800,7 @@ fun ScheduleItem(
                 headlineContent = { Text(schedule.name, fontWeight = FontWeight.Bold, color = contentColor) },
                 supportingContent = {
                     val modeText = schedule.mode.name.lowercase().replaceFirstChar { it.uppercase() }
-                    val statusText = if (isActiveNow) "Active" else "Inactive"
+                    val statusText = if (isActiveNow) stringResource(R.string.schedule_active) else stringResource(R.string.schedule_inactive)
                     Column {
                         Text(
                             text = "${schedule.startTime} - ${schedule.endTime} • $modeText • $statusText • ${schedule.packageNames.size} apps",
@@ -859,14 +861,14 @@ fun ScheduleItem(
                             IconButton(onClick = onEdit) {
                                 Icon(
                                     imageVector = Icons.Outlined.Edit,
-                                    contentDescription = "Edit",
+                                    contentDescription = stringResource(R.string.edit),
                                     tint = if (isSelected) contentColor else MaterialTheme.colorScheme.primary
                                 )
                             }
                             IconButton(onClick = onDelete) {
                                 Icon(
                                     imageVector = Icons.Outlined.Delete,
-                                    contentDescription = "Delete",
+                                    contentDescription = stringResource(R.string.delete),
                                     tint = if (isSelected) contentColor else MaterialTheme.colorScheme.error
                                 )
                             }
@@ -1122,13 +1124,13 @@ fun ShieldConfigItem(
 
                     val hours = shield.timeLimitMinutes / 60
                     val mins = shield.timeLimitMinutes % 60
-                    val typeText = if (shield.type == FocusType.GOAL) "target" else "limit"
+                    val typeText = if (shield.type == FocusType.GOAL) stringResource(R.string.shield_type_target) else stringResource(R.string.shield_type_limit)
                     val limitText = if (hours > 0) "${hours}h ${mins}m $typeText" else "${mins}m $typeText"
 
                     val statusText = if (shield.type == FocusType.GOAL) {
-                        "Productive"
+                        stringResource(R.string.shield_status_productive)
                     } else {
-                        if (shield.isStrictModeEnabled) "Strict" else "Normal"
+                        if (shield.isStrictModeEnabled) stringResource(R.string.shield_status_strict) else stringResource(R.string.shield_status_normal)
                     }
 
                     Text(
@@ -1137,7 +1139,7 @@ fun ShieldConfigItem(
                         color = secondaryColor
                     )
 
-                    val timeLabel = if (shield.type == FocusType.GOAL) "To Go" else "Left"
+                    val timeLabel = if (shield.type == FocusType.GOAL) stringResource(R.string.to_go) else stringResource(R.string.left)
                     val timeText = if (usesExhausted && remainingResetMillis > 0) {
                         "Reset in ${formatRemainingTime(remainingResetMillis)}"
                     } else {

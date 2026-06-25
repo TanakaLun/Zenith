@@ -31,6 +31,8 @@ import com.etrisad.zenith.ui.screens.bedtime.DaysSelectionCard
 import com.etrisad.zenith.ui.screens.bedtime.TimePickerDialog
 import com.etrisad.zenith.ui.screens.bedtime.TimeSelectionRow
 import com.etrisad.zenith.ui.viewmodel.GracePeriodViewModel
+import com.etrisad.zenith.R
+import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.delay
 import java.time.Duration
 import java.time.LocalTime
@@ -139,7 +141,7 @@ fun GracePeriodScreen(
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
-                            text = "Grace Period overrides all restrictions. Shields, schedules, and bedtime will not block any apps while active.",
+                            text = stringResource(R.string.grace_period_desc_info),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -224,12 +226,12 @@ fun GracePeriodToggleCard(enabled: Boolean, onToggle: (Boolean) -> Unit) {
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Grace Period",
+                    text = stringResource(R.string.grace_period),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = if (enabled) "All apps are temporarily unblocked" else "Currently disabled",
+                    text = if (enabled) stringResource(R.string.grace_period_desc_active) else stringResource(R.string.bedtime_disabled),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -292,6 +294,7 @@ fun GracePeriodStatusProgress(
         currentTime.isAfter(startTime) || currentTime.isBefore(endTime)
     }
 
+    val context = androidx.compose.ui.platform.LocalContext.current
     val (label, remainingText, progressValue) = remember(currentTime, startTime, endTime, isGracePeriod) {
         if (isGracePeriod) {
             val totalDuration = if (endTime.isAfter(startTime)) {
@@ -308,7 +311,7 @@ fun GracePeriodStatusProgress(
             val hours = remaining.toHours()
             val minutes = remaining.toMinutes() % 60
             Triple(
-                "Grace period ends in",
+                context.getString(R.string.grace_period_ends_in),
                 if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m",
                 (elapsed.toMinutes().toFloat() / totalDuration.toMinutes().toFloat()).coerceIn(0f, 1f)
             )
@@ -321,7 +324,7 @@ fun GracePeriodStatusProgress(
             val hours = timeToStart.toHours()
             val minutes = timeToStart.toMinutes() % 60
             Triple(
-                "Starts in",
+                context.getString(R.string.bedtime_starts_in),
                 if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m",
                 1f - (timeToStart.toMinutes().toFloat() / (24 * 60).toFloat()).coerceIn(0f, 1f)
             )

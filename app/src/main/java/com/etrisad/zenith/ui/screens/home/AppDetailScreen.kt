@@ -52,6 +52,8 @@ import com.etrisad.zenith.ui.components.focus.GoalSettingsBottomSheet
 import com.etrisad.zenith.ui.components.focus.ShieldSettingsBottomSheet
 import com.etrisad.zenith.ui.viewmodel.AppInfo
 import com.etrisad.zenith.ui.viewmodel.HomeViewModel
+import com.etrisad.zenith.R
+import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -197,7 +199,7 @@ fun AppDetailScreen(
 
                     item {
                         UsageCard(
-                            title = "Today's Usage",
+                            title = stringResource(R.string.todays_usage),
                             time = formatDuration(uiState.todayUsage),
                             targetMillis = targetMillis,
                             currentUsage = uiState.todayUsage,
@@ -244,7 +246,7 @@ fun AppDetailScreen(
                             showDatabaseIndicator = preferences.showDatabaseIndicator,
                             formatDuration = formatDuration,
                             onDaySelected = { },
-                            title = "History (21 Days)",
+                            title = stringResource(R.string.history_21_days),
                             shape = RoundedCornerShape(8.dp)
                         )
                         Spacer(modifier = Modifier.height(4.dp))
@@ -775,7 +777,7 @@ fun UsageTrendsRow(
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    "Yesterday",
+                    stringResource(R.string.yesterday),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -797,7 +799,7 @@ fun UsageTrendsRow(
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    "Trend",
+                    stringResource(R.string.trend),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -859,7 +861,7 @@ fun StreakCard(
         ) {
             Column {
                 Text(
-                    text = "Streak",
+                    text = stringResource(R.string.streak),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold
@@ -872,7 +874,7 @@ fun StreakCard(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "Best Streak",
+                    text = stringResource(R.string.best_streak),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline
                 )
@@ -895,7 +897,7 @@ fun StreakCard(
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "days today",
+                    text = stringResource(R.string.days_today),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -933,13 +935,13 @@ fun PauseShieldCard(
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(
-                        "Pause Shield/Goal",
+                        stringResource(R.string.pause_shield_goal),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.secondary
                     )
                     Text(
-                        "Temporarily disable limits",
+                        stringResource(R.string.temporarily_disable_limits),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1001,13 +1003,13 @@ fun ResumeCard(
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(
-                            "Shield Paused",
+                            text = stringResource(R.string.shield_paused),
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            if (remainingMillis == -1L) "Paused indefinitely"
-                            else "Resumes in ${formatDuration(remainingMillis)}",
+                            if (remainingMillis == -1L) stringResource(R.string.paused_indefinitely)
+                            else stringResource(R.string.resumes_in, formatDuration(remainingMillis)),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -1019,7 +1021,7 @@ fun ResumeCard(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text("Resume Now", style = MaterialTheme.typography.labelLarge)
+                    Text(stringResource(R.string.resume_now), style = MaterialTheme.typography.labelLarge)
                 }
             }
             

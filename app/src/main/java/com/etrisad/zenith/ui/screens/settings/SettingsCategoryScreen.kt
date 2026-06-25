@@ -13,7 +13,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.etrisad.zenith.R
 import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -32,6 +34,8 @@ import com.etrisad.zenith.ui.viewmodel.FocusViewModel
 import com.etrisad.zenith.ui.viewmodel.FocusViewModelFactory
 import com.etrisad.zenith.util.BackupUtils
 import com.etrisad.zenith.worker.BackupManager
+import com.etrisad.zenith.R
+import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.launch
 
 @Composable
@@ -87,9 +91,9 @@ fun SettingsCategoryScreen(
 
                     BackupUtils.backupDatabase(context, it).onSuccess {
                         preferencesRepository.setLastBackupTimestamp(System.currentTimeMillis())
-                        Toast.makeText(context, "Backup successful!", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.backup_successful), Toast.LENGTH_SHORT).show()
                     }.onFailure { e ->
-                        Toast.makeText(context, "Backup failed: ${e.message}", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, context.getString(R.string.backup_failed, e.message), Toast.LENGTH_LONG).show()
                     }
                 }
             }
@@ -126,7 +130,7 @@ fun SettingsCategoryScreen(
                         pendingRestoreUri = it
                         showRestoreSheet = true
                     } else {
-                        Toast.makeText(context, "Invalid backup file", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.invalid_backup_file), Toast.LENGTH_SHORT).show()
                     }
                 }
             }
@@ -152,7 +156,7 @@ fun SettingsCategoryScreen(
                         false
                     } else {
                         perfBackPressedOnce = true
-                        Toast.makeText(context, "Apply settings first before leaving", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.apply_settings_first), Toast.LENGTH_SHORT).show()
                         true
                     }
                 } else {
@@ -167,7 +171,7 @@ fun SettingsCategoryScreen(
                 navController.popBackStack()
             } else {
                 perfBackPressedOnce = true
-                Toast.makeText(context, "Apply settings first before leaving", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.apply_settings_first), Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -239,7 +243,7 @@ fun SettingsCategoryScreen(
                         onBackupNow = {
                             if (preferences.backupDirectoryUri.isNotEmpty()) {
                                 backupManager.runBackupNow(preferences.backupDirectoryUri)
-                                Toast.makeText(context, "Backup started...", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.backup_started), Toast.LENGTH_SHORT).show()
                             }
                         },
                         onBackup = { backupLauncher.launch("zenith_backup_${System.currentTimeMillis()}.db") },
@@ -288,7 +292,7 @@ fun SettingsCategoryScreen(
                                     latestRelease = release
                                     showUpdateSheet = true
                                 } else {
-                                    Toast.makeText(context, "Failed to fetch latest release", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, context.getString(R.string.failed_to_fetch_latest_release), Toast.LENGTH_SHORT).show()
                                 }
                             }
                         },
@@ -299,7 +303,7 @@ fun SettingsCategoryScreen(
                             coroutineScope.launch {
                                 preferencesRepository.setOnboardingStatsCompleted(false)
                                 onTriggerOnboardingStats()
-                                Toast.makeText(context, "Stats onboarding triggered", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.stats_onboarding_triggered), Toast.LENGTH_SHORT).show()
                                 navController.popBackStack(Screen.Settings.route, false)
                             }
                         },
@@ -307,7 +311,7 @@ fun SettingsCategoryScreen(
                             coroutineScope.launch {
                                 preferencesRepository.setOnboardingUpdateCompleted(false)
                                 onTriggerOnboardingUpdate()
-                                Toast.makeText(context, "Update onboarding triggered", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.update_onboarding_triggered), Toast.LENGTH_SHORT).show()
                                 navController.popBackStack(Screen.Settings.route, false)
                             }
                         },
@@ -316,9 +320,9 @@ fun SettingsCategoryScreen(
                             coroutineScope.launch {
                                 try {
                                     preferencesRepository.runManualStreakRecovery(app.shieldRepository)
-                                    Toast.makeText(context, "Streak recovery completed successfully!", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, context.getString(R.string.streak_recovery_completed), Toast.LENGTH_SHORT).show()
                                 } catch (e: Exception) {
-                                    Toast.makeText(context, "Recovery failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, context.getString(R.string.recovery_failed, e.message), Toast.LENGTH_SHORT).show()
                                 }
                             }
                         },
@@ -357,7 +361,7 @@ fun SettingsCategoryScreen(
                         end = 24.dp
                     ),
                 icon = { Icon(Icons.Outlined.Check, contentDescription = null) },
-                text = { Text("Apply Settings") },
+                text = { Text(stringResource(R.string.apply)) },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
             )
@@ -413,10 +417,10 @@ fun SettingsCategoryScreen(
                                 backupManager.scheduleBackup(currentBackupInterval, currentBackupUri)
                             }
 
-                            Toast.makeText(context, "Restore successful! Restarting app...", Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, context.getString(R.string.restore_successful), Toast.LENGTH_LONG).show()
                             BackupUtils.restartApp(context)
                         }.onFailure { e ->
-                            Toast.makeText(context, "Restore failed: ${e.message}", Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, context.getString(R.string.restore_failed, e.message), Toast.LENGTH_LONG).show()
                         }
                     }
                     showRestoreSheet = false

@@ -14,7 +14,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import com.etrisad.zenith.R
 import androidx.compose.ui.unit.dp
 import androidx.documentfile.provider.DocumentFile
 import com.etrisad.zenith.data.preferences.UserPreferences
@@ -38,11 +40,11 @@ fun DataManagementSettings(
     onRestore: () -> Unit
 ) {
     Column {
-        PreferenceCategory(title = "Backup & Restore")
+        PreferenceCategory(title = stringResource(R.string.settings_backup_and_restore))
 
         SettingsToggle(
-            title = "Auto Backup",
-            description = "Periodically backup your database to a folder",
+            title = stringResource(R.string.auto_backup),
+            description = stringResource(R.string.auto_backup_desc),
             checked = preferences.autoBackupEnabled,
             onCheckedChange = onAutoBackupEnabledChange,
             icon = Icons.Outlined.AutoMode,
@@ -72,8 +74,8 @@ fun DataManagementSettings(
 
         Spacer(modifier = Modifier.height(4.dp))
         SettingsActionItem(
-            title = "Manual Backup",
-            summary = "Save your settings and schedules to a file now",
+            title = stringResource(R.string.manual_backup),
+            summary = stringResource(R.string.manual_backup_desc),
             onClick = onBackup,
             icon = Icons.Outlined.Backup,
             shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
@@ -81,19 +83,19 @@ fun DataManagementSettings(
 
         Spacer(modifier = Modifier.height(4.dp))
         SettingsActionItem(
-            title = "Restore Data",
-            summary = "Load data from a previous backup file",
+            title = stringResource(R.string.restore_data),
+            summary = stringResource(R.string.restore_data_desc),
             onClick = onRestore,
             icon = Icons.Outlined.Restore,
             shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
         )
 
         Spacer(modifier = Modifier.height(16.dp))
-        PreferenceCategory(title = "Sync & Maintenance")
+        PreferenceCategory(title = stringResource(R.string.settings_sync_and_maintenance))
 
         SettingsToggle(
-            title = "Sync on Entry",
-            description = "Refresh usage stats every time you open the stats screen. Enable this if you experience data inconsistency.",
+            title = stringResource(R.string.sync_on_entry),
+            description = stringResource(R.string.sync_on_entry_desc),
             checked = preferences.refreshOnOpenUsageStats,
             onCheckedChange = onRefreshOnOpenUsageStatsChange,
             icon = Icons.Outlined.Sync,
@@ -167,7 +169,7 @@ fun AutoBackupSettings(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                text = "Auto Backup Configuration",
+                text = stringResource(R.string.auto_backup_config),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
@@ -203,9 +205,9 @@ fun AutoBackupSettings(
                     }
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Backup Location", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.backup_location), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
                         Text(
-                            text = if (directoryUri.isNotEmpty() && !isLocationValid) "Location inaccessible" else readablePath,
+                            text = if (directoryUri.isNotEmpty() && !isLocationValid) stringResource(R.string.location_inaccessible) else readablePath,
                             style = MaterialTheme.typography.bodySmall,
                             color = if (directoryUri.isEmpty() || !isLocationValid) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -253,7 +255,7 @@ fun AutoBackupSettings(
                     }
                     Spacer(modifier = Modifier.width(16.dp))
                     Column {
-                        Text("Last Backup", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.last_backup), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
                         Text(
                             text = lastBackupText,
                             style = MaterialTheme.typography.bodySmall,
@@ -267,7 +269,7 @@ fun AutoBackupSettings(
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Spacer(modifier = Modifier.height(16.dp))
 
-            Text("Backup Interval", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.backup_interval), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(12.dp))
             
             val intervals = listOf(3, 6, 12, 24)
@@ -283,7 +285,7 @@ fun AutoBackupSettings(
 
             ZenithButton(
                 onClick = onBackupNow,
-                text = "Backup Now",
+                text = stringResource(R.string.backup_now),
                 icon = Icons.Outlined.CloudUpload,
                 type = ZenithButtonType.Tonal,
                 size = ZenithButtonSize.Medium,

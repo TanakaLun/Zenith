@@ -28,6 +28,8 @@ import coil.compose.SubcomposeAsyncImage
 import com.etrisad.zenith.data.local.entity.ShieldEntity
 import com.etrisad.zenith.data.preferences.UserPreferences
 import com.etrisad.zenith.data.preferences.UserPreferencesRepository
+import com.etrisad.zenith.R
+import androidx.compose.ui.res.stringResource
 import com.etrisad.zenith.ui.components.ZenithButton
 import com.etrisad.zenith.ui.viewmodel.AppInfo
 import kotlinx.coroutines.launch
@@ -226,8 +228,8 @@ fun GoalSettingsBottomSheet(
                             ?: "Custom",
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("Remind of Goal") },
-                        supportingText = { Text("Zenith will nudge you to open this app") },
+                        label = { Text(stringResource(R.string.remind_of_goal)) },
+                        supportingText = { Text(stringResource(R.string.remind_of_goal_desc)) },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isGoalDropdownExpanded) },
                         modifier = Modifier
                             .fillMaxWidth()
