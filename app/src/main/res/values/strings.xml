@@ -177,7 +177,7 @@
     <string name="power_and_overlay">Power &amp; Overlay</string>
     <string name="goal_shield">Goal Shield</string>
     <string name="regular_shield">Regular Shield</string>
-    <string name="default">Default</string>
+    <string name="default_mode">Default</string>
     <string name="reset_all">Reset All</string>
     <string name="custom_profile_hint">Custom profile lets you tune every parameter manually</string>
     <string name="battery_warning_desc">This preset reduces background checking frequency to save battery. Consider enabling Accessibility Service for instant app detection without polling.</string>

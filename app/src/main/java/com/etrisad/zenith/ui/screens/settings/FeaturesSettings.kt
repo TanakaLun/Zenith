@@ -367,7 +367,7 @@ fun ForegroundNotificationStatusSelector(
             val modeOptions = listOf(
                 ForegroundNotificationStatusMode.DAILY_USAGE to "Usage",
                 ForegroundNotificationStatusMode.ACTIVE_FOCUS to "Focus",
-                ForegroundNotificationStatusMode.DEFAULT to "Default"
+                ForegroundNotificationStatusMode.DEFAULT to stringResource(R.string.notification_default)
             )
 
             ZenithToggleButtonGroup(

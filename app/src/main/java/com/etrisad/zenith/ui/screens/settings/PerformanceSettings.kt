@@ -643,7 +643,7 @@ fun PerformanceTuningPanel(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    GroupHeader("Default", Icons.Outlined.TouchApp)
+                    GroupHeader(stringResource(R.string.default_mode), Icons.Outlined.TouchApp)
                     Spacer(modifier = Modifier.height(8.dp))
                     DelaySliderItem(label = "Default Interval", description = "Used when nothing else is active", icon = Icons.Outlined.TouchApp, value = delayDefault, onValueChange = { v -> delayDefault = v; autoSwitch() }, onReset = { delayDefault = 1200L; autoSwitch() }, range = 100f..10000f)
                     Row(

@@ -403,7 +403,7 @@ fun GoalSettingsBottomSheet(
                                             val isFile = goalCallerSoundUri != null && goalCallerSoundUri?.startsWith("content://media") == false
 
                                             GroupedOptionButton(
-                                                label = "Default",
+                                                label = stringResource(R.string.default_mode),
                                                 selected = isDefault,
                                                 onClick = { goalCallerSoundUri = null },
                                                 isFirst = true,

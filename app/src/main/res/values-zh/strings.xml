@@ -177,7 +177,7 @@
     <string name="power_and_overlay">电源与覆盖层</string>
     <string name="goal_shield">目标护盾</string>
     <string name="regular_shield">常规护盾</string>
-    <string name="default">默认</string>
+    <string name="default_mode">默认</string>
     <string name="reset_all">全部重置</string>
     <string name="custom_profile_hint">自定义配置可手动调整每个参数</string>
     <string name="battery_warning_desc">此预设会降低后台检查频率以节省电池。建议启用无障碍服务以即时检测应用启动而无需轮询。</string>
