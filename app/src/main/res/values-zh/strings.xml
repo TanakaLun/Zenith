@@ -88,6 +88,7 @@
     <string name="session_usage_overlay_desc">在允许使用应用时显示剩余时间的浮动界面</string>
     <string name="show_current_event">显示当前事件</string>
     <string name="show_current_event_desc">在应用延迟期间显示当前日历事件及进度</string>
+    <string name="show_current_event_desc_no_permission">请在设置中授予日历访问权限</string>
     <string name="show_current_event_no_permission">请在设置中授予日历访问权限</string>
     <string name="status_notification">状态通知</string>
     <string name="status_notification_desc">选择 Zenith 在监控活动时显示的内容</string>

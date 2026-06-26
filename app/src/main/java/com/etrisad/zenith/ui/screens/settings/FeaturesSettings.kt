@@ -31,8 +31,6 @@ import com.etrisad.zenith.ui.components.ZenithButtonSize
 import com.etrisad.zenith.ui.components.ZenithToggleButtonGroup
 import com.etrisad.zenith.ui.components.ZenithToggleOption
 import com.google.accompanist.drawablepainter.rememberDrawablePainter
-import com.etrisad.zenith.R
-import androidx.compose.ui.res.stringResource
 
 @Composable
 fun FeaturesSettings(

@@ -13,8 +13,6 @@ import com.etrisad.zenith.R
 import com.etrisad.zenith.data.preferences.FontOption
 import com.etrisad.zenith.data.preferences.ThemeConfig
 import com.etrisad.zenith.data.preferences.UserPreferences
-import com.etrisad.zenith.R
-import androidx.compose.ui.res.stringResource
 
 @Composable
 fun AppearanceSettings(

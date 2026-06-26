@@ -403,7 +403,7 @@ fun BedtimeScreen(
                         targetMillis = bedtimeTargetMillis,
                         focusType = FocusType.SHIELD,
                         formatDuration = { viewModel.formatDuration(it) },
-                        text = stringResource(R.string.history),
+                        title = stringResource(R.string.history),
                         containerColor = containerColor,
                         shape = RoundedCornerShape(8.dp)
                     )

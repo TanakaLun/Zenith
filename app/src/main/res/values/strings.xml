@@ -88,6 +88,7 @@
     <string name="session_usage_overlay_desc">Show a floating HUD with remaining time when an app is allowed</string>
     <string name="show_current_event">Show Current Event</string>
     <string name="show_current_event_desc">Show your current calendar event with progress during app delay</string>
+    <string name="show_current_event_desc_no_permission">Grant Calendar Access permission in Settings to enable</string>
     <string name="show_current_event_no_permission">Grant Calendar Access permission in Settings to enable</string>
     <string name="status_notification">Status Notification</string>
     <string name="status_notification_desc">Choose what Zenith shows while monitoring is active</string>

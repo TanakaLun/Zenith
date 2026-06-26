@@ -34,8 +34,6 @@ import com.etrisad.zenith.ui.viewmodel.FocusViewModel
 import com.etrisad.zenith.ui.viewmodel.FocusViewModelFactory
 import com.etrisad.zenith.util.BackupUtils
 import com.etrisad.zenith.worker.BackupManager
-import com.etrisad.zenith.R
-import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.launch
 
 @Composable
