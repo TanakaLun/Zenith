@@ -300,7 +300,10 @@
     <string name="other_apps">Other Apps</string>
     <string name="apps_minimal_usage">%d apps with minimal usage</string>
     <string name="usage_toggle">Usage</string>
+    <string name="usage">Usage</string>
+    <string name="usage_recent">Usage</string>
     <string name="recent_toggle">Recent</string>
+    <string name="recent">Recent</string>
 
     <!-- Grace Period Screen -->
     <string name="grace_period_desc_active">All apps are temporarily unblocked</string>
